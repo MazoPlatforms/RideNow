@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-11-02T22:48:44.169Z",
+  "drivers": 1000,
+  "activeRides": 100,
+  "connections": 1100,
+  "locationUpdates": 2000,
+  "elapsedSeconds": 10.1,
+  "errors": 0,
+  "restP95Ms": 22,
+  "locationAckP95Ms": 75,
+  "realtimeP95Ms": 562,
+  "realtimeSamples": 200,
+  "notes": "Local single API, real PostgreSQL/PostGIS and Redis; Mazo routes. Does not benchmark WhatsApp, FCM, storage or dispatch throughput."
+}

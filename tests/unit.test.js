@@ -1,0 +1,87 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { calculateFare } from '../src/modules/pricing.js';
+import { normalizePhone } from '../src/modules/auth.js';
+import { encrypt, decrypt, hash, equal } from '../src/shared/crypto.js';
+import { loadConfig } from '../src/shared/config.js';
+import { createMaps } from '../src/adapters/maps.js';
+const plan = {
+  base_minor: 10000,
+  per_km_minor: 8000,
+  per_minute_minor: 1000,
+  waiting_minor: 2000,
+  minimum_minor: 10000,
+  surge: 1,
+};
+test('fare separates driving time and stop waiting with five free minutes', () => {
+  assert.equal(calculateFare(plan, 2000, 600, 420), 40000);
+  assert.equal(calculateFare({ ...plan, surge: 2 }, 2000, 600, 420), 66000);
+  assert.equal(calculateFare(plan, 0, 0, 299), 10000);
+});
+test('money rounds once to minor unit and enforces minimum', () => {
+  assert.equal(calculateFare({ ...plan, minimum_minor: 50000 }, 1, 1, 0), 50000);
+  assert.equal(
+    calculateFare(
+      { ...plan, base_minor: 0, minimum_minor: 0, per_km_minor: 1, per_minute_minor: 0 },
+      1500,
+      0,
+    ),
+    2,
+  );
+});
+test('Sri Lankan mobile normalization rejects other countries', () => {
+  assert.equal(normalizePhone('077 123 4567'), '+94771234567');
+  assert.equal(normalizePhone('+94 (77) 123-4567'), '+94771234567');
+  assert.throws(() => normalizePhone('+917712345678'));
+});
+test('credential encryption authenticates ciphertext', () => {
+  const key = 'ab'.repeat(32),
+    encrypted = encrypt('private-credential', key);
+  assert.equal(decrypt(encrypted, key), 'private-credential');
+  const corrupted = Buffer.from(encrypted, 'base64');
+  corrupted[20] ^= 1;
+  assert.throws(() => decrypt(corrupted.toString('base64'), key));
+  assert(equal(hash('secret', 'pepper'), hash('secret', 'pepper')));
+  assert(!equal('abc', 'abcd'));
+});
+test('production rejects development OTP and insecure origins', () => {
+  assert.throws(() =>
+    loadConfig({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgres://localhost/test',
+      JWT_SECRET: 'x'.repeat(32),
+      OTP_PEPPER: 'y'.repeat(32),
+      ENCRYPTION_KEY: 'ab'.repeat(32),
+    }),
+  );
+});
+test('real Mazo graph verifies checksum, routes, matrix, search and coverage', async () => {
+  const maps = await createMaps({
+    MAP_GRAPH_PATH: 'data/kattankudy-routing.json',
+    MAP_MANIFEST_PATH: 'data/kattankudy-routing-manifest.json',
+    MAP_CATEGORY_APPROVALS: '',
+    NODE_ENV: 'test',
+  });
+  const points = [
+    [81.6973617, 7.7060005],
+    [81.7005996, 7.7099703],
+  ];
+  const route = await maps.route({ waypoints: points, vehicleCategory: 'TUK' });
+  assert(route.distanceMeters > 1000);
+  assert(route.legs[0].geometry.coordinates.length > 2);
+  assert((await maps.searchPlaces({ query: 'mosque' })).items.length > 0);
+  assert.equal(
+    (await maps.matrix({ origins: [[0, 0]], destination: points[0], vehicleCategory: 'TUK' }))[0],
+    null,
+  );
+  await assert.rejects(
+    maps.route({
+      waypoints: [
+        [0, 0],
+        [1, 1],
+      ],
+      vehicleCategory: 'TUK',
+    }),
+    { code: 'ROUTE_UNAVAILABLE' },
+  );
+});

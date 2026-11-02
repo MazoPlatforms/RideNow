@@ -1,0 +1,53 @@
+name: backend
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4-alpine
+        env:
+          POSTGRES_USER: ride
+          POSTGRES_PASSWORD: ride
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ride"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+      storage:
+        image: rustfs/rustfs:1.0.0-alpha.83
+        env:
+          RUSTFS_VOLUMES: /data
+          RUSTFS_ADDRESS: 0.0.0.0:9000
+          RUSTFS_CONSOLE_ENABLE: "false"
+          RUSTFS_ACCESS_KEY: ride-local
+          RUSTFS_SECRET_KEY: ride-local-password
+        ports: ['9000:9000']
+        options: >-
+          --user 0:0
+          --health-cmd "curl -fsS http://localhost:9000/health"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:all
+      - run: npm run test:storage
+      - run: npm run docs:api
+      - run: git diff --exit-code -- docs/openapi.json
+      - run: npm audit --omit=dev --audit-level=moderate
+      - run: npm run test:load
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-report
+          path: docs/load-report.json

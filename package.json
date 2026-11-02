@@ -1,0 +1,55 @@
+{
+  "name": "mazo-ride-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/processes/api.js",
+    "worker": "node --env-file-if-exists=.env src/processes/worker.js",
+    "whatsapp": "node --env-file-if-exists=.env src/processes/whatsapp.js",
+    "migrate": "node --env-file-if-exists=.env scripts/migrate.js",
+    "seed": "node --env-file-if-exists=.env scripts/seed.js",
+    "admin:create": "node --env-file-if-exists=.env scripts/admin.js",
+    "test": "node --test tests/unit.test.js",
+    "test:integration": "NODE_ENV=test node --test --test-concurrency=1 tests/integration.test.js",
+    "test:all": "npm test && npm run test:integration",
+    "check": "find src scripts tests -name '*.js' -exec node --check {} +",
+    "docs:api": "node scripts/export-openapi.js",
+    "test:load": "node scripts/load-test.js",
+    "storage:init": "node --env-file-if-exists=.env scripts/storage-init.js",
+    "otp:dev": "node --env-file-if-exists=.env scripts/development-deliveries.js",
+    "demo": "node scripts/demo.js",
+    "test:storage": "node --test tests/storage.test.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.900.0",
+    "@aws-sdk/s3-request-presigner": "^3.900.0",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "@whiskeysockets/baileys": "^6.7.21",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "decimal.js": "^10.6.0",
+    "express": "^5.1.0",
+    "firebase-admin": "^14.5.0",
+    "helmet": "^8.1.0",
+    "jose": "^6.1.0",
+    "node-pg-migrate": "^9.0.0",
+    "otpauth": "^9.4.1",
+    "pg": "^8.16.3",
+    "pino": "^10.0.0",
+    "redis": "^5.8.2",
+    "socket.io": "^4.8.1",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.1",
+    "supertest": "^7.1.4",
+    "yaml": "^2.8.1"
+  },
+  "overrides": {
+    "glob": "^14.0.3"
+  }
+}
