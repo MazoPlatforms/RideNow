@@ -10,3 +10,8 @@ coverage/
 /library-files/
 /scratch/
 /shared/
+
+# Live-provider reports and session exports
+whatsapp-smoke-report.json
+creds.json
+auth_info_baileys/

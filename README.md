@@ -40,6 +40,8 @@ npm run otp:dev
 
 ### WhatsApp மற்றும் நிர்வாகி
 
+உண்மையான செய்தி அனுப்பும் GitHub சோதனை: [WhatsApp சோதனை வழிமுறைகள்](docs/whatsapp-testing.md). `production` Environment-ன் `WA_AUTH_CREDS` secret-ஐப் பயன்படுத்தும் தனி manual workflow வழங்கப்பட்டுள்ளது.
+
 `OTP_PROVIDER=baileys` அமைத்து `npm run whatsapp` இயக்கவும். Terminal-ல் வரும் pairing QR payload-ஐ நம்பகமான local QR renderer-ல் காட்டி account-ஐ இணைக்கவும். QR payload-ஐ public QR இணையதளங்களில் பகிரக்கூடாது. Gateway credentials database-ல் AES-256-GCM மூலம் encrypt செய்யப்படும்; ஒரே gateway மட்டுமே advisory lock பெறும்.
 
 Baileys அதிகாரப்பூர்வ WhatsApp Business API அல்ல. இணைப்பு இல்லையெனில் OTP request `503 OTP_PROVIDER_UNAVAILABLE`; மாற்று provider இணைக்க authentication code-ஐ மாற்றாமல் gateway adapter-ஐ மாற்றலாம். SMS adapter இந்த வெளியீட்டில் இல்லை.

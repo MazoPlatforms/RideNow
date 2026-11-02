@@ -1,0 +1,67 @@
+name: WhatsApp நேரடிச் சோதனை
+on:
+  workflow_dispatch:
+    inputs:
+      recipient:
+        description: 'ஒரு சோதனை OTP பெறும் இலங்கை WhatsApp எண் (94 உடன்)'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: whatsapp-live-production
+  cancel-in-progress: false
+jobs:
+  smoke:
+    name: ஒரு உண்மையான OTP மற்றும் delivery சோதனை
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4-alpine
+        env:
+          POSTGRES_USER: ride
+          POSTGRES_PASSWORD: ride
+          POSTGRES_DB: whatsapp_smoke_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ride -d whatsapp_smoke_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    env:
+      DATABASE_URL: postgres://ride:ride@localhost:5432/whatsapp_smoke_test
+      REDIS_URL: redis://localhost:6379/13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run migrate
+      - name: பெறுநர் எண்ணைப் பதிவுகளில் மறைத்தல்
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync,appendFileSync} from 'node:fs';
+          const phone=String(JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH,'utf8')).inputs.recipient).replace(/^\+/,'');
+          if(!/^947\d{8}$/.test(phone))throw new Error('A valid Sri Lankan mobile number is required');
+          console.log(`::add-mask::${phone}`);
+          console.log(`::add-mask::+${phone}`);
+          appendFileSync(process.env.GITHUB_ENV,`WA_TEST_RECIPIENT=${phone}\n`);
+          JS
+      - name: ஒரு OTP அனுப்புதல் மற்றும் உறுதிப்படுத்துதல்
+        env:
+          WA_AUTH_CREDS: ${{ secrets.WA_AUTH_CREDS }}
+        run: npm run test:whatsapp:live
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: whatsapp-smoke-report
+          path: whatsapp-smoke-report.json
+          if-no-files-found: ignore
+          retention-days: 3

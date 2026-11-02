@@ -1,14 +1,13 @@
-import makeWASocketExport, {
-  initAuthCreds,
-  BufferJSON,
-  proto,
-  DisconnectReason,
-} from '@whiskeysockets/baileys';
+import makeWASocketExport, { DisconnectReason } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { loadConfig } from '../shared/config.js';
 import { database, one } from '../shared/db.js';
-import { encrypt, decrypt } from '../shared/crypto.js';
+import { createWhatsAppAuth } from '../adapters/whatsapp-auth.js';
+import { deliverWhatsAppOtp } from '../adapters/whatsapp-otp.js';
 import { claimJob, finishJob } from '../worker.js';
+// Signal's console diagnostics can include private session keys.
+for (const method of ['log', 'info', 'warn', 'error', 'debug', 'trace', 'dir', 'table'])
+  console[method] = () => {};
 const config = loadConfig();
 if (config.OTP_PROVIDER !== 'baileys') throw new Error('Set OTP_PROVIDER=baileys');
 const pool = database(config.DATABASE_URL),
@@ -18,36 +17,7 @@ if (!(await one(lock, 'SELECT pg_try_advisory_lock(927561) AS locked')).locked)
 const makeWASocket =
   typeof makeWASocketExport === 'function' ? makeWASocketExport : makeWASocketExport.default;
 const logger = pino({ level: 'silent' });
-const read = async (id) => {
-  const row = await one(pool, 'SELECT value FROM gateway_credentials WHERE id=$1', [id]);
-  return row ? JSON.parse(decrypt(row.value, config.ENCRYPTION_KEY), BufferJSON.reviver) : null;
-};
-const save = async (id, value) => {
-  await pool.query(
-    'INSERT INTO gateway_credentials(id,value) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET value=$2,updated_at=now()',
-    [id, encrypt(JSON.stringify(value, BufferJSON.replacer), config.ENCRYPTION_KEY)],
-  );
-};
-const creds = (await read('creds')) ?? initAuthCreds();
-const keys = {
-  async get(type, ids) {
-    const values = {};
-    for (const id of ids) {
-      let value = await read(`${type}:${id}`);
-      if (type === 'app-state-sync-key' && value)
-        value = proto.Message.AppStateSyncKeyData.fromObject(value);
-      values[id] = value;
-    }
-    return values;
-  },
-  async set(data) {
-    for (const [type, values] of Object.entries(data))
-      for (const [id, value] of Object.entries(values)) {
-        if (value) await save(`${type}:${id}`, value);
-        else await pool.query('DELETE FROM gateway_credentials WHERE id=$1', [`${type}:${id}`]);
-      }
-  },
-};
+const auth = await createWhatsAppAuth(pool, config);
 let running = true,
   connected = false,
   socket,
@@ -59,13 +29,13 @@ const ready = async (value) =>
   );
 function connect() {
   socket = makeWASocket({
-    auth: { creds, keys },
+    auth: auth.state,
     logger,
     markOnlineOnConnect: false,
     syncFullHistory: false,
   });
   socket.ev.on('creds.update', () =>
-    save('creds', creds).catch(() => {
+    auth.saveCreds().catch(() => {
       running = false;
     }),
   );
@@ -105,21 +75,7 @@ try {
       const job = await claimJob(pool, ['otp']);
       if (job) {
         try {
-          const c = await one(pool, 'SELECT * FROM otp_challenges WHERE id=$1', [
-            job.payload.challengeId,
-          ]);
-          if (c && !c.used_at && c.expires_at > Date.now()) {
-            const code = decrypt(job.payload.encryptedCode, config.ENCRYPTION_KEY);
-            await Promise.race([
-              socket.sendMessage(`${c.phone.slice(1)}@s.whatsapp.net`, {
-                text: `Mazo பயணச் சேவை OTP: ${code}. 5 நிமிடங்களில் காலாவதியாகும். இதைப் பகிர வேண்டாம்.`,
-              }),
-              new Promise((_, reject) => {
-                const t = setTimeout(() => reject(new Error('WhatsApp timeout')), 20000);
-                t.unref();
-              }),
-            ]);
-          }
+          await deliverWhatsAppOtp({ pool, socket, config, job });
           await finishJob(pool, job);
         } catch (e) {
           await finishJob(pool, job, e);
@@ -131,6 +87,7 @@ try {
 } finally {
   await ready(false);
   socket?.end();
+  await auth.flush();
   lock.release();
   await pool.end();
 }
