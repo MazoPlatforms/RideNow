@@ -21,7 +21,6 @@ export function parseWhatsAppSeed(value) {
     creds?.signedPreKey?.keyPair?.public,
   ];
   if (
-    !creds?.registered ||
     typeof creds.me?.id !== 'string' ||
     !buffers.every((b) => Buffer.isBuffer(b) && b.length === 32) ||
     !Buffer.isBuffer(creds.signedPreKey?.signature)

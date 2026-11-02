@@ -32,6 +32,7 @@ export async function deliverWhatsAppOtp({ pool, socket, config, job, demo = fal
 }
 
 export function trackWhatsAppReceipts(socket) {
+  const rejected = new Set();
   const states = new Map(),
     waits = new Map();
   const record = (id, level) => {
@@ -48,11 +49,23 @@ export function trackWhatsAppReceipts(socket) {
     for (const { key, receipt } of updates)
       if (receipt?.receiptTimestamp || receipt?.readTimestamp) record(key?.id, 3);
   };
+  const serverAck = (node) => {
+    if (node.attrs?.error) {
+      rejected.add(node.attrs.id);
+      if (waits.has(node.attrs.id)) waits.get(node.attrs.id)();
+    } else record(node.attrs?.id, 2);
+  };
+  const rawReceipt = (node) => {
+    if (node.attrs && [undefined, 'read', 'read-self', 'played'].includes(node.attrs.type))
+      record(node.attrs.id, 3);
+  };
+  socket.ws?.on('CB:ack,class:message', serverAck);
+  socket.ws?.on('CB:receipt', rawReceipt);
   socket.ev.on('messages.update', messages);
   socket.ev.on('message-receipt.update', receipts);
   return {
     async wait(id, timeoutMs = 60000) {
-      if ((states.get(id) ?? 0) < 3)
+      if (!rejected.has(id) && (states.get(id) ?? 0) < 3)
         await new Promise((resolve) => {
           const done = () => {
             clearTimeout(timer);
@@ -62,10 +75,13 @@ export function trackWhatsAppReceipts(socket) {
           const timer = setTimeout(done, timeoutMs);
           waits.set(id, done);
         });
+      if (rejected.has(id)) return 'rejected';
       const status = states.get(id) ?? 0;
       return status >= 3 ? 'delivered' : status >= 2 ? 'server_acknowledged' : 'unconfirmed';
     },
     close() {
+      socket.ws?.off('CB:ack,class:message', serverAck);
+      socket.ws?.off('CB:receipt', rawReceipt);
       socket.ev.off('messages.update', messages);
       socket.ev.off('message-receipt.update', receipts);
       for (const done of waits.values()) done();

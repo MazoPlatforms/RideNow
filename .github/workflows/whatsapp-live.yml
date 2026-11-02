@@ -6,6 +6,11 @@ on:
         description: 'ஒரு சோதனை OTP பெறும் இலங்கை WhatsApp எண் (94 உடன்)'
         required: true
         type: string
+      mode:
+        description: 'இணைப்பை மட்டும் சோதிக்கவா, ஒரு உண்மையான OTP அனுப்பவா?'
+        type: choice
+        default: connection-only
+        options: [connection-only, send-otp]
 permissions:
   contents: read
 concurrency:
@@ -35,6 +40,7 @@ jobs:
     env:
       DATABASE_URL: postgres://ride:ride@localhost:5432/whatsapp_smoke_test
       REDIS_URL: redis://localhost:6379/13
+      WA_TEST_MODE: ${{ inputs.mode }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

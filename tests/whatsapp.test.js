@@ -17,6 +17,12 @@ test('paired Baileys JSON restores binary keys without exposing malformed secret
   const creds = testCredentials(),
     seed = parseWhatsAppSeed(JSON.stringify(creds, BufferJSON.replacer));
   assert(seed.creds.noiseKey.private.equals(creds.noiseKey.private));
+  // QR-paired Baileys sessions may retain registered=false while me.id is present.
+  assert.equal(
+    parseWhatsAppSeed(JSON.stringify({ ...creds, registered: false }, BufferJSON.replacer)).creds.me
+      .id,
+    creds.me.id,
+  );
   const wrapped = parseWhatsAppSeed(
     JSON.stringify(
       { creds, keys: { session: { example: Buffer.from('session-key') } } },
@@ -75,6 +81,23 @@ test('server acknowledgement is distinguished from device delivery; early receip
     socket.ev.emit('messages.update', [{ key: { id: 'later' }, update: { status: 3 } }]);
     assert.equal(await waiting, 'delivered');
     assert.equal(await tracker.wait('unknown', 5), 'unconfirmed');
+  } finally {
+    tracker.close();
+  }
+});
+
+test('raw provider acknowledgements are retained when application events are buffered', async () => {
+  const socket = { ev: new EventEmitter(), ws: new EventEmitter() },
+    tracker = trackWhatsAppReceipts(socket);
+  try {
+    socket.ws.emit('CB:ack,class:message', { attrs: { id: 'raw-server' } });
+    assert.equal(await tracker.wait('raw-server', 5), 'server_acknowledged');
+    socket.ws.emit('CB:receipt', { attrs: { id: 'raw-device' } });
+    assert.equal(await tracker.wait('raw-device', 5), 'delivered');
+    socket.ws.emit('CB:ack,class:message', { attrs: { id: 'rejected', error: '479' } });
+    assert.equal(await tracker.wait('rejected', 5), 'rejected');
+    socket.ws.emit('CB:receipt', { attrs: { id: 'needs-retry', type: 'retry' } });
+    assert.equal(await tracker.wait('needs-retry', 5), 'unconfirmed');
   } finally {
     tracker.close();
   }

@@ -23,6 +23,9 @@ for (const method of ['log', 'info', 'warn', 'error', 'debug', 'trace', 'dir', '
   console[method] = () => {};
 const report = {
   startedAt: new Date().toISOString(),
+  mode: process.env.WA_TEST_MODE ?? 'send-otp',
+  recipientRegistered: false,
+  selfRecipient: false,
   credentialsImported: false,
   connected: false,
   sendAccepted: false,
@@ -101,6 +104,7 @@ async function connect(auth) {
   }
 }
 try {
+  check(['send-otp', 'connection-only'].includes(report.mode), 'WA_TEST_MODE_INVALID');
   check(process.env.WA_AUTH_CREDS?.trim(), 'WA_AUTH_CREDS_MISSING');
   const digits = (process.env.WA_TEST_RECIPIENT ?? '').replace(/^\+/, '');
   check(/^947\d{8}$/.test(digits), 'WA_TEST_RECIPIENT_INVALID');
@@ -130,75 +134,99 @@ try {
   report.connected = true;
   tracker = trackWhatsAppReceipts(socket);
   progress('whatsapp_connected');
-  await pool.query(
-    "INSERT INTO system_state(key,value) VALUES('whatsapp.ready','true') ON CONFLICT(key) DO UPDATE SET value='true',updated_at=now()",
-  );
-  redis = createClient({ url: config.REDIS_URL });
-  redis.on('error', () => {});
-  await redis.connect();
-  const maps = await createMaps(config),
-    { app } = createApp({
-      pool,
-      redis,
-      config,
-      maps,
-      storage: {},
-      logger: pino({ level: 'silent' }),
+  report.selfRecipient = waAuth.state.creds.me.id.split('@')[0].split(':')[0] === digits;
+  let lookupTimer;
+  const registered = await Promise.race([
+    socket.onWhatsApp(digits),
+    new Promise((_, reject) => {
+      lookupTimer = setTimeout(
+        () =>
+          reject(
+            Object.assign(new Error('Recipient lookup timeout'), {
+              code: 'WA_RECIPIENT_LOOKUP_TIMEOUT',
+            }),
+          ),
+        15000,
+      );
+    }),
+  ]).finally(() => clearTimeout(lookupTimer));
+  report.recipientRegistered = registered?.some((item) => item.exists) ?? false;
+  check(report.recipientRegistered, 'WA_RECIPIENT_NOT_REGISTERED');
+  progress('recipient_registered');
+  if (report.mode === 'send-otp') {
+    await pool.query(
+      "INSERT INTO system_state(key,value) VALUES('whatsapp.ready','true') ON CONFLICT(key) DO UPDATE SET value='true',updated_at=now()",
+    );
+    redis = createClient({ url: config.REDIS_URL });
+    redis.on('error', () => {});
+    await redis.connect();
+    const maps = await createMaps(config),
+      { app } = createApp({
+        pool,
+        redis,
+        config,
+        maps,
+        storage: {},
+        logger: pino({ level: 'silent' }),
+      });
+    server = createServer(app);
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const requested = await fetch(base + '/v1/auth/otp/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: `+${digits}` }),
     });
-  server = createServer(app);
-  server.listen(0, '127.0.0.1');
-  await once(server, 'listening');
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const requested = await fetch(base + '/v1/auth/otp/request', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone: `+${digits}` }),
-  });
-  check(requested.status === 202, 'OTP_REQUEST_FAILED');
-  const challenge = await requested.json(),
-    job = await claimJob(pool, ['otp']);
-  check(job?.payload.challengeId === challenge.challengeId, 'OTP_QUEUE_FAILED');
-  const code = decrypt(job.payload.encryptedCode, config.ENCRYPTION_KEY);
-  mask(code);
-  // Exactly one send attempt. Timeout/failure never automatically sends another OTP.
-  const sent = await deliverWhatsAppOtp({ pool, socket, config, job, demo: true });
-  check(!sent.skipped && sent.messageId, 'WA_SEND_NOT_ACCEPTED');
-  await finishJob(pool, job);
-  report.sendAccepted = true;
-  progress('otp_send_accepted');
-  const delivery = tracker.wait(sent.messageId, 60000);
-  const verified = await fetch(base + '/v1/auth/otp/verify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ challengeId: challenge.challengeId, code }),
-  });
-  check(verified.status === 200, 'OTP_VERIFICATION_FAILED');
-  const session = await verified.json();
-  mask(session.accessToken);
-  mask(session.refreshToken);
-  report.otpVerification = true;
-  const replay = await fetch(base + '/v1/auth/otp/verify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ challengeId: challenge.challengeId, code }),
-  });
-  check(replay.status === 401, 'OTP_REPLAY_NOT_REJECTED');
-  report.otpReplayRejected = true;
-  const headers = { Authorization: `Bearer ${session.accessToken}` };
-  check((await fetch(base + '/v1/me', { headers })).status === 200, 'AUTHENTICATED_REQUEST_FAILED');
-  check(
-    (await fetch(base + '/v1/auth/logout', { method: 'POST', headers })).status === 200,
-    'LOGOUT_FAILED',
-  );
-  check((await fetch(base + '/v1/me', { headers })).status === 401, 'SESSION_NOT_REVOKED');
-  report.sessionRevoked = true;
-  report.delivery = await delivery;
-  progress(
-    report.delivery === 'delivered'
-      ? 'device_delivery_acknowledged'
-      : 'device_delivery_not_confirmed',
-  );
-  check(report.delivery === 'delivered', 'WA_DEVICE_DELIVERY_UNCONFIRMED');
+    check(requested.status === 202, 'OTP_REQUEST_FAILED');
+    const challenge = await requested.json(),
+      job = await claimJob(pool, ['otp']);
+    check(job?.payload.challengeId === challenge.challengeId, 'OTP_QUEUE_FAILED');
+    const code = decrypt(job.payload.encryptedCode, config.ENCRYPTION_KEY);
+    mask(code);
+    // Exactly one send attempt. Timeout/failure never automatically sends another OTP.
+    const sent = await deliverWhatsAppOtp({ pool, socket, config, job, demo: true });
+    check(!sent.skipped && sent.messageId, 'WA_SEND_NOT_ACCEPTED');
+    await finishJob(pool, job);
+    report.sendAccepted = true;
+    progress('otp_send_accepted');
+    const delivery = tracker.wait(sent.messageId, 60000);
+    const verified = await fetch(base + '/v1/auth/otp/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeId: challenge.challengeId, code }),
+    });
+    check(verified.status === 200, 'OTP_VERIFICATION_FAILED');
+    const session = await verified.json();
+    mask(session.accessToken);
+    mask(session.refreshToken);
+    report.otpVerification = true;
+    const replay = await fetch(base + '/v1/auth/otp/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeId: challenge.challengeId, code }),
+    });
+    check(replay.status === 401, 'OTP_REPLAY_NOT_REJECTED');
+    report.otpReplayRejected = true;
+    const headers = { Authorization: `Bearer ${session.accessToken}` };
+    check(
+      (await fetch(base + '/v1/me', { headers })).status === 200,
+      'AUTHENTICATED_REQUEST_FAILED',
+    );
+    check(
+      (await fetch(base + '/v1/auth/logout', { method: 'POST', headers })).status === 200,
+      'LOGOUT_FAILED',
+    );
+    check((await fetch(base + '/v1/me', { headers })).status === 401, 'SESSION_NOT_REVOKED');
+    report.sessionRevoked = true;
+    report.delivery = await delivery;
+    progress(
+      report.delivery === 'delivered'
+        ? 'device_delivery_acknowledged'
+        : 'device_delivery_not_confirmed',
+    );
+    check(report.delivery === 'delivered', 'WA_DEVICE_DELIVERY_UNCONFIRMED');
+  }
   report.result = 'passed';
 } catch (error) {
   report.result = 'failed';
