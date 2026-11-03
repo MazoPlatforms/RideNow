@@ -79,11 +79,17 @@ export async function processJobs(deps) {
         ]);
         if (doc?.scan_status === 'PENDING') {
           const result = await storage.scan(doc);
-          await pool.query('UPDATE documents SET scan_status=$2,object_version=$3 WHERE id=$1', [
-            doc.id,
-            result.status,
-            result.version,
-          ]);
+          const updated = await pool.query(
+            "UPDATE documents SET scan_status=$2,object_version=$3,object_key=COALESCE($4,object_key) WHERE id=$1 AND scan_status='PENDING'",
+            [doc.id, result.status, result.version ?? null, result.verifiedKey ?? null],
+          );
+          if (!updated.rowCount && result.verifiedKey) {
+            try {
+              await storage.discardVerified(result.verifiedKey);
+            } catch {
+              logger.warn({ documentId: doc.id }, 'Unreferenced verified copy requires cleanup');
+            }
+          }
         }
       } else if (push) await push(job.payload);
       else throw Object.assign(new Error('Push unavailable'), { code: 'PUSH_DISABLED' });

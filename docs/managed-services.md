@@ -14,4 +14,4 @@
 
 Supabase-ல் ஏற்கெனவே அட்டவணைகள் இருந்தால், repository migrations-உடன் அவற்றின் columns/version history பொருந்துகிறதா என்று முதலில் பரிசீலிக்க வேண்டும். இந்த workflow தானாக migrations இயக்காது. Application tables-ஐ Data API-ல் வெளிப்படாத schema/அனுமதிகளுடன் அமைத்து, PostgreSQL role மற்றும் RLS access model-ஐ உறுதிசெய்த பிறகே deployment migration செய்ய வேண்டும்.
 
-Supabase Storage S3 versioning-ஐ ஆதரிக்காததால், தற்போதைய document scanner-ஐ அதற்கு மாற்ற தனி adapter மாற்றம் தேவை. PostgreSQL இணைப்பு வெற்றி என்பது Storage இணைப்பு வெற்றி அல்ல.
+Cloudflare R2-க்கு versioning தேவையில்லாத verified-copy முறை வழங்கப்பட்டுள்ளது; [R2 வழிமுறைகள்](r2-storage.md). Supabase Storage தனியாக இணைத்துச் சோதிக்கப்படவில்லை. PostgreSQL இணைப்பு வெற்றி என்பது Storage இணைப்பு வெற்றி அல்ல.

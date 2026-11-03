@@ -34,7 +34,7 @@ Driver lifecycle command: `POST /v1/rides/:id/actions`, body `{action,pin?}`. Ac
 2. அசல் Content-Type/Content-Length-உடன் upload செய்தல்.
 3. `POST /v1/drivers/documents/:id/submit` மூலம் scan queue-ல் சேர்த்தல்.
 4. Upload URL expiry-க்கு அப்பால் 6 நிமிடம் கழித்து scan நடைபெறும்; file signature மற்றும் ClamAV முடிவு சரிபார்க்கப்படும்.
-5. Scan செய்த exact S3 object version மட்டுமே review download-ல் வழங்கப்படும். Bucket versioning கட்டாயம்.
+5. Versioned S3-ல் scan செய்த exact object version வழங்கப்படும். R2-ல் scan செய்த bytes, பயனர் upload URL மூலம் மாற்ற முடியாத தனி verified key-ல் சேமிக்கப்படும்; review download அந்த நகலை மட்டுமே வழங்கும்.
 
 Driver: IDENTITY, LICENSE. Vehicle: REGISTRATION, INSURANCE. MIME: JPEG/PNG/PDF; அதிகபட்சம் 10 MiB. அனைத்து ஆவணங்களும் CLEAN, காலாவதியாகாத நிலையில் இருந்தால்தான் approval/availability செல்லும்.
 

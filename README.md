@@ -89,12 +89,12 @@ PostgreSQL/PostGIS, transactions, locks, constraints, migrations, Redis மற�
 
 ## Production தயார்நிலை
 
-Supabase/Upstash secrets மற்றும் நேரடி இணைப்புச் சோதனை: [வழிமுறைகள்](docs/managed-services.md).
+Supabase/Upstash secrets மற்றும் நேரடி இணைப்புச் சோதனை: [வழிமுறைகள்](docs/managed-services.md). Cloudflare R2: [சேமிப்பக வழிமுறைகள்](docs/r2-storage.md).
 
 Production-க்கு முன் [இயக்கக் கையேடு](docs/operations.md), [API ஒப்பந்தம்](docs/api.md), [பாதுகாப்பு மற்றும் தரவு விதிகள்](docs/security.md) ஆகியவற்றைப் பின்பற்றவும்.
 
 - உண்மையான fare/commission விகிதங்கள், service-area polygons, தேவையான ஆவணங்கள் மற்றும் retention சட்ட விதிகள் உறுதிசெய்யப்பட வேண்டும்.
-- Private versioned S3 bucket, ClamAV, FCM credentials, இணைக்கப்பட்ட Baileys account தேவை.
+- Private S3/R2 bucket, ClamAV, FCM credentials, இணைக்கப்பட்ட Baileys account தேவை. R2-க்கு scan செய்த bytes தனி verified நகலாகப் பாதுகாக்கப்படும்; versioned S3-க்கு object version pin பயன்படுத்தப்படும்.
 - `MAP_CATEGORY_APPROVALS`-ல் உறுதிசெய்யப்பட்ட வகைகளை மட்டும் குறிப்பிடவும். தற்போதைய graph-ல் turn-restriction relations இல்லை; பொதுவான driving பாதையை எல்லா வகைகளுக்கும் சட்டபூர்வமானதாகக் கருதக்கூடாது.
 - Production config HTTPS origins, Baileys, FCM, S3 ஆகியவற்றைக் கட்டாயப்படுத்தும். Routing coverage-க்கு வெளியே quote மறுக்கப்படும்; public demo OSRM fallback இல்லை.
 - Dockerfile வழங்கப்பட்டுள்ளது; இந்த பணிச்சூழலில் முழு application image build மற்றும் வெளிச்சேவை delivery smoke test இயக்கப்படவில்லை.

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { lookup } from 'node:dns/promises';
 import { writeFile } from 'node:fs/promises';
 import { createClient } from 'redis';
 import { database, one } from '../src/shared/db.js';
@@ -57,6 +58,15 @@ async function postgres() {
     const url = postgresConnectionString(process.env.DATABASE_URL),
       parsed = new URL(url);
     check(isSupabaseHost(parsed.hostname), 'SUPABASE_DATABASE_URL_REQUIRED');
+    report.postgres.connectionKind = parsed.hostname.endsWith('.pooler.supabase.com')
+      ? 'session_pooler'
+      : 'direct';
+    report.postgres.port = Number(parsed.port || 5432);
+    const addresses = await lookup(parsed.hostname, { all: true });
+    report.postgres.dns = {
+      ipv4: addresses.filter((a) => a.family === 4).length,
+      ipv6: addresses.filter((a) => a.family === 6).length,
+    };
     pool = database(url, { max: 1, connectionTimeoutMillis: 10000, query_timeout: 10000 });
     pool.on('error', () => {});
     client = await pool.connect();

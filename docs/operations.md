@@ -28,7 +28,7 @@ TLS verification அணைக்க வேண்டாம். Production image n
 
 - PostgreSQL: PostGIS, pgcrypto extensions; migrations-க்கு DDL role; application-க்கு குறைந்த permissions; TLS மற்றும் connection pool budget.
 - Redis: private network, authentication/TLS; rate limits மற்றும் socket adapter; business jobs PostgreSQL-ல் இருப்பதால் Redis restart-ல் அவை இழக்கப்படாது.
-- S3: private bucket, versioning; scan/download-க்கு object-version read permission; public read மறுப்பு. Browser upload origin-க்கு குறுகிய CORS policy.
+- Storage: private bucket. Versioned S3-க்கு object-version read permission; R2-க்கு Object Read & Write மற்றும் verified நகல்கள். Public read மறுப்பு; browser upload origin-க்கு குறுகிய CORS policy.
 - `S3_ENDPOINT`: backend internal endpoint. விருப்பமான `S3_PUBLIC_ENDPOINT`: browser அணுகக்கூடிய presign endpoint. இரண்டும் அதே bucket/credentials-ஐ குறிக்க வேண்டும்.
 - ClamAV: `CLAMAV_HOST`, `CLAMAV_PORT` (default 3310); private network; fresh signatures. Scanner இல்லாவிட்டால் documents PENDING-ல் இருக்கும்; approval முடியாது.
 - FCM: `FCM_ENABLED=true`; Application Default Credentials அல்லது mounted `GOOGLE_APPLICATION_CREDENTIALS`; valid app registration token-உடன் dry-run smoke test.
@@ -72,7 +72,7 @@ OTP காலாவதியான job-ஐ replay செய்ய வேண்�
 ## Backups மற்றும் rollback
 
 - Managed PostgreSQL PITR இயக்கவும்; தினசரி encrypted backup; மாதந்தோறும் isolated restore drill.
-- S3 versioning மற்றும் backup/lifecycle policy; document versions-ஐ retention முடியும் முன் purge செய்யக்கூடாது.
+- S3 versions அல்லது R2 verified objects-க்கு backup/lifecycle policy; approved ஆவணங்களை retention முடியும் முன் purge செய்யக்கூடாது.
 - `ENCRYPTION_KEY`, JWT/OTP secrets-ஐ secret manager-ல் backup செய்யவும். Encryption key இழந்தால் Baileys, MFA, PIN/idempotency பதிவுகளை decrypt செய்ய முடியாது.
 - Application rollback-ல் பழைய image-க்கு திரும்பவும்; additive database migration-ஐ அப்படியே வைத்திருக்கவும். Data rollback-க்கு PITR restore மற்றும் reconciliation தேவை.
 - SIGTERM API-ல் connections drain; worker தற்போதைய tick முடித்து நிற்கும். குறைந்தது 60 விநாடி termination grace கொடுக்கவும்.

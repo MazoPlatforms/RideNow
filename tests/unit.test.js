@@ -124,3 +124,17 @@ test('managed connection URLs enforce TLS and preserve local test connections', 
     null,
   );
 });
+
+test('R2 selects immutable verified copies without changing versioned S3 defaults', async () => {
+  const { storageSettings } = await import('../src/adapters/storage-settings.js');
+  const r2 = storageSettings({ S3_ENDPOINT: 'https://example.r2.cloudflarestorage.com' });
+  assert.equal(r2.r2, true);
+  assert.equal(r2.mode, 'immutable');
+  assert.equal(r2.options.region, 'auto');
+  assert.equal(r2.options.requestChecksumCalculation, 'WHEN_REQUIRED');
+  const s3 = storageSettings({ S3_ENDPOINT: 'http://localhost:9000' });
+  assert.equal(s3.mode, 'versioned');
+  assert.throws(() => storageSettings({ S3_ENDPOINT: 'http://example.r2.cloudflarestorage.com' }), {
+    code: 'R2_HTTPS_REQUIRED',
+  });
+});

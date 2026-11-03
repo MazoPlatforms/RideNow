@@ -786,3 +786,43 @@ test('WhatsApp credentials import is encrypted, retains Signal keys and never re
     ),
   );
 });
+
+test('concurrent scan jobs publish one immutable document reference and discard the unused copy', async () => {
+  const d = await driver();
+  const doc = await one(
+    pool,
+    "INSERT INTO documents(driver_id,kind,object_key,mime,bytes,expires_at) VALUES($1,'IDENTITY',$2,'application/pdf',100,now()+interval '1 year') RETURNING *",
+    [d.user.id, 'staging/' + randomUUID()],
+  );
+  await pool.query("INSERT INTO jobs(kind,payload) VALUES('scan',$1),('scan',$1)", [
+    { documentId: doc.id },
+  ]);
+  let release,
+    calls = 0;
+  const ready = new Promise((resolve) => {
+    release = resolve;
+  });
+  const generated = [],
+    discarded = [];
+  const storage = {
+    async scan() {
+      const key = `verified/${doc.id}/${'a'.repeat(64)}-${randomUUID()}`;
+      generated.push(key);
+      if (++calls === 2) release();
+      await ready;
+      return { status: 'CLEAN', version: null, verifiedKey: key };
+    },
+    async discardVerified(key) {
+      discarded.push(key);
+    },
+  };
+  await Promise.all([
+    processJobs({ pool, storage, logger }),
+    processJobs({ pool, storage, logger }),
+  ]);
+  const published = await one(pool, 'SELECT * FROM documents WHERE id=$1', [doc.id]);
+  assert.equal(published.scan_status, 'CLEAN');
+  assert(generated.includes(published.object_key));
+  assert.equal(discarded.length, 1);
+  assert.notEqual(discarded[0], published.object_key);
+});

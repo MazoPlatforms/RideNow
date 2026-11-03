@@ -7,7 +7,7 @@
 - Rate limiter Redis தோல்வியில் fail closed. Edge IP limit 10,000/min, authenticated user 180/min, auth endpoint IP 10/min, socket user 120 commands/min.
 - SQL parameterized; state transitions, assignment, idempotency, ledger transactions lock செய்யப்பட்ட database transactions-ல்.
 - Ledger entries/transactions, fare versions immutable; திருத்தத்திற்கு reversal/புதிய version.
-- Document scan CLEAN இல்லாமல் review download/driver approval கிடையாது. Exact scanned S3 version pin செய்யப்படும்.
+- Document scan CLEAN இல்லாமல் review download/driver approval கிடையாது. S3-ல் exact scanned version pin; R2-ல் SHA-256 அடையாளத்துடன் புதிய server-only key-க்கு scanned bytes சேமிக்கப்படும். Verified key-க்கு user upload URL வழங்கப்படாது.
 - Rider history-ல் driver-ன் தற்போதைய இடம் வெளியிடப்படாது; realtime GPS தற்போதைய assignment-க்கு மட்டும்.
 - OTP, password, JWT, Baileys credentials, முழு documents ஆகியவை logs-ல் எழுதப்படக்கூடாது. QR/TOTP enrollment secrets operator-க்கு ஒருமுறை வழங்கப்படுகின்றன.
 
