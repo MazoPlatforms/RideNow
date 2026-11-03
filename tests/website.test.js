@@ -15,7 +15,7 @@ app.use((req, res) => res.status(404).json({ code: 'NOT_FOUND' }));
 const api = supertest(app);
 
 test('website serves supplied HTML and assets without changing their contents', async () => {
-  for (const file of ['index.html', 'newsroom/the-preview/index.html', 'styles/home.css', 'src/home.mjs']) {
+  for (const file of ['index.html', 'newsroom/the-preview/index.html', 'styles/home.css', 'src/home.mjs', 'robots.txt', 'sitemap.xml']) {
     const path = file === 'index.html' ? '/' : `/${file}`;
     const result = await api.get(path).expect(200);
     assert.equal(result.text, await readFile(new URL(`../website/${file}`, import.meta.url), 'utf8'));

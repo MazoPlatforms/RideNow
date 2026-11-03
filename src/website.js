@@ -26,6 +26,9 @@ export function mountWebsite(app) {
     app.use(`/${directory}`, express.static(join(root, directory), {
       dotfiles: 'deny', index: false, maxAge: '1h',
     }));
+  app.get(['/robots.txt', '/sitemap.xml'], (req, res) =>
+    res.sendFile(join(root, req.path.slice(1))),
+  );
   for (const file of readdirSync(root, { recursive: true, withFileTypes: true })) {
     if (!file.isFile() || file.name !== 'index.html') continue;
     const path = join(file.parentPath, file.name);
