@@ -53,6 +53,8 @@ NODE_EXTRA_CA_CERTS=/etc/secrets/supabase-ca.crt
 
 Production-ல் `OTP_PROVIDER` code மூலம் `baileys` ஆக நிர்ணயிக்கப்படுகிறது. Render-ல் இந்த variable இல்லாவிட்டாலும் அல்லது வேறு மதிப்பாக இருந்தாலும் Baileys மட்டுமே பயன்படுத்தப்படும். Development/test adapter தேர்வு தொடர்ந்து கிடைக்கும்.
 
+CA-க்கு மாற்று அமைப்பு: `SUPABASE_CA_CERT` environment variable-ல் public PEM வைத்திருந்தால் `start:pilot` தற்காலிக CA file உருவாக்கி, child processes தொடங்கும் முன்பே `NODE_EXTRA_CA_CERTS` அமைக்கும். இந்த முறையில் மேலுள்ள `/etc/secrets/supabase-ca.crt` அமைப்பு தேவையில்லை. இரண்டையும் அமைத்தால் ஏற்கெனவே உள்ள CA file-உடன் புதிய CA சேர்க்கப்படும்; குறிப்பிடும் file உண்மையாக இருக்க வேண்டும். TLS certificate verification தொடர்ந்து இயங்கும்.
+
 மேலும் `S3_ENDPOINT`, `S3_BUCKET` சேர்க்கவும். `CORS_ORIGINS`-ல் உண்மையான HTTPS frontend origin-களை comma-separated-ஆக சேர்க்கவும். அங்கீகரிக்கப்பட்ட vehicle categories-ஐ மட்டும் `MAP_CATEGORY_APPROVALS`-ல் குறிப்பிடவும்; சாலைச் சரிபார்ப்புக்கு முன் `TUK,CAR,VAN` என்று அனுமதி கொடுக்க வேண்டாம். `PORT` Render வழங்கும் மதிப்பிலேயே இருக்கட்டும்.
 
 `TRUST_PROXY_HOPS`-ஐ actual proxy chain சரிபார்த்த பிறகே அமைக்கவும். தவறான அமைப்பு rate limiting-ஐ பாதிக்கும். நேரடி onrender.com ingress-ல் ஓர் proxy hop இருப்பதை உறுதிப்படுத்தினால் `1`; பின்னர் Cloudflare proxy சேர்த்தால் மீண்டும் சோதிக்கவும்.
