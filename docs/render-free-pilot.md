@@ -47,8 +47,7 @@ DB_SCHEMA=ridenow
 DB_ROLE=ridenow_backend
 DB_POOL_MAX=4
 S3_REGION=auto
-FCM_ENABLED=true
-GOOGLE_APPLICATION_CREDENTIALS=/etc/secrets/firebase-service-account.json
+FCM_ENABLED=false
 NODE_EXTRA_CA_CERTS=/etc/secrets/supabase-ca.crt
 ```
 
@@ -61,7 +60,7 @@ Production-ல் `OTP_PROVIDER` code மூலம் `baileys` ஆக நிர
 Render Secret Files:
 
 - `supabase-ca.crt`: GitHub Variable `SUPABASE_CA_CERT`-ல் இருக்கும் public CA PEM. TLS verification-ஐ முடக்க வேண்டாம்.
-- `firebase-service-account.json`: Firebase Admin SDK service-account credential. இது இன்னும் வழங்கப்படவில்லை. `FCM_ENABLED=true` மட்டும் போதாது; உண்மையான device-token push delivery சோதனையும் வேண்டும்.
+- Firebase credential இந்த self-hosted notification அமைப்புக்குத் தேவையில்லை. பின்னர் FCM சேர்த்தால் மட்டும் `FCM_ENABLED=true` மற்றும் `GOOGLE_APPLICATION_CREDENTIALS=/etc/secrets/firebase-service-account.json` அமைத்து உண்மையான push delivery-ஐச் சோதிக்கவும்.
 
 ஆவண malware scanning-க்கு Render-இலிருந்து அணுகக்கூடிய உண்மையான ClamAV endpoint தேவை: `CLAMAV_HOST`, `CLAMAV_PORT`. ClamAV TCP protocol-ல் authentication/TLS இல்லை; public internet-க்கு scanner port-ஐ நேரடியாகத் திறக்க வேண்டாம். பாதுகாக்கப்பட்ட network/tunnel அமைக்க வேண்டும். Scanner இல்லாமல் driver documents CLEAN ஆகாது. Free instance-க்குள் ClamAV-ஐயும் சேர்த்து இயக்குவது இந்த deployment அமைப்பின் பகுதி அல்ல.
 
@@ -83,7 +82,7 @@ Service live ஆன பிறகு மட்டுமே அதன் Render da
 2. `/health/live` → 200; `/health/ready` → 200 மற்றும் `status=ready`.
 3. Worker heartbeat, WhatsApp connection ஆகியவற்றைச் சரிபார்க்கவும். உரிமையாளர் ஒப்புக்கொண்ட எண்ணுக்கு ஒரு OTP அனுப்பி verify/replay rejection சோதிக்கவும்; ஒவ்வொரு deploy-க்கும் தானாக OTP அனுப்ப வேண்டாம்.
 4. Restart/redeploy செய்த பிறகும் WhatsApp session மீளவும், pending jobs தொடரவும் வேண்டும்.
-5. உண்மையான FCM device delivery, scanner வழியாக R2 upload/download, driver approval, booking → dispatch → accept → start → complete → cash ledger ஆகியவற்றைச் சோதிக்கவும்.
+5. WebSocket notifications, reconnect பிறகு notification inbox, scanner வழியாக R2 upload/download, driver approval, booking → dispatch → accept → start → complete → cash ledger ஆகியவற்றைச் சோதிக்கவும்.
 6. Free memory/CPU, connection counts, job backlog, latency அளந்த பிறகே குறைந்த எண்ணிக்கையிலான pilot பயனர்களை அனுமதிக்கவும்.
 
 ## இலவசத் திட்ட வரம்புகள்
@@ -97,3 +96,13 @@ Service live ஆன பிறகு மட்டுமே அதன் Render da
 - [UptimeRobot Free](https://uptimerobot.com/pricing/): 5-minute monitoring. HTTP checks idle நேரத்தைக் குறைக்கலாம்; hosting suspension, restart, quota அல்லது downtime-ஐத் தடுக்க உத்தரவாதம் இல்லை.
 
 உண்மையான பயணங்களின் dispatch, scheduled rides, live tracking, WhatsApp OTP ஆகியவற்றிற்கு தொடர்ந்து இயங்கும் paid infrastructure-க்கு மாறுவது pilot readiness மதிப்பீட்டின் பகுதி.
+
+## அதே சேவையில் self-hosted notifications
+
+Notification worker ஏற்கெனவே `start:pilot`-க்குள் இயங்குகிறது; தனி Render service தேவையில்லை. PostgreSQL outbox → notifications inbox → Redis → authenticated Socket.IO இணைப்பு என்ற வழியில் அறிவிப்புகள் செல்கின்றன. FCM இல்லாவிட்டாலும் inbox மற்றும் WebSocket தொடர்ந்து இயங்கும். `driver.location` போன்ற அதிக அதிர்வெண் tracking நிகழ்வுகள் inbox-ல் சேமிக்கப்படாது.
+
+Android/iOS client Socket.IO protocol பயன்படுத்த வேண்டும்; raw WebSocket client மட்டும் போதாது. Handshake-ல் `auth: { token: accessToken }` அனுப்பவும். பயன்பாட்டுக்குரிய `ride.updated` போன்ற event-களைக் கேட்டு `eventId` மூலம் duplicate-களைத் தவிர்க்கவும். ஒவ்வொரு reconnect-க்கும் JWT உடன் `GET /v1/me/notifications` அழைத்து தவறவிட்ட அறிவிப்புகளைப் பெறவும்; வாசித்தபின் `POST /v1/me/notifications/:id/read`. Socket event வராத நேரத்திலும் PostgreSQL inbox இருக்கும்; 90 நாள் retention தற்போதைய worker policy.
+
+`FCM_ENABLED=false` நிலையில் புதிய external push jobs உருவாகாது. பழைய push jobs இருந்தால் அவற்றின் attempts அதிகரிக்காமல் pending-ல் இருக்கும்; பின்னர் FCM இயக்கினால் அவை தொடரலாம். Push provider-ஐ இயக்குவதற்கு முன் பழைய அறிவிப்புகளின் பொருத்தத்தை ஆய்வு செய்யவும். Inbox read status என்பது சாதன OS push delivery receipt அல்ல.
+
+இந்த முறை செயலி இணைந்திருக்கும் நேரத்தில் உடனடி அறிவிப்புகளையும், மீண்டும் திறந்தபின் inbox-ஐயும் வழங்கும். செயலி background/suspended/மூடப்பட்ட நிலையில் உடனடி OS notification உத்தரவாதம் இல்லை; iOS-க்கு APNs, வழக்கமான Android சாதனங்களுக்கு FCM போன்ற push transport தனியாகத் தேவை. Self-hosted worker மட்டும் அவற்றை மாற்றாது. Render Free sleep/restart நேரத்தில் உடனடி அனுப்புதலும் நிற்கும்; மீண்டும் தொடங்கியதும் pending outbox தொடரும்.

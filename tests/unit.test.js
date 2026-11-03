@@ -62,6 +62,9 @@ test('production fixes Baileys regardless of environment provider and enforces H
     /Production requires HTTPS origins/,
   );
   assert.equal(loadConfig({ ...env, NODE_ENV: 'test', OTP_PROVIDER: undefined }).OTP_PROVIDER, 'database');
+  assert.equal(loadConfig({ ...env, FCM_ENABLED: undefined }).FCM_ENABLED, 'false');
+  assert.throws(() => loadConfig({ ...env, FCM_ENABLED: 'false', S3_BUCKET: undefined }),
+    /Production requires private S3 storage/);
 });
 test('real Mazo graph verifies checksum, routes, matrix, search and coverage', async () => {
   const maps = await createMaps({

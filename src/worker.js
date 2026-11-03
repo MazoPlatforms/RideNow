@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { one, transaction } from './shared/db.js';
 import { dispatchTick } from './modules/dispatch.js';
-export async function publishOutbox({ pool, redis }) {
+export async function publishOutbox({ pool, redis, config }) {
   for (let n = 0; n < 100; n++) {
     const found = await transaction(pool, async (db) => {
       const e = await one(
@@ -17,7 +17,7 @@ export async function publishOutbox({ pool, redis }) {
               'INSERT INTO notifications(user_id,event_id,type,payload) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING RETURNING id',
               [userId, e.id, e.type, e.payload],
             );
-            if (notification)
+            if (notification && config?.FCM_ENABLED === 'true')
               await db.query("INSERT INTO jobs(kind,payload) VALUES('push',$1)", [
                 { notificationId: notification.id, userId, type: e.type, payload: e.payload },
               ]);
@@ -70,7 +70,9 @@ export async function finishJob(pool, job, error) {
 export async function processJobs(deps) {
   const { pool, storage, push, logger } = deps;
   for (let i = 0; i < 20; i++) {
-    const job = await claimJob(pool, ['scan', 'push']);
+    // Disabled external push must not consume retries or falsely record delivery.
+    // Existing jobs remain pending until an external push provider is enabled.
+    const job = await claimJob(pool, push ? ['scan', 'push'] : ['scan']);
     if (!job) break;
     try {
       if (job.kind === 'scan') {

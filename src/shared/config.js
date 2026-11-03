@@ -34,7 +34,7 @@ export function loadConfig(env = process.env) {
       })
   )
     throw new Error('Production requires HTTPS origins');
-  if (c.NODE_ENV === 'production' && (c.FCM_ENABLED !== 'true' || !c.S3_BUCKET))
-    throw new Error('Production requires FCM and private S3 storage');
+  if (c.NODE_ENV === 'production' && !c.S3_BUCKET)
+    throw new Error('Production requires private S3 storage');
   return c;
 }

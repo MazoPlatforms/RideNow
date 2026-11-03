@@ -470,6 +470,35 @@ test('outbox is durable and notifications deduplicate on retry', async () => {
   await publishOutbox({ pool, redis });
   assert.equal((await one(pool, 'SELECT count(*)::int AS n FROM notifications')).n, 1);
 });
+test('self-hosted notifications survive offline use without external push jobs', async () => {
+  const s = await login(), other = await login();
+  await booking(s);
+  await publishOutbox({ pool, redis, config: { FCM_ENABLED: 'false' } });
+  const inbox = (await request('get', '/v1/me/notifications', s).expect(200)).body.items;
+  assert.equal(inbox.length, 1);
+  assert.equal(inbox[0].read_at, null);
+  assert.equal((await request('get', '/v1/me/notifications', other).expect(200)).body.items.length, 0);
+  assert.equal((await one(pool, "SELECT count(*)::int AS n FROM jobs WHERE kind='push'")).n, 0);
+  await request('post', `/v1/me/notifications/${inbox[0].id}/read`, s).expect(200);
+  assert((await request('get', '/v1/me/notifications', s).expect(200)).body.items[0].read_at);
+});
+test('optional external push queues once and preserves pending jobs while disabled', async () => {
+  const s = await login();
+  await booking(s);
+  const enabled = { FCM_ENABLED: 'true' };
+  await publishOutbox({ pool, redis, config: enabled });
+  await pool.query('UPDATE outbox_events SET published_at=NULL');
+  await publishOutbox({ pool, redis, config: enabled });
+  assert.equal((await one(pool, "SELECT count(*)::int AS n FROM jobs WHERE kind='push'")).n, 1);
+  await processJobs({ pool, storage, logger, push: null });
+  const job = await one(pool, "SELECT * FROM jobs WHERE kind='push'");
+  assert.equal(job.attempts, 0);
+  assert.equal(job.done_at, null);
+  let delivered = 0;
+  await processJobs({ pool, storage, logger, push: async () => { delivered++; } });
+  assert.equal(delivered, 1);
+  assert((await one(pool, 'SELECT done_at FROM jobs WHERE id=$1', [job.id])).done_at);
+});
 test('WebSocket authenticates, checks ride ownership, delivers events and revokes sessions', async () => {
   const s = await login(),
     other = await login(),
