@@ -70,6 +70,8 @@ Cash-only நிலையில் driver பெற்ற முழுப் ப
 
 ## சோதனைகள்
 
+Render Free Tier-ல் API, worker, WhatsApp gateway ஆகியவற்றை ஒரே instance-ல் இயக்கவும் UptimeRobot கண்காணிப்பைச் சேர்க்கவும் [முன்னோட்ட deployment வழிகாட்டி](docs/render-free-pilot.md) பார்க்கவும்.
+
 ```sh
 npm test
 npm run test:storage

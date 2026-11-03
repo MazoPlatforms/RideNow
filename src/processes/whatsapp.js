@@ -12,14 +12,23 @@ const config = loadConfig();
 if (config.OTP_PROVIDER !== 'baileys') throw new Error('Set OTP_PROVIDER=baileys');
 const pool = database(config.DATABASE_URL),
   lock = await pool.connect();
-if (!(await one(lock, 'SELECT pg_try_advisory_lock(927561) AS locked')).locked)
-  throw new Error('WhatsApp gateway already running');
+let running = true;
+process.on('SIGTERM', () => { running = false; });
+process.on('SIGINT', () => { running = false; });
+// Render starts the replacement before stopping the previous instance. Wait for
+// its session lock instead of failing the entire replacement during this overlap.
+while (running && !(await one(lock, 'SELECT pg_try_advisory_lock(927561) AS locked')).locked)
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+if (!running) {
+  lock.release();
+  await pool.end();
+  process.exit(0);
+}
 const makeWASocket =
   typeof makeWASocketExport === 'function' ? makeWASocketExport : makeWASocketExport.default;
 const logger = pino({ level: 'silent' });
 const auth = await createWhatsAppAuth(pool, config);
-let running = true,
-  connected = false,
+let connected = false,
   socket,
   reconnectAt = 0;
 const ready = async (value) =>
@@ -56,12 +65,6 @@ function connect() {
     }
   });
 }
-process.on('SIGTERM', () => {
-  running = false;
-});
-process.on('SIGINT', () => {
-  running = false;
-});
 await ready(false);
 connect();
 try {

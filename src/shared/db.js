@@ -1,6 +1,9 @@
 import pg from 'pg';
 import { postgresConnectionString, isSupabaseHost } from './connections.js';
 export function database(url, options = {}) {
+  const poolMax = Number(process.env.DB_POOL_MAX ?? 20);
+  if (!Number.isInteger(poolMax) || poolMax < 2 || poolMax > 100)
+    throw new Error('INVALID_DATABASE_POOL_MAX');
   const connectionString = postgresConnectionString(url);
   const cloud = isSupabaseHost(new URL(connectionString).hostname);
   const {
@@ -15,7 +18,7 @@ export function database(url, options = {}) {
     throw new Error('INVALID_DATABASE_NAMESPACE');
   return new pg.Pool({
     connectionString,
-    max: 20,
+    max: poolMax,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
     ...rest,
