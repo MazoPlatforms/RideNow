@@ -1,0 +1,15 @@
+[
+  {
+    "slug": "the-preview",
+    "title": "What this preview is—and isn’t.",
+    "heading": ["What this preview", "is—and isn’t."],
+    "description": "A factual note about the current RideNow website and app-development preview.",
+    "category": "Product note · Development status",
+    "lede": "An evergreen product note about the RideNow website and apps as they are currently being developed.",
+    "sections": [
+      {"title":"What you can explore","text":"The website presents concept designs for the Rider and Driver apps, explains the intended cash-first approach in Sri Lankan rupees, and describes the product principles being considered. Interactive app-store controls are previews only."},
+      {"title":"What is not available","text":"The site does not accept ride requests, create accounts, or take payments. There are no public app-store listings, announced service locations, or published fare rates. SMS verification, live maps, dispatch, route search, payments, and Driver registration are not connected to this website."},
+      {"title":"What happens next","text":"RideNow will publish confirmed product and availability information here when it is ready. No launch date or service coverage is being announced in this note."}
+    ]
+  }
+]

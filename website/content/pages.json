@@ -1,0 +1,166 @@
+{
+  "about": {
+    "title": "About RideNow — A more considered way to move",
+    "description": "The RideNow story, mission, and direction for Rider and Driver journeys in Sri Lanka.",
+    "eyebrow": "A local idea, taking shape",
+    "heading": ["Movement,", "made more human."],
+    "lede": "RideNow is being built around a simple thought: the journey should feel considered, from the first tap to the moment you arrive.",
+    "image": "ridenow-colombo-bluehour.webp",
+    "imageAlt": "Colombo's waterfront and city lights reflected on an evening road",
+    "layout": "editorial",
+    "sections": [
+      {"kind":"split","eyebrow":"THE STORY SO FAR","title":"A product in progress, shaped around everyday journeys.","text":"RideNow is an original Sri Lankan ride-hailing project in development. The work today is about building a thoughtful foundation for Riders and Drivers: a clear experience, familiar payments, and useful tools for real journeys. There is no operational ride service to book yet.","image":"ridenow-rider-journey.webp","imageAlt":"A Sri Lankan coastal city seen from a car at golden hour"},
+      {"kind":"principles","eyebrow":"OUR MISSION","title":"Make getting there feel simpler.","items":[{"title":"For the journey","text":"Design around the real steps of a ride, with clear information at each point."},{"title":"For Sri Lanka","text":"Build for local context, Sinhala, Tamil and English, and prices expressed in LKR."},{"title":"For both sides","text":"Give Riders and Drivers an experience that respects their time and choices."}]},
+      {"kind":"callout","eyebrow":"OUR VISION","title":"A more connected way to move through the places we call home.","text":"That vision will be measured by what the product can reliably deliver—not by promises made before launch.","link":"/how-it-works/","linkText":"Explore the planned ride flow"}
+    ]
+  },
+  "help": {
+    "title":"RideNow Help Center — Clear answers, while we build",
+    "description":"Search answers about RideNow's planned Rider and Driver apps, payments, availability, safety, and privacy.",
+    "eyebrow":"Support, without the guesswork",
+    "heading":["A good place", "to find an answer."],
+    "lede":"Search what you need to know about the RideNow preview and the service being planned.",
+    "image":"ridenow-driver-road.webp",
+    "imageAlt":"A car on Colombo's waterfront road at sunrise",
+    "layout":"help",
+    "sections":[
+      {"kind":"help","eyebrow":"HELP CENTER","title":"What would you like to know?","groups":[
+        {"title":"Getting started","items":[{"q":"Can I book a RideNow ride today?","a":"Not yet. The Rider app and service are in development. This website does not accept ride requests."},{"q":"Can I create a Rider or Driver account?","a":"No. Account registration and authentication are not connected to this website."},{"q":"Is there a RideNow app listing?","a":"There are no public app-store listings today. The Rider and Driver apps are development previews."}]},
+        {"title":"Fares and payments","items":[{"q":"What will rides cost?","a":"Fare rates have not been set or published. Any future fare and applicable charges should be shown before a Rider confirms a trip."},{"q":"How is payment being designed?","a":"RideNow is being designed cash-first, with amounts in Sri Lankan rupees (LKR). Electronic payment options have not been announced."},{"q":"Does RideNow charge Drivers commission?","a":"RideNow's stated model is zero commission on Driver fares. Other fees, settlement rules, and final Driver terms still need to be confirmed."}]},
+        {"title":"Location, safety, and privacy","items":[{"q":"Where will RideNow operate?","a":"Operational service areas have not been announced. The Colombo imagery on this site is illustrative, not an availability map."},{"q":"Why might the apps ask for location?","a":"The planned apps may use location to set a pickup point and support availability or an active trip. This website does not request location."},{"q":"How can I contact support about an account or trip?","a":"There are no live accounts or trips, and a monitored support channel has not been published. Do not send sensitive personal information through this preview."}]}
+      ]}
+    ]
+  },
+  "contact": {
+    "title":"Contact RideNow — Get in touch",
+    "description":"Contact RideNow about the project, partnerships, or general questions. The contact form is a non-sending preview.",
+    "eyebrow":"A line of communication",
+    "heading":["We’re listening.", "The service is still in progress."],
+    "lede":"Use this page to understand how to reach RideNow today—and what this website cannot yet receive.",
+    "image":"ridenow-driver-at-the-wheel.webp",
+    "imageAlt":"A Driver at the wheel with Colombo lights ahead at blue hour",
+    "layout":"contact",
+    "sections":[
+      {"kind":"contact","eyebrow":"CONTACT","title":"Send a message","text":"This form demonstrates the fields and validation RideNow may use. It does not send, store, or deliver messages; no production contact system is connected.","fields":[{"name":"name","label":"Your name","type":"text","required":true,"max":100,"autocomplete":"name"},{"name":"email","label":"Email address","type":"email","required":true,"max":254,"autocomplete":"email"},{"name":"topic","label":"What is this about?","type":"select","required":true,"options":["General question","Business enquiry","Partnership enquiry","Press enquiry","Accessibility feedback","Other"]},{"name":"message","label":"Message","type":"textarea","required":true,"max":2000}]},
+      {"kind":"callout","eyebrow":"NO UNSUPPORTED CONTACT DETAILS","title":"The RideNow operating entity and public support contacts have not yet been confirmed.","text":"We won’t publish a guessed email address or physical address. Please don’t enter sensitive account, identity, or payment information in this preview form."}
+    ]
+  },
+  "how-it-works": {
+    "title":"How RideNow is planned to work — A ride in four steps",
+    "description":"An interactive walkthrough of the RideNow Rider journey. This is a product concept, not a live booking flow.",
+    "eyebrow":"A ride, from the first tap",
+    "heading":["The journey", "in four clear steps."],
+    "lede":"Explore the planned Rider flow. Nothing here requests a ride or connects to a Driver.",
+    "image":"ridenow-rider-journey.webp",
+    "imageAlt":"A Sri Lankan coastal city seen from a car at golden hour",
+    "layout":"walkthrough",
+    "sections":[{"kind":"walkthrough","eyebrow":"ILLUSTRATIVE FLOW","title":"Move through the idea","steps":[{"title":"Set your pickup","text":"Use a pickup point that makes sense for where you are. Location entry and provider choices are still being implemented."},{"title":"Choose a destination","text":"Add where you want to go. Planned map, search, geocoding, and routing providers have not been selected."},{"title":"Review the trip","text":"See the route and fare information before deciding. Fare rules and rates are not yet defined."},{"title":"Request and pay","text":"A future request can be matched with an available Driver. The product is designed cash-first in LKR; no live dispatch or payment is connected."}]}]
+  },
+  "fares": {
+    "title":"RideNow fares — How pricing is being designed",
+    "description":"Understand RideNow's planned cash-first, LKR fare approach. No live rates or fare estimates are published.",
+    "eyebrow":"Clarity before a journey",
+    "heading":["A fare should", "make sense."],
+    "lede":"RideNow is being designed around clear fare information in Sri Lankan rupees. Actual prices and rules are not available yet.",
+    "image":"ridenow-colombo-bluehour.webp",
+    "imageAlt":"Colombo's waterfront and city lights reflected on an evening road",
+    "layout":"pricing",
+    "sections":[
+      {"kind":"principles","eyebrow":"PRICING PRINCIPLES","title":"What we believe a Rider should be able to see.","items":[{"title":"A price in LKR","text":"Display trip prices in Sri Lankan rupees, with the currency identified clearly."},{"title":"Details before confirmation","text":"Show the fare and any applicable charges before the Rider confirms a trip."},{"title":"A familiar way to pay","text":"Cash-first is the current design direction. No electronic payment option has been announced."}]},
+      {"kind":"callout","eyebrow":"NO RATES PUBLISHED","title":"No fare calculator or price list is available yet.","text":"Vehicle categories, minimum fares, distance or time rates, waiting charges, cancellations, taxes, tolls, and settlement rules all require business decisions. Don’t use this page to estimate a real trip.","link":"/help/","linkText":"Read the Help Center"},
+      {"kind":"split","eyebrow":"DRIVER MODEL","title":"Zero commission on Driver fares is RideNow’s stated direction.","text":"The exact settlement process, any other fees, taxes, and Driver agreement terms must be defined and shown before onboarding. No final fare or payout schedule is being represented here.","image":"ridenow-driver-road.webp","imageAlt":"A car on Colombo's waterfront road at sunrise"}
+    ]
+  },
+  "cities": {
+    "title":"RideNow cities — Service coverage is not announced",
+    "description":"RideNow has not announced operating cities or service availability. Check this page for confirmed coverage in future.",
+    "eyebrow":"Local by design, not yet live",
+    "heading":["A city is more", "than a pin on a map."],
+    "lede":"RideNow is being developed for Sri Lankan journeys. No city or service area is currently open for bookings.",
+    "image":"ridenow-colombo-bluehour.webp",
+    "imageAlt":"An illustrative view of Colombo's waterfront at blue hour, not a service map",
+    "layout":"coverage",
+    "sections":[{"kind":"availability","eyebrow":"COVERAGE STATUS","title":"Service locations have not been announced.","text":"The Colombo scenes across this website are original concept artwork. They do not show live Drivers, operating boundaries, or current availability. City selection, launch timing, and coverage will be published only after RideNow confirms them.","link":"/help/","linkText":"See service availability questions"}]
+  },
+  "safety": {
+    "title":"RideNow safety — Principles for a safer ride experience",
+    "description":"Read about safety principles being considered for RideNow Riders and Drivers. No live safety response service is available.",
+    "eyebrow":"Care, built into the journey",
+    "heading":["Safety starts", "before the ride."],
+    "lede":"The product is still in development. These are design priorities, not a claim that safety features or live response services are active.",
+    "image":"ridenow-driver-road.webp",
+    "imageAlt":"A car at Colombo's waterfront in early light",
+    "layout":"safety",
+    "sections":[
+      {"kind":"principles","eyebrow":"DESIGN PRIORITIES","title":"The basics need to be clear and dependable.","items":[{"title":"Know who you’re travelling with","text":"Trip screens should clearly show relevant Rider, Driver, and vehicle details once a ride is accepted."},{"title":"Location with purpose","text":"Location permission should be explained in context and requested only for defined journey features."},{"title":"A clear way to get help","text":"RideNow must establish and publish support, complaint, and incident-response processes before service launch."}]},
+      {"kind":"callout","eyebrow":"IF THERE IS IMMEDIATE DANGER","title":"Contact the appropriate local emergency service first.","text":"RideNow has not published an emergency response line or a live safety team. Do not rely on this website for urgent assistance."},
+      {"kind":"split","eyebrow":"STILL TO BE DEFINED","title":"Safety tools require operational decisions, not just interface design.","text":"Identity and vehicle checks, trip sharing, incident handling, support coverage, data access, and escalation procedures need verified processes and responsible teams before they can be described as available.","image":"ridenow-rider-journey.webp","imageAlt":"An illustrative car journey on the Sri Lankan coast"}
+    ]
+  },
+  "newsroom": {
+    "title":"RideNow Newsroom — Product notes and announcements",
+    "description":"The RideNow newsroom for verified product announcements and updates. No launch date or service area has been announced.",
+    "eyebrow":"Notes from the road ahead",
+    "heading":["The work,", "as it takes shape."],
+    "lede":"A home for verified RideNow updates. We’ll publish confirmed information here, without guessing at dates or availability.",
+    "image":"ridenow-driver-at-the-wheel.webp",
+    "imageAlt":"A driver viewing Colombo city lights from inside a car",
+    "layout":"newsroom",
+    "sections":[{"kind":"newsroom","eyebrow":"PRODUCT NOTE · CURRENT PREVIEW","title":"What this RideNow preview is—and what it isn’t.","text":"RideNow is an original Sri Lankan ride-hailing project in development. The website shows Rider and Driver product direction; it does not provide live bookings, accounts, app-store listings, or operating coverage.","link":"/newsroom/the-preview/","linkText":"Read the product note","articleSlug":"the-preview"}]
+  },
+  "business": {
+    "title":"RideNow for business — Transportation ideas for teams",
+    "description":"Explore the business transportation needs RideNow may support. No business product, account, or service is currently available.",
+    "eyebrow":"For journeys that bring work together",
+    "heading":["Business travel,", "with room to move."],
+    "lede":"We’re exploring what a considered ride experience could mean for teams in Sri Lanka. No corporate booking product is live.",
+    "image":"ridenow-driver-road.webp",
+    "imageAlt":"A car on a city waterfront road at sunrise",
+    "layout":"business",
+    "sections":[{"kind":"split","eyebrow":"AN AREA TO EXPLORE","title":"A useful service begins with the needs of real teams.","text":"Scheduled journeys, staff travel, account controls, consolidated billing, and service-level commitments are possibilities to research—not features RideNow currently offers. Any future business product would need defined eligibility, pricing, support, and privacy terms.","image":"ridenow-driver-at-the-wheel.webp","imageAlt":"A view of the road ahead from inside a car"},{"kind":"callout","eyebrow":"NOT ACCEPTING BUSINESS BOOKINGS","title":"There is no business account or corporate ride service yet.","text":"Organisations interested in future discussions can use the preview contact form. It does not deliver messages to RideNow today.","link":"/contact/","linkText":"Open the contact preview"}]
+  },
+  "partners": {
+    "title":"Partner with RideNow — Collaboration, considered carefully",
+    "description":"Learn about the partnership areas RideNow expects to evaluate. No partner program or commercial agreements are available.",
+    "eyebrow":"Build the right connections",
+    "heading":["Good partnerships", "start with clarity."],
+    "lede":"RideNow will need dependable partners in the places where technology meets a real journey. Those relationships are not yet in operation.",
+    "image":"ridenow-colombo-bluehour.webp",
+    "imageAlt":"Colombo waterfront at blue hour",
+    "layout":"partners",
+    "sections":[{"kind":"principles","eyebrow":"AREAS TO ASSESS","title":"Capabilities a ride platform may need.","items":[{"title":"Mapping and mobility","text":"Maps, geocoding, routing, and location services require provider selection and coverage review."},{"title":"Communications","text":"SMS, notifications, hosting, and customer support need clear ownership and data safeguards."},{"title":"Payments and local services","text":"Any payment or commercial partnership depends on the final operating model and regulatory review."}]},{"kind":"callout","eyebrow":"NO ACTIVE PARTNER PROGRAM","title":"Provider and partnership enquiries can start with a conversation.","text":"This website has no partner submission or onboarding service. The contact form is a local preview only; messages are not sent.","link":"/contact/","linkText":"View contact options"}]
+  },
+  "careers": {
+    "title":"Careers at RideNow — Opportunities as the team takes shape",
+    "description":"RideNow is building its team over time. No current job openings or recruitment process have been published.",
+    "eyebrow":"People make the product",
+    "heading":["A thoughtful service", "needs thoughtful people."],
+    "lede":"RideNow is in development. We’ll list real openings here when roles, hiring teams, and application channels are ready.",
+    "image":"ridenow-driver-at-the-wheel.webp",
+    "imageAlt":"A view through a car toward a city at night",
+    "layout":"careers",
+    "sections":[{"kind":"availability","eyebrow":"NO OPEN ROLES PUBLISHED","title":"There are no active job listings today.","text":"No application process, salary information, or hiring contact has been published. Be cautious of anyone claiming to recruit on RideNow’s behalf or requesting payment for a job opportunity.","link":"/about/","linkText":"Learn about the project"}]
+  },
+  "accessibility": {
+    "title":"RideNow accessibility — Designing for more people",
+    "description":"Learn about RideNow's accessibility approach for this website and the planned Rider and Driver apps.",
+    "eyebrow":"More ways to take part",
+    "heading":["Access is part", "of the journey."],
+    "lede":"RideNow is being designed to work for people with different devices, languages, abilities, and ways of moving. The apps are not yet live for an accessibility audit.",
+    "image":"ridenow-rider-journey.webp",
+    "imageAlt":"A coastal city road seen from a vehicle",
+    "layout":"accessibility",
+    "sections":[{"kind":"principles","eyebrow":"DESIGN COMMITMENTS","title":"Accessibility belongs in the everyday details.","items":[{"title":"Readable and adaptable","text":"Use legible type, sufficient contrast, zoom-friendly layouts, and support for system text settings."},{"title":"Keyboard and assistive technology","text":"Use semantic controls, visible focus, clear names, and a logical reading order on the website."},{"title":"Language and context","text":"Plan for English, Sinhala, and Tamil, and explain permissions and trip decisions in plain language."},{"title":"Real-world accessibility","text":"Accessibility needs in vehicles, pickup points, service processes, and support require research and operational planning."}]},{"kind":"callout","eyebrow":"FEEDBACK CHANNEL","title":"A monitored accessibility contact is not yet available.","text":"The contact form is a visual and validation preview; it cannot deliver feedback. A public feedback route should be provided before launch.","link":"/contact/","linkText":"View contact page"}]
+  },
+  "download": {
+    "title":"Download RideNow — Rider and Driver app previews",
+    "description":"RideNow Rider and Driver apps are in development. No public Google Play or Apple App Store listings are available.",
+    "eyebrow":"The app is taking shape",
+    "heading":["Your Ride.", "Right Now."],
+    "lede":"The Rider and Driver apps are in development. We’ll link official app-store listings here when they exist.",
+    "image":"ridenow-rider-journey.webp",
+    "imageAlt":"A coastal road seen from inside a car",
+    "layout":"download",
+    "sections":[{"kind":"download","eyebrow":"APP AVAILABILITY","title":"No public store listings are available today.","text":"These buttons are preview controls, not download links. RideNow has no iOS app available. Android debug APKs are development builds, not consumer app-store releases."},{"kind":"split","eyebrow":"TWO APP EXPERIENCES","title":"Built for the person taking the ride and the person driving.","text":"Rider and Driver Android apps are being developed separately. A public listing will appear only after a confirmed release channel is ready.","image":"ridenow-driver-road.webp","imageAlt":"A car parked beside the city waterfront"}]
+  }
+}

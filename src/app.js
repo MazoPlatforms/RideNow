@@ -16,6 +16,7 @@ import * as rides from './modules/rides.js';
 import * as drivers from './modules/drivers.js';
 import * as ledger from './modules/ledger.js';
 import { acceptOffer } from './modules/dispatch.js';
+import { mountWebsite } from './website.js';
 export const coordinate = z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]);
 export const locationSchema = z
   .object({
@@ -1004,6 +1005,7 @@ export function createApp({ pool, redis, config, maps, storage, logger }) {
       paths,
     }),
   );
+  mountWebsite(app);
   app.use((req, res, next) => next(new AppError(404, 'NOT_FOUND')));
   app.use(errorHandler(logger));
   return { app, auth, paths };

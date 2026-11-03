@@ -12,6 +12,7 @@ COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node migrations ./migrations
 COPY --chown=node:node data ./data
 COPY --chown=node:node vendor ./vendor
+COPY --chown=node:node website ./website
 USER node
 EXPOSE 3000
 CMD ["node", "src/processes/api.js"]
