@@ -85,3 +85,42 @@ test('real Mazo graph verifies checksum, routes, matrix, search and coverage', a
     { code: 'ROUTE_UNAVAILABLE' },
   );
 });
+
+test('managed connection URLs enforce TLS and preserve local test connections', async () => {
+  const { postgresConnectionString, redisConnectionString } = await import(
+    '../src/shared/connections.js'
+  );
+  assert.equal(
+    new URL(redisConnectionString('redis://default:synthetic@sample.upstash.io:6379')).protocol,
+    'rediss:',
+  );
+  assert.equal(new URL(redisConnectionString('redis://localhost:6379/15')).protocol, 'redis:');
+  assert.throws(() => redisConnectionString('https://sample.upstash.io'), {
+    code: 'REDIS_TCP_URL_REQUIRED',
+  });
+  assert.equal(
+    new URL(
+      postgresConnectionString(
+        'postgresql://postgres.project:synthetic@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres',
+      ),
+    ).searchParams.get('sslmode'),
+    'verify-full',
+  );
+  assert.throws(
+    () =>
+      postgresConnectionString(
+        'postgresql://postgres.project:synthetic@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres',
+      ),
+    { code: 'SUPABASE_SESSION_POOLER_REQUIRED' },
+  );
+  assert.throws(
+    () => postgresConnectionString('private-invalid-string'),
+    (e) => e.code === 'DATABASE_TCP_URL_REQUIRED' && !e.message.includes('private-invalid-string'),
+  );
+  assert.equal(
+    new URL(
+      postgresConnectionString('postgres://ride:ride@localhost:5432/ride_test'),
+    ).searchParams.get('sslmode'),
+    null,
+  );
+});

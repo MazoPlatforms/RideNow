@@ -23,7 +23,8 @@
     "otp:dev": "node --env-file-if-exists=.env scripts/development-deliveries.js",
     "demo": "node scripts/demo.js",
     "test:storage": "node --test tests/storage.test.js",
-    "test:whatsapp:live": "node scripts/whatsapp-smoke.js"
+    "test:whatsapp:live": "node scripts/whatsapp-smoke.js",
+    "test:services:live": "node scripts/services-smoke.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.900.0",

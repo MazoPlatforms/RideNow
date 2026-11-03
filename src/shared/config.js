@@ -1,11 +1,12 @@
 import { z } from 'zod';
+import { postgresConnectionString, redisConnectionString } from './connections.js';
 export function loadConfig(env = process.env) {
   const schema = z
     .object({
       NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
       PORT: z.coerce.number().int().positive().default(3000),
-      DATABASE_URL: z.string().min(1),
-      REDIS_URL: z.string().default('redis://localhost:6379'),
+      DATABASE_URL: z.string().min(1).transform(postgresConnectionString),
+      REDIS_URL: z.string().default('redis://localhost:6379').transform(redisConnectionString),
       JWT_SECRET: z.string().min(32),
       OTP_PEPPER: z.string().min(32),
       ENCRYPTION_KEY: z.string().regex(/^[a-f\d]{64}$/i),

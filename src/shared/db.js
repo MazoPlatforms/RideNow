@@ -1,10 +1,12 @@
 import pg from 'pg';
-export function database(url) {
+import { postgresConnectionString } from './connections.js';
+export function database(url, options = {}) {
   return new pg.Pool({
-    connectionString: url,
+    connectionString: postgresConnectionString(url),
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
+    ...options,
   });
 }
 export async function transaction(pool, fn) {

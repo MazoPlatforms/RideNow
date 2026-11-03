@@ -89,6 +89,8 @@ PostgreSQL/PostGIS, transactions, locks, constraints, migrations, Redis மற�
 
 ## Production தயார்நிலை
 
+Supabase/Upstash secrets மற்றும் நேரடி இணைப்புச் சோதனை: [வழிமுறைகள்](docs/managed-services.md).
+
 Production-க்கு முன் [இயக்கக் கையேடு](docs/operations.md), [API ஒப்பந்தம்](docs/api.md), [பாதுகாப்பு மற்றும் தரவு விதிகள்](docs/security.md) ஆகியவற்றைப் பின்பற்றவும்.
 
 - உண்மையான fare/commission விகிதங்கள், service-area polygons, தேவையான ஆவணங்கள் மற்றும் retention சட்ட விதிகள் உறுதிசெய்யப்பட வேண்டும்.

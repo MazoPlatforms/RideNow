@@ -1,6 +1,7 @@
 import { runner } from 'node-pg-migrate';
+import { postgresConnectionString } from '../src/shared/connections.js';
 await runner({
-  databaseUrl: process.env.DATABASE_URL,
+  databaseUrl: postgresConnectionString(process.env.DATABASE_URL),
   dir: 'migrations',
   direction: 'up',
   migrationsTable: 'schema_migrations',
