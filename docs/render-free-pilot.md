@@ -52,6 +52,8 @@ GOOGLE_APPLICATION_CREDENTIALS=/etc/secrets/firebase-service-account.json
 NODE_EXTRA_CA_CERTS=/etc/secrets/supabase-ca.crt
 ```
 
+Production-ல் `OTP_PROVIDER` code மூலம் `baileys` ஆக நிர்ணயிக்கப்படுகிறது. Render-ல் இந்த variable இல்லாவிட்டாலும் அல்லது வேறு மதிப்பாக இருந்தாலும் Baileys மட்டுமே பயன்படுத்தப்படும். Development/test adapter தேர்வு தொடர்ந்து கிடைக்கும்.
+
 மேலும் `S3_ENDPOINT`, `S3_BUCKET` சேர்க்கவும். `CORS_ORIGINS`-ல் உண்மையான HTTPS frontend origin-களை comma-separated-ஆக சேர்க்கவும். அங்கீகரிக்கப்பட்ட vehicle categories-ஐ மட்டும் `MAP_CATEGORY_APPROVALS`-ல் குறிப்பிடவும்; சாலைச் சரிபார்ப்புக்கு முன் `TUK,CAR,VAN` என்று அனுமதி கொடுக்க வேண்டாம். `PORT` Render வழங்கும் மதிப்பிலேயே இருக்கட்டும்.
 
 `TRUST_PROXY_HOPS`-ஐ actual proxy chain சரிபார்த்த பிறகே அமைக்கவும். தவறான அமைப்பு rate limiting-ஐ பாதிக்கும். நேரடி onrender.com ingress-ல் ஓர் proxy hop இருப்பதை உறுதிப்படுத்தினால் `1`; பின்னர் Cloudflare proxy சேர்த்தால் மீண்டும் சோதிக்கவும்.

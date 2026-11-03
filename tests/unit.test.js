@@ -44,16 +44,24 @@ test('credential encryption authenticates ciphertext', () => {
   assert(equal(hash('secret', 'pepper'), hash('secret', 'pepper')));
   assert(!equal('abc', 'abcd'));
 });
-test('production rejects development OTP and insecure origins', () => {
-  assert.throws(() =>
-    loadConfig({
-      NODE_ENV: 'production',
-      DATABASE_URL: 'postgres://localhost/test',
-      JWT_SECRET: 'x'.repeat(32),
-      OTP_PEPPER: 'y'.repeat(32),
-      ENCRYPTION_KEY: 'ab'.repeat(32),
-    }),
+test('production fixes Baileys regardless of environment provider and enforces HTTPS', () => {
+  const env = {
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgres://localhost/test',
+    JWT_SECRET: 'x'.repeat(32),
+    OTP_PEPPER: 'y'.repeat(32),
+    ENCRYPTION_KEY: 'ab'.repeat(32),
+    CORS_ORIGINS: 'https://example.com',
+    FCM_ENABLED: 'true',
+    S3_BUCKET: 'test-private-documents',
+  };
+  for (const OTP_PROVIDER of [undefined, 'database', 'baileys', 'invalid'])
+    assert.equal(loadConfig({ ...env, OTP_PROVIDER }).OTP_PROVIDER, 'baileys');
+  assert.throws(
+    () => loadConfig({ ...env, CORS_ORIGINS: 'http://localhost:5173' }),
+    /Production requires HTTPS origins/,
   );
+  assert.equal(loadConfig({ ...env, NODE_ENV: 'test', OTP_PROVIDER: undefined }).OTP_PROVIDER, 'database');
 });
 test('real Mazo graph verifies checksum, routes, matrix, search and coverage', async () => {
   const maps = await createMaps({

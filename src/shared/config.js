@@ -18,19 +18,22 @@ export function loadConfig(env = process.env) {
       FCM_ENABLED: z.enum(['true', 'false']).default('false'),
     })
     .passthrough();
-  const c = schema.parse(env);
+  // Production always sends OTPs through WhatsApp; environment values cannot
+  // accidentally select the development database delivery adapter.
+  const c = schema.parse(
+    env.NODE_ENV === 'production' ? { ...env, OTP_PROVIDER: 'baileys' } : env,
+  );
   if (
     c.NODE_ENV === 'production' &&
-    (c.OTP_PROVIDER !== 'baileys' ||
-      !c.CORS_ORIGINS.split(',').every((origin) => {
+    !c.CORS_ORIGINS.split(',').every((origin) => {
         try {
           return new URL(origin).protocol === 'https:';
         } catch {
           return false;
         }
-      }))
+      })
   )
-    throw new Error('Production requires Baileys and HTTPS origins');
+    throw new Error('Production requires HTTPS origins');
   if (c.NODE_ENV === 'production' && (c.FCM_ENABLED !== 'true' || !c.S3_BUCKET))
     throw new Error('Production requires FCM and private S3 storage');
   return c;
