@@ -117,9 +117,18 @@ export async function maintenance(pool) {
     const end = new Date(month);
     end.setUTCMonth(end.getUTCMonth() + 1);
     const label = `ride_location_points_${month.getUTCFullYear()}_${String(month.getUTCMonth() + 1).padStart(2, '0')}`;
-    await db.query(
-      `CREATE TABLE IF NOT EXISTS ${label} PARTITION OF ride_location_points FOR VALUES FROM ('${month.toISOString()}') TO ('${end.toISOString()}')`,
-    );
+    if (
+      (
+        await one(
+          db,
+          "SELECT has_schema_privilege(current_user,current_schema(),'CREATE') AS allowed",
+        )
+      ).allowed
+    ) {
+      await db.query(
+        `CREATE TABLE IF NOT EXISTS ${label} PARTITION OF ride_location_points FOR VALUES FROM ('${month.toISOString()}') TO ('${end.toISOString()}')`,
+      );
+    }
     await db.query("DELETE FROM ride_location_points WHERE recorded_at<now()-interval '30 days'");
     await db.query(
       "DELETE FROM ride_events e USING rides r WHERE e.ride_id=r.id AND r.state IN ('COMPLETED','CANCELLED','NO_DRIVER','NO_SHOW') AND e.created_at<now()-interval '90 days'",

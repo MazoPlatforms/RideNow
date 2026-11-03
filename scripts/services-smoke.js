@@ -67,7 +67,13 @@ async function postgres() {
       ipv4: addresses.filter((a) => a.family === 4).length,
       ipv6: addresses.filter((a) => a.family === 6).length,
     };
-    pool = database(url, { max: 1, connectionTimeoutMillis: 10000, query_timeout: 10000 });
+    pool = database(url, {
+      schema: 'public',
+      role: null,
+      max: 1,
+      connectionTimeoutMillis: 10000,
+      query_timeout: 10000,
+    });
     pool.on('error', () => {});
     client = await pool.connect();
     await client.query('SELECT 1');

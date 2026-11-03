@@ -826,3 +826,41 @@ test('concurrent scan jobs publish one immutable document reference and discard 
   assert.equal(discarded.length, 1);
   assert.notEqual(discarded[0], published.object_key);
 });
+
+test('private schema migrations are repeatable and backend role is constrained by RLS and grants', async () => {
+  const { installPrivateSchema } = await import('../src/database/private-schema.js');
+  const admin = await pool.connect();
+  try {
+    await installPrivateSchema(admin);
+    await installPrivateSchema(admin);
+  } finally {
+    admin.release();
+  }
+  const appPool = database(dbUrl, { schema: 'ridenow', role: 'ridenow_backend', max: 1 });
+  try {
+    const conn = await appPool.connect();
+    try {
+      assert.equal((await one(conn, 'SELECT current_schema() AS name')).name, 'ridenow');
+      await conn.query('BEGIN');
+      const u = await one(conn, "INSERT INTO users(phone) VALUES('+94770000009') RETURNING id");
+      assert(u.id);
+      await conn.query('ROLLBACK');
+      assert.equal(
+        (await one(conn, "SELECT has_schema_privilege(current_user,'ridenow','CREATE') AS allowed"))
+          .allowed,
+        false,
+      );
+      await assert.rejects(conn.query('UPDATE schema_migrations SET name=name'), { code: '42501' });
+      await assert.rejects(conn.query('DELETE FROM audit_logs'), { code: '42501' });
+      const rls = await one(
+        conn,
+        "SELECT count(*)::int AS total,count(*) FILTER(WHERE rowsecurity)::int AS secured FROM pg_tables WHERE schemaname='ridenow'",
+      );
+      assert.equal(rls.total, rls.secured);
+    } finally {
+      conn.release();
+    }
+  } finally {
+    await appPool.end();
+  }
+});

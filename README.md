@@ -89,6 +89,8 @@ PostgreSQL/PostGIS, transactions, locks, constraints, migrations, Redis மற�
 
 ## Production தயார்நிலை
 
+`ridenow-demo` தனி schema, migrations மற்றும் role அனுமதிகள்: [தரவுத்தள அமைப்பு](docs/private-database.md).
+
 Supabase/Upstash secrets மற்றும் நேரடி இணைப்புச் சோதனை: [வழிமுறைகள்](docs/managed-services.md). Cloudflare R2: [சேமிப்பக வழிமுறைகள்](docs/r2-storage.md).
 
 Production-க்கு முன் [இயக்கக் கையேடு](docs/operations.md), [API ஒப்பந்தம்](docs/api.md), [பாதுகாப்பு மற்றும் தரவு விதிகள்](docs/security.md) ஆகியவற்றைப் பின்பற்றவும்.

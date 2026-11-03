@@ -1,0 +1,41 @@
+name: ridenow-demo தனி schema அமைத்தல்
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: schema-install-production
+  cancel-in-progress: false
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: விருப்பமான Supabase பொது CA certificate
+        env:
+          SUPABASE_CA_CERT: ${{ vars.SUPABASE_CA_CERT }}
+        run: |
+          node --input-type=module <<'JS'
+          import {writeFileSync,appendFileSync} from 'node:fs';
+          import {join} from 'node:path';
+          import {X509Certificate} from 'node:crypto';
+          const ca=process.env.SUPABASE_CA_CERT?.trim();
+          if(ca){
+            try{new X509Certificate(ca);}catch{throw new Error('SUPABASE_CA_CERT must contain a public PEM certificate');}
+            const file=join(process.env.RUNNER_TEMP,'ridenow-supabase-ca.crt');
+            writeFileSync(file,ca+'\n',{mode:0o600});
+            appendFileSync(process.env.GITHUB_ENV,`NODE_EXTRA_CA_CERTS=${file}\n`);
+          }
+          JS
+      - name: ridenow-demo migrations மற்றும் அனுமதிகள்
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/install-private-schema.js
