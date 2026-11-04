@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">RideNow</string>
+    <string name="splash_description">RideNow. Your ride, before you ask.</string>
+    <string name="splash_tagline">Your ride, before you ask.</string>
+</resources>

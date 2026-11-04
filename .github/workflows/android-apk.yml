@@ -1,0 +1,108 @@
+name: Android APK preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK 35 and build tools
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Record unchanged source checksums
+        run: |
+          mkdir -p "$RUNNER_TEMP/android-release"
+          git ls-files -z app/android | sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
+      - name: Generate wrapper outside the supplied project
+        run: |
+          wrapper_dir="$RUNNER_TEMP/ridenow-wrapper"
+          mkdir -p "$wrapper_dir"
+          printf 'rootProject.name = "wrapper-bootstrap"\n' > "$wrapper_dir/settings.gradle.kts"
+          gradle --no-daemon --project-dir "$wrapper_dir" wrapper --gradle-version 8.9 --distribution-type bin
+          cp "$wrapper_dir/gradlew" app/android/gradlew
+          cp "$wrapper_dir/gradlew.bat" app/android/gradlew.bat
+          cp "$wrapper_dir/gradle/wrapper/gradle-wrapper.jar" app/android/gradle/wrapper/gradle-wrapper.jar
+          chmod +x app/android/gradlew
+      - uses: gradle/actions/wrapper-validation@v4
+      - name: Build the supplied splash-screen project
+        working-directory: app/android
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
+      - name: Verify APK and preserve original sources
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/android/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/android/app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/android-apk-metadata.txt"
+          head -5 "$RUNNER_TEMP/android-apk-metadata.txt"
+          sha256sum --check "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
+          git diff --exit-code -- app/android
+          cp app/android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/android-release/RideNow-Android-splash-debug.apk"
+          cp app/android/RideNow-Android.zip "$RUNNER_TEMP/android-release/RideNow-Android.zip"
+          cd "$RUNNER_TEMP/android-release"
+          sha256sum RideNow-Android-splash-debug.apk RideNow-Android.zip ANDROID_SOURCE_SHA256SUMS.txt > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ridenow-android-${{ github.run_id }}
+          path: ${{ runner.temp }}/android-release/
+          retention-days: 30
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-build-log-${{ github.run_id }}
+          path: ${{ runner.temp }}/android-build.log
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ridenow-android-${{ github.run_id }}
+          path: android-release
+      - name: Publish installable splash preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="android-splash-${GITHUB_RUN_ID}"
+          cat > "$RUNNER_TEMP/android-release-notes.md" <<EOF
+          Android splash-screen preview built from commit ${GITHUB_SHA}.
+
+          - Contains only the supplied splash screen and its existing placeholder screen.
+          - Original Kotlin, resources, manifest, and Gradle project files are unchanged.
+          - The missing wrapper scripts and JAR were generated only in GitHub Actions using Gradle 8.9 and Java 17.
+          - APK is debug-signed for installation and testing, not a production or Play Store release. Debug signing keys may differ between workflow runs; installing a later preview can require uninstalling the previous one.
+          - Minimum Android version: Android 8.0 (API 26).
+          - The original uploaded ZIP and SHA-256 checksums are included.
+          EOF
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" android-release/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$tag" android-release/* --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --prerelease \
+              --title "RideNow Android splash preview #${GITHUB_RUN_NUMBER}" \
+              --notes-file "$RUNNER_TEMP/android-release-notes.md"
+          fi
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"
