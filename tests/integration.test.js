@@ -1264,6 +1264,10 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
     await page.getByRole('button',{name:'Sign out',exact:false}).click();
     await page.waitForURL('**/admin/login/');
     await page.setViewportSize({width:1440,height:1000});
+    await page.setViewportSize({width:360,height:800});
+    const helpRect=await page.locator('main>div:first-child>span').evaluate(el=>({rect:el.getBoundingClientRect().toJSON(),lineHeight:Number.parseFloat(getComputedStyle(el).lineHeight)}));
+    assert(helpRect.rect.height<=helpRect.lineHeight+1&&helpRect.rect.right<=360);
+    await page.setViewportSize({width:1440,height:1000});
     await page.screenshot({path:'/tmp/ridenow-admin-login.png',fullPage:true});
     await page.getByLabel('Phone number').fill(a.phone);
     await page.getByLabel('Password',{exact:true}).fill(a.password);
