@@ -1,0 +1,26 @@
+# RideNow Logo Asset Manifest
+
+Inventory audit of the 16 supplied original PNG files. Every source file was visually reviewed in a contact sheet and retained byte-for-byte; only the filenames changed. All supplied files are opaque RGB PNGs with a flat light or dark background. No byte-identical duplicates were found. Similar-looking variants remain separately available because their proportions, color treatment, or composition differ.
+
+| Previous filename | Current filename | Dimensions | Format / mode | Appearance | Intended use |
+|---|---|---:|---|---|---|
+| `file_0000000021d081f99db0371ae64e3851.png` | `ridenow-stacked-white-on-black.png` | 1774 × 887 | PNG / RGB (opaque) | Stacked symbol and wordmark; white only; black background (corrected visual classification) | Dark-background monochrome lockup; preserve as supplied artwork. |
+| `file_00000000255881f58beefa537111414f.png` | `ridenow-stacked-black-on-white.png` | 1774 × 887 | PNG / RGB (opaque) | Stacked symbol and wordmark; black; white background | Light-background monochrome lockup. |
+| `file_0000000043b08230ad7ec7615e729b2d.png` | `ridenow-stacked-black-yellow-on-white.png` | 1774 × 887 | PNG / RGB (opaque) | Stacked symbol and wordmark; black and brand yellow; white background | Light-background primary full lockup. |
+| `file_000000005b5c81fdbea0204b979fa8ed.png` | `ridenow-wordmark-white-yellow-on-black-wide.png` | 2172 × 724 | PNG / RGB (opaque) | Horizontal wordmark; white and brand yellow; black background | Dark-background horizontal brand use. |
+| `file_000000006fe88208901cb9d50734a213.png` | `ridenow-symbol-black-yellow-on-white-square.png` | 1254 × 1254 | PNG / RGB (opaque) | Standalone symbol; black and brand yellow; white background | Square light-background app mark reference. |
+| `file_00000000720c81fdb7da1c13003d4513.png` | `ridenow-stacked-black-yellow-on-white-wide.png` | 1774 × 887 | PNG / RGB (opaque) | Stacked symbol and wordmark; black and brand yellow; white background | Wide light-background full lockup variant. |
+| `file_00000000835081f5a063028267b3c35a.png` | `ridenow-stacked-yellow-on-white.png` | 1774 × 887 | PNG / RGB (opaque) | Stacked symbol and wordmark; brand yellow; white background | Single-color yellow lockup; suitable for dark surfaces after contrast review. |
+| `file_0000000091d881f786bd97311805d6e4.png` | `ridenow-wordmark-black-yellow-on-white-wide.png` | 2172 × 724 | PNG / RGB (opaque) | Horizontal wordmark; black and brand yellow; white background | Wide light-background horizontal brand use. |
+| `file_00000000c35881f5ab04ef7d21bb40dd.png` | `ridenow-wordmark-yellow-on-white-wide.png` | 2172 × 724 | PNG / RGB (opaque) | Horizontal wordmark; brand yellow; white background | Single-color yellow wordmark; low contrast on light surfaces. |
+| `file_00000000cc548230993367a4348fbfd9.png` | `ridenow-wordmark-white-on-black-wide.png` | 2172 × 724 | PNG / RGB (opaque) | Horizontal wordmark; white; black background | Monochrome wordmark for dark surfaces. |
+| `file_00000000d6748230b51eedde03d387e8.png` | `ridenow-wordmark-black-on-white-wide.png` | 2172 × 724 | PNG / RGB (opaque) | Horizontal wordmark; black; white background | Monochrome wordmark for light surfaces. |
+| `file_00000000e30081fda999263a4f83a3bc.png` | `ridenow-wordmark-black-yellow-on-white.png` | 2172 × 724 | PNG / RGB (opaque) | Horizontal wordmark; black and brand yellow; white background | Primary light-background horizontal brand use. |
+| `file_00000000eb148211808020bb90382dea.png` | `ridenow-symbol-white-yellow-on-black-square.png` | 1254 × 1254 | PNG / RGB (opaque) | Standalone symbol; white and brand yellow; black background | Square dark-background app mark reference. |
+| `file_00000000eeb882309402f32ac768cb87.png` | `ridenow-wordmark-black-yellow-on-white-compact.png` | 1774 × 887 | PNG / RGB (opaque) | Horizontal wordmark; black and brand yellow; white background | Compact, centered horizontal lockup; alternate composition. |
+| `file_00000000eee481fdb0352dd3348cead4.png` | `ridenow-stacked-mark-white-yellow-on-black-wide.png` | 1774 × 887 | PNG / RGB (opaque) | Stacked symbol and wordmark; white and brand yellow; black background | Wide dark-background full lockup variant. |
+| `file_00000000f16c8230accf20b751de327a.png` | `ridenow-stacked-mark-white-yellow-on-black-compact.png` | 1774 × 887 | PNG / RGB (opaque) | Stacked symbol and wordmark; white and brand yellow; black background | Compact dark-background full lockup variant. |
+
+## Android resource selection
+
+The Rider UI continues to use the existing transparent light/dark RideNow wordmarks and matching standalone marks in `app/src/main/res/drawable-nodpi/` and `drawable/`. The Adaptive Icon foreground, legacy launcher icons, and notification mark use the supplied standalone white/yellow symbol on a near-black field (`ridenow-symbol-white-yellow-on-black-square.png` is the source reference). The themed launcher monochrome and notification small-icon pixels use that same symbol's alpha silhouette rendered as a single white shape; they do not include the wordmark. The adaptive foreground uses a conservative centered scale for the mask safe area. Existing wordmark and splash assets are reused for screen branding rather than duplicated into extra resource variants.

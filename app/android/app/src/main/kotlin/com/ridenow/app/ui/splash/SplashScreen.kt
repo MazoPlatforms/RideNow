@@ -50,10 +50,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ridenow.app.R
-import com.ridenow.app.ui.theme.DarkRideColors
-import com.ridenow.app.ui.theme.LightRideColors
-import com.ridenow.app.ui.theme.OrbGradient
-import com.ridenow.app.ui.theme.OrbInk
+import com.ridenow.app.ui.components.LogoMark
+import com.ridenow.app.ui.components.Wordmark
+import androidx.compose.ui.unit.Dp
 import com.ridenow.app.ui.theme.RideColors
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
@@ -109,8 +108,17 @@ fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
         Canvas(Modifier.fillMaxSize()) {
             drawStreets(c)
             drawRoute(c, route.value)
-            drawOrb(c, intro.value, orbit, pulse, route.value)
+            drawHalo(c, intro.value, orbit, pulse, route.value)
         }
+
+        LogoMark(
+            width = 112.dp,
+            modifier = Modifier.align(Alignment.TopCenter).offset(y = maxHeight * 0.426f - 48.dp).graphicsLayer {
+                alpha = intro.value
+                scaleX = 0.8f + 0.2f * intro.value
+                scaleY = 0.8f + 0.2f * intro.value
+            },
+        )
 
         Column(
             Modifier.fillMaxWidth().padding(top = textTop).graphicsLayer {
@@ -119,10 +127,10 @@ fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
             },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("RideNow", color = c.fg, fontSize = 36.sp, fontWeight = FontWeight.Light, letterSpacing = 1.4.sp)
+            Wordmark(height = 34.dp)
             Text(
                 stringResource(R.string.splash_tagline), color = c.muted, fontSize = 14.sp,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = 14.dp),
             )
         }
 
@@ -183,31 +191,20 @@ private fun DrawScope.drawRoute(c: RideColors, progress: Float) {
     }
 }
 
-private fun DrawScope.drawOrb(c: RideColors, intro: Float, orbit: Float, pulse: Float, route: Float) {
+private fun DrawScope.drawHalo(c: RideColors, intro: Float, orbit: Float, pulse: Float, route: Float) {
     val center = orbCenter(size)
     val ringOuter = 110.dp.toPx()
     val ringInner = 82.dp.toPx()
-    val orbR = 48.dp.toPx() * (0.85f + 0.15f * intro)
-
+    drawCircle(Brush.radialGradient(listOf(c.accent.copy(alpha = 0.18f * intro), androidx.compose.ui.graphics.Color.Transparent), center, 150.dp.toPx()), 150.dp.toPx(), center)
     drawCircle(c.ring1.copy(alpha = intro), ringOuter, center, style = Stroke(1.dp.toPx()))
     drawCircle(c.ring2.copy(alpha = intro), ringInner, center, style = Stroke(1.dp.toPx()))
-
     if (route > 0.95f) {
-        drawCircle(c.accent.copy(alpha = (1f - pulse) * 0.35f), orbR + pulse * 70.dp.toPx(), center, style = Stroke(2.dp.toPx()))
+        drawCircle(c.accent.copy(alpha = (1f - pulse) * 0.35f), ringInner * 0.6f + pulse * 90.dp.toPx(), center, style = Stroke(2.dp.toPx()))
     }
-
     val angle = Math.toRadians(orbit.toDouble() - 90.0)
     val dot = Offset(center.x + cos(angle).toFloat() * ringOuter, center.y + sin(angle).toFloat() * ringOuter)
     drawCircle(c.accent.copy(alpha = 0.3f * intro), 11.dp.toPx(), dot)
     drawCircle(c.accent.copy(alpha = intro), 4.dp.toPx(), dot)
-
-    val brush = Brush.radialGradient(
-        0f to OrbGradient[0], 0.45f to OrbGradient[1], 1f to OrbGradient[2],
-        center = Offset(center.x - orbR * 0.2f, center.y - orbR * 0.3f), radius = orbR * 1.5f,
-    )
-    drawCircle(brush, orbR, center, alpha = intro)
-    drawCircle(OrbInk.copy(alpha = intro), 16.9.dp.toPx() * (orbR / 48.dp.toPx()), center, style = Stroke(2.8.dp.toPx()))
-    drawCircle(OrbInk.copy(alpha = intro), 6.2.dp.toPx() * (orbR / 48.dp.toPx()), center)
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)

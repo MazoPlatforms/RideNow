@@ -19,6 +19,12 @@ import androidx.compose.ui.unit.dp
 object RideIcons {
     val Pin = listOf("M10 18s6-5.2 6-9.5a6 6 0 1 0-12 0C4 12.8 10 18 10 18z", "M8,8.5a2,2 0 1,0 4,0a2,2 0 1,0 -4,0")
     val Flag = listOf("M5 17V3m0 1h10l-2 3.5 2 3.5H5")
+    val Back = listOf("M12.5 4L6.5 10l6 6")
+    val ChevronDown = listOf("M5 7.5l5 5 5-5")
+    val Check = listOf("M4.5 10.5l3.5 3.5 7.5-8")
+    val Close = listOf("M5 5l10 10M15 5L5 15")
+    val Lock = listOf("M5,9h10v8h-10z", "M7 9V7a3 3 0 0 1 6 0v2")
+    val Search = listOf("M9,9m-6,0a6,6 0 1,0 12,0a6,6 0 1,0 -12,0", "M13.5 13.5L17 17")
     val Card = listOf("M4.5,4.5h11a2.5,2.5 0 0 1 2.5,2.5v6a2.5,2.5 0 0 1 -2.5,2.5h-11a2.5,2.5 0 0 1 -2.5,-2.5v-6a2.5,2.5 0 0 1 2.5,-2.5z", "M2 8.5h16")
 }
 

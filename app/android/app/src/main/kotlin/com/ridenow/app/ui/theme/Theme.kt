@@ -11,30 +11,31 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-/** Design tokens from the RideNow design foundations board. */
+/** RideNow brand yellow, sampled from the supplied logo. */
+val BrandYellow = Color(0xFFFEC604)
+/** Near-black ink used on top of the brand yellow and as the dark background. */
+val Ink = Color(0xFF0A0C10)
+
 @Immutable
 data class RideColors(
     val bg: Color, val fg: Color, val muted: Color, val line: Color, val border: Color,
     val accent: Color, val onAccent: Color, val street: Color, val street2: Color,
-    val ring1: Color, val ring2: Color, val isDark: Boolean,
+    val ring1: Color, val ring2: Color, val field: Color, val danger: Color, val isDark: Boolean,
 )
 
 val DarkRideColors = RideColors(
-    bg = Color(0xFF07090D), fg = Color(0xFFEEF2F6), muted = Color(0xFF9AA6B2),
-    line = Color(0xFF1E2733), border = Color(0xFF2A3646), accent = Color(0xFF7CF5D0),
-    onAccent = Color(0xFF04130E), street = Color(0xFF1C2633), street2 = Color(0xFF26334A),
-    ring1 = Color(0xFF1E2733), ring2 = Color(0xFF2A3646), isDark = true,
+    bg = Ink, fg = Color(0xFFF2F4F7), muted = Color(0xFF9AA3AE),
+    line = Color(0xFF1E2430), border = Color(0xFF2C3442), accent = BrandYellow,
+    onAccent = Ink, street = Color(0xFF1A202A), street2 = Color(0xFF252D3A),
+    ring1 = Color(0xFF1E2430), ring2 = Color(0xFF2C3442), field = Color(0xFF11151C), danger = Color(0xFFFF8F8F), isDark = true,
 )
+/** On light backgrounds the accent is a deeper amber so text and icons keep 4.5:1 contrast. */
 val LightRideColors = RideColors(
-    bg = Color(0xFFF6F8FA), fg = Color(0xFF0B1117), muted = Color(0xFF4F5B67),
-    line = Color(0xFFDDE3E9), border = Color(0xFFC3CCD6), accent = Color(0xFF0A7A5F),
-    onAccent = Color(0xFFFFFFFF), street = Color(0xFFFFFFFF), street2 = Color(0xFFFFFFFF),
-    ring1 = Color(0xFFD5DCE3), ring2 = Color(0xFFBFC9D3), isDark = false,
+    bg = Color(0xFFF6F8FA), fg = Ink, muted = Color(0xFF4F5B67),
+    line = Color(0xFFDDE3E9), border = Color(0xFFC3CCD6), accent = Color(0xFF8A5A00),
+    onAccent = Color.White, street = Color.White, street2 = Color.White,
+    ring1 = Color(0xFFD5DCE3), ring2 = Color(0xFFBFC9D3), field = Color.White, danger = Color(0xFFB3261E), isDark = false,
 )
-
-/** Mint orb gradient is the same in both themes. */
-val OrbGradient = listOf(Color(0xFFB9FFEA), Color(0xFF7CF5D0), Color(0xFF2E9C80))
-val OrbInk = Color(0xFF04130E)
 
 val LocalRideColors = staticCompositionLocalOf { DarkRideColors }
 
@@ -47,10 +48,5 @@ fun RideNowTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composabl
     val c = if (darkTheme) DarkRideColors else LightRideColors
     val scheme = if (darkTheme) darkColorScheme(primary = c.accent, background = c.bg, surface = c.bg, onBackground = c.fg, onSurface = c.fg)
     else lightColorScheme(primary = c.accent, background = c.bg, surface = c.bg, onBackground = c.fg, onSurface = c.fg)
-    CompositionLocalProvider(LocalRideColors provides c) {
-        MaterialTheme(colorScheme = scheme, content = content)
-    }
+    CompositionLocalProvider(LocalRideColors provides c) { MaterialTheme(colorScheme = scheme, content = content) }
 }
-
-/** Primary button colour is the same mint in both themes. */
-val Mint = Color(0xFF7CF5D0)

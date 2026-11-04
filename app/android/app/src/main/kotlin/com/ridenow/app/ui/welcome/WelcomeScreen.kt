@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -49,10 +50,10 @@ import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideButtonStyle
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
-import com.ridenow.app.ui.components.RideMark
+import com.ridenow.app.ui.components.LogoMark
+import com.ridenow.app.ui.components.Wordmark
 import com.ridenow.app.ui.components.drawCityStreets
 import com.ridenow.app.ui.components.drawDrifters
-import com.ridenow.app.ui.theme.OrbGradient
 import com.ridenow.app.ui.theme.RideColors
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
@@ -88,7 +89,10 @@ fun WelcomeScreen(
 
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().entrance(120), contentAlignment = Alignment.Center) {
                 val side = minOf(236.dp, maxHeight, maxWidth)
-                Canvas(Modifier.size(side).clearAndSetSemantics { }) { drawWelcomeOrb(c, orbit, breath) }
+                Box(Modifier.size(side).clearAndSetSemantics { }, contentAlignment = Alignment.Center) {
+                    Canvas(Modifier.fillMaxSize()) { drawWelcomeHalo(c, orbit, breath) }
+                    LogoMark(side * 0.47f, Modifier.graphicsLayer { val k = 1f + 0.03f * breath; scaleX = k; scaleY = k })
+                }
             }
 
             Column(Modifier.entrance(220)) {
@@ -121,9 +125,7 @@ fun WelcomeScreen(
 private fun TopBar(onHelp: () -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     Row(modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-        RideMark(c.accent)
-        Spacer(Modifier.width(10.dp))
-        Text("RideNow", color = c.fg, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.4.sp)
+        Wordmark(height = 24.dp)
         Spacer(Modifier.weight(1f))
         Box(
             Modifier.heightIn(min = 48.dp).clickable(onClick = onHelp).padding(horizontal = 8.dp),
@@ -145,30 +147,19 @@ private fun Feature(icon: List<String>, textRes: Int) {
     }
 }
 
-/** Orb with two rings, a slowly orbiting dot, a soft glow and a gentle breathing scale. */
-private fun DrawScope.drawWelcomeOrb(c: RideColors, orbit: Float, breath: Float) {
+/** Two rings, a slowly orbiting dot and a soft glow behind the logo. */
+private fun DrawScope.drawWelcomeHalo(c: RideColors, orbit: Float, breath: Float) {
     val u = size.minDimension / 236f
     val center = Offset(size.width / 2, size.height / 2)
     val outer = 117f * u
     val inner = 87f * u
-    val orbR = 52f * u * (1f + 0.03f * breath)
-
-    drawCircle(Brush.radialGradient(listOf(c.accent.copy(alpha = 0.16f + 0.06f * breath), Color.Transparent), center, orbR * 2.3f), orbR * 2.3f, center)
+    drawCircle(Brush.radialGradient(listOf(c.accent.copy(alpha = 0.16f + 0.06f * breath), Color.Transparent), center, 130f * u), 130f * u, center)
     drawCircle(c.ring1, outer, center, style = Stroke(1.dp.toPx()))
     drawCircle(c.ring2, inner, center, style = Stroke(1.dp.toPx()))
-
     val a = Math.toRadians(orbit.toDouble() - 90.0)
     val dot = Offset(center.x + cos(a).toFloat() * outer, center.y + sin(a).toFloat() * outer)
     drawCircle(c.accent.copy(alpha = 0.3f), 10.dp.toPx(), dot)
-    drawCircle(c.fg, 4.dp.toPx(), dot)
-
-    drawCircle(
-        Brush.radialGradient(
-            0f to OrbGradient[0], 0.45f to OrbGradient[1], 1f to OrbGradient[2],
-            center = Offset(center.x - orbR * 0.2f, center.y - orbR * 0.3f), radius = orbR * 1.5f,
-        ),
-        orbR, center,
-    )
+    drawCircle(c.accent, 4.dp.toPx(), dot)
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)

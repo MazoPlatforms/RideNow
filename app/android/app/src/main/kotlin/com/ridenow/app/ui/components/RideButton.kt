@@ -8,7 +8,9 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -16,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -23,8 +26,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ridenow.app.ui.theme.Mint
-import com.ridenow.app.ui.theme.OrbInk
+import com.ridenow.app.ui.theme.BrandYellow
+import com.ridenow.app.ui.theme.Ink
 import com.ridenow.app.ui.theme.RideTheme
 
 enum class RideButtonStyle { Primary, Text }
@@ -35,6 +38,8 @@ fun RideButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     style: RideButtonStyle = RideButtonStyle.Primary,
+    enabled: Boolean = true,
+    loading: Boolean = false,
 ) {
     val c = RideTheme.colors
     val interaction = remember { MutableInteractionSource() }
@@ -46,18 +51,22 @@ fun RideButton(
         modifier.fillMaxWidth().height(if (primary) 56.dp else 48.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(28.dp))
-            .background(if (primary) Mint else androidx.compose.ui.graphics.Color.Transparent)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button) {
+            .background(if (primary) (if (enabled) BrandYellow else c.line) else Color.Transparent)
+            .clickable(interactionSource = interaction, indication = null, enabled = enabled && !loading, role = Role.Button) {
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text,
-            color = if (primary) OrbInk else c.fg,
-            fontSize = if (primary) 16.sp else 15.sp,
-            fontWeight = if (primary) FontWeight.SemiBold else FontWeight.Normal,
-        )
+        if (loading) {
+            CircularProgressIndicator(Modifier.size(22.dp), color = Ink, strokeWidth = 2.5.dp)
+        } else {
+            Text(
+                text,
+                color = if (primary) (if (enabled) Ink else c.muted) else c.fg,
+                fontSize = if (primary) 16.sp else 15.sp,
+                fontWeight = if (primary) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        }
     }
 }

@@ -15,15 +15,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
+import com.ridenow.app.ui.auth.PhoneScreen
 import com.ridenow.app.ui.splash.SplashScreen
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.welcome.WelcomeScreen
 
-enum class Screen { Splash, Welcome, Phone }
+enum class Screen { Splash, Welcome, Phone, Otp }
 
 @Composable
 fun AppRoot() {
     var screen by rememberSaveable { mutableStateOf(Screen.Splash) }
+    var phone by rememberSaveable { mutableStateOf("") }
     Crossfade(targetState = screen, animationSpec = tween(400), label = "root") { current ->
         when (current) {
             Screen.Splash -> SplashScreen(onFinished = { screen = Screen.Welcome })
@@ -34,7 +36,11 @@ fun AppRoot() {
             )
             Screen.Phone -> {
                 BackHandler { screen = Screen.Welcome }
-                Placeholder("Phone number screen goes here")
+                PhoneScreen(onBack = { screen = Screen.Welcome }, onCodeSent = { phone = it; screen = Screen.Otp })
+            }
+            Screen.Otp -> {
+                BackHandler { screen = Screen.Phone }
+                Placeholder("Code screen for $phone goes here")
             }
         }
     }
