@@ -51,7 +51,7 @@ jobs:
           cp "$wrapper_dir/gradle/wrapper/gradle-wrapper.jar" app/android/gradle/wrapper/gradle-wrapper.jar
           chmod +x app/android/gradlew
       - uses: gradle/actions/wrapper-validation@v4
-      - name: Build the supplied splash-screen project
+      - name: Build the supplied Android project
         working-directory: app/android
         run: |
           set -o pipefail
@@ -63,10 +63,10 @@ jobs:
           head -5 "$RUNNER_TEMP/android-apk-metadata.txt"
           sha256sum --check "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
           git diff --exit-code -- app/android
-          cp app/android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/android-release/RideNow-Android-splash-debug.apk"
+          cp app/android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/android-release/RideNow-Android-debug.apk"
           cp app/android/RideNow-Android.zip "$RUNNER_TEMP/android-release/RideNow-Android.zip"
           cd "$RUNNER_TEMP/android-release"
-          sha256sum RideNow-Android-splash-debug.apk RideNow-Android.zip ANDROID_SOURCE_SHA256SUMS.txt > SHA256SUMS.txt
+          sha256sum RideNow-Android-debug.apk RideNow-Android.zip ANDROID_SOURCE_SHA256SUMS.txt > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: ridenow-android-${{ github.run_id }}
@@ -97,10 +97,10 @@ jobs:
         run: |
           tag="android-splash-${GITHUB_RUN_ID}"
           cat > "$RUNNER_TEMP/android-release-notes.md" <<EOF
-          Android splash-screen preview built from commit ${GITHUB_SHA}.
+          RideNow Android UI preview built from commit ${GITHUB_SHA}.
 
-          - Contains the screens and UI components currently present in the supplied Android project; the app remains an incomplete preview.
-          - Original Kotlin, resources, manifest, and Gradle project files are unchanged.
+          - Contains the screens and UI components currently present in the supplied Android project; app flows remain incomplete.
+          - The uploaded ZIP is preserved byte-for-byte. The extracted source adds the missing Compose `dp` import required to compile `Backdrop.kt`.
           - The missing wrapper scripts and JAR were generated only in GitHub Actions using Gradle 8.9 and Java 17.
           - APK is debug-signed for installation and testing, not a production or Play Store release. Debug signing keys may differ between workflow runs; installing a later preview can require uninstalling the previous one.
           - Minimum Android version: Android 8.0 (API 26).
@@ -111,7 +111,7 @@ jobs:
           else
             gh release create "$tag" android-release/* --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --prerelease \
-              --title "RideNow Android splash preview #${GITHUB_RUN_NUMBER}" \
+              --title "RideNow Android preview #${GITHUB_RUN_NUMBER}" \
               --notes-file "$RUNNER_TEMP/android-release-notes.md"
           fi
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"

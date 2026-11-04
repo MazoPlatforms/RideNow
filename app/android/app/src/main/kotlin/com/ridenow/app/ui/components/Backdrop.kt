@@ -3,6 +3,7 @@ package com.ridenow.app.ui.components
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.unit.dp
 import com.ridenow.app.ui.theme.RideColors
 
 /** Faint city grid used behind onboarding screens. */
