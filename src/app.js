@@ -17,6 +17,7 @@ import * as drivers from './modules/drivers.js';
 import * as ledger from './modules/ledger.js';
 import { acceptOffer } from './modules/dispatch.js';
 import { mountWebsite } from './website.js';
+import { mountAdminSetup } from './admin-setup.js';
 export const coordinate = z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]);
 export const locationSchema = z
   .object({
@@ -83,6 +84,7 @@ export function createApp({ pool, redis, config, maps, storage, logger }) {
     express.json({ limit: '256kb' }),
   );
   app.use('/v1', rateLimiter(redis, config, { limit: 10000, seconds: 60, prefix: 'edge' }));
+  app.use('/v1/auth', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   const sensitive = rateLimiter(redis, config, { limit: 10, seconds: 60, prefix: 'auth' });
   function route(
     method,
@@ -197,10 +199,18 @@ export function createApp({ pool, redis, config, maps, storage, logger }) {
     {
       access: 'public',
       body: z
-        .object({ phone, password: z.string().min(12).max(128), totp: z.string().regex(/^\d{6}$/) })
+        .object({ phone, password: z.string().min(12).max(128), totp: z.string().regex(/^\d{6}$/).optional(),
+          challengeId: uuid.optional(), code: z.string().regex(/^\d{6}$/).optional() })
         .strict(),
     },
-    ({ body }) => auth.staffLogin(body.phone, body.password, body.totp),
+    ({ body }) => auth.staffLogin(body.phone, body.password, body.totp, body.challengeId, body.code),
+  );
+  route(
+    'post',
+    '/v1/auth/admin/recover',
+    { access: 'public', body: z.object({ phone, password: z.string().min(12).max(128),
+      recoveryPassword: z.string().min(20).max(128) }).strict() },
+    ({ body }) => auth.recoverAdmin(body.phone, body.password, body.recoveryPassword),
   );
   route(
     'post',
@@ -1005,6 +1015,7 @@ export function createApp({ pool, redis, config, maps, storage, logger }) {
       paths,
     }),
   );
+  mountAdminSetup(app, { pool, redis, config, auth });
   mountWebsite(app);
   app.use((req, res, next) => next(new AppError(404, 'NOT_FOUND')));
   app.use(errorHandler(logger));

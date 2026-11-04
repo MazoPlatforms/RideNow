@@ -50,6 +50,8 @@ Baileys அதிகாரப்பூர்வ WhatsApp Business API அல்�
 npm run admin:create -- 0771234567
 ```
 
+தற்காலிக browser setup, விருப்ப TOTP மற்றும் OTP இல்லாத நேரத்திற்கான recovery login விவரங்கள்: [Admin setup வழிகாட்டி](docs/admin-setup.md).
+
 கடவுச்சொல் stdin-ல் பெறப்படும்; `ADMIN_PASSWORD` மூலமும் வழங்கலாம். கிடைக்கும் TOTP secret-ஐ authenticator-ல் பதிவு செய்யவும். `POST /v1/auth/staff/login` வழியாக password + TOTP பயன்படுத்தவும். Rider OTP மூலம் Staff/Admin login அனுமதிக்கப்படாது. முதல் admin உருவாக்கியபின் Staff provision மற்றும் permissions API வழியாக நிர்வகிக்கலாம்.
 
 ## பயண ஓட்டம்

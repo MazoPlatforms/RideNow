@@ -687,6 +687,111 @@ test('staff TOTP is single-use and staff cannot grant permissions', async () => 
     permissions: [],
   }).expect(403);
 });
+
+async function setupTest(fn) {
+  config.ADMIN_SETUP_KEY = 'local-test-setup-key-'.repeat(3);
+  config.ADMIN_SETUP_EXPIRES_AT = new Date(Date.now() + 3600000).toISOString();
+  const call = (path, body, key = config.ADMIN_SETUP_KEY) => api.post(`/v1/admin-setup/${path}`)
+    .set('X-Admin-Setup-Key', key).send(body);
+  try { await fn(call); }
+  finally { delete config.ADMIN_SETUP_KEY; delete config.ADMIN_SETUP_EXPIRES_AT; }
+}
+async function adminOtp(phone) {
+  await pool.query("UPDATE otp_challenges SET created_at=now()-interval '61 seconds' WHERE phone=$1", [phone]);
+  const result = await auth.requestOtp(phone);
+  const job = await one(pool, "SELECT payload FROM jobs WHERE payload->>'challengeId'=$1", [result.challengeId]);
+  return { challengeId: result.challengeId, code: decrypt(job.payload.encryptedCode, config.ENCRYPTION_KEY) };
+}
+const adminBody = (phone) => ({ phone, name: 'Test administrator', password: 'temporary-admin-password-1234' });
+
+test('temporary admin setup is disabled by default, key protected and expires', async () => {
+  await api.get('/admin-setup/').expect(404).expect('Cache-Control', 'no-store');
+  await setupTest(async (call) => {
+    await api.get('/admin-setup/').expect(200).expect('X-Robots-Tag', 'noindex, nofollow');
+    await call('otp', { phone: '+94770000101' }, 'wrong-key').expect(404);
+    await call('complete', { ...adminBody('+94770000101'), verification: 'setup-key' }, 'wrong-key').expect(404);
+    assert.equal((await one(pool, 'SELECT count(*)::int AS n FROM users')).n, 0);
+    config.ADMIN_SETUP_EXPIRES_AT = new Date(Date.now() - 1000).toISOString();
+    await call('otp', { phone: '+94770000101' }).expect(404);
+  });
+});
+
+test('OTP-verified setup persists failed attempts, closes once and supports password plus OTP login', async () => {
+  await setupTest(async (call) => {
+    const phone = '+94770000102';
+    const otp = await adminOtp(phone);
+    const wrong = otp.code === '000000' ? '111111' : '000000';
+    await call('complete', { ...adminBody(phone), ...otp, code: wrong }).expect(401);
+    assert.equal((await one(pool, 'SELECT attempts FROM otp_challenges WHERE id=$1', [otp.challengeId])).attempts, 1);
+    const result = (await call('complete', { ...adminBody(phone), ...otp }).expect(201)).body;
+    assert.equal(result.totpEnabled, false);
+    assert(result.recoveryPassword.length >= 32);
+    const user = await one(pool, 'SELECT * FROM users WHERE id=$1', [result.id]);
+    assert.deepEqual(user.roles, ['ADMIN']);
+    assert.notEqual(user.password_hash, adminBody(phone).password);
+    assert.notEqual(user.recovery_password_hash, result.recoveryPassword);
+    await api.get('/admin-setup/').expect(404);
+    await call('complete', { ...adminBody('+94770000103'), verification: 'setup-key' }).expect(404);
+    await pool.query("UPDATE users SET roles=ARRAY['RIDER'] WHERE id=$1", [result.id]);
+    await call('otp', { phone: '+94770000103' }).expect(404);
+    await pool.query("UPDATE users SET roles=ARRAY['ADMIN'] WHERE id=$1", [result.id]);
+    await assert.rejects(auth.staffLogin(phone, adminBody(phone).password), { code: 'WHATSAPP_OTP_REQUIRED' });
+    const next = await adminOtp(phone);
+    const session = await auth.staffLogin(phone, adminBody(phone).password, undefined, next.challengeId, next.code);
+    assert(session.accessToken);
+    await assert.rejects(auth.staffLogin(phone, adminBody(phone).password, undefined, next.challengeId, next.code), { code: 'OTP_INVALID' });
+  });
+});
+
+test('setup-key fallback creates only one first admin under concurrent requests', async () => {
+  await setupTest(async (call) => {
+    const results = await Promise.all([
+      call('complete', { ...adminBody('+94770000104'), verification: 'setup-key' }),
+      call('complete', { ...adminBody('+94770000105'), verification: 'setup-key' }),
+    ]);
+    assert.deepEqual(results.map((r) => r.status).sort(), [201, 404]);
+    assert.equal((await one(pool, "SELECT count(*)::int AS n FROM users WHERE 'ADMIN'=ANY(roles)")).n, 1);
+    assert.equal((await one(pool, "SELECT details->>'verification' AS mode FROM audit_logs WHERE action='ADMIN_WEB_BOOTSTRAP'")).mode, 'setup-key');
+  });
+});
+
+test('optional TOTP is confirmed before storage; OTP cannot bypass enrolled TOTP', async () => {
+  await setupTest(async (call) => {
+    const OTPAuth = await import('otpauth');
+    const phone = '+94770000106';
+    const enrollment = (await call('totp', { phone }).expect(200)).body;
+    await call('complete', { ...adminBody(phone), verification: 'setup-key', enrollment: enrollment.enrollment.slice(0, -4) + 'AAAA', totp: '000000' }).expect(400);
+    await call('complete', { ...adminBody(phone), verification: 'setup-key', enrollment: enrollment.enrollment, totp: 'invalid' }).expect(400);
+    const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(enrollment.secret), digits: 6, period: 30 });
+    const created = (await call('complete', { ...adminBody(phone), verification: 'setup-key', enrollment: enrollment.enrollment, totp: totp.generate() }).expect(201)).body;
+    assert.equal(created.totpEnabled, true);
+    const user = await one(pool, 'SELECT * FROM users WHERE id=$1', [created.id]);
+    assert.notEqual(user.totp_secret, enrollment.secret);
+    const otp = await adminOtp(phone);
+    await assert.rejects(auth.staffLogin(phone, adminBody(phone).password, undefined, otp.challengeId, otp.code), { code: 'INVALID_CREDENTIALS' });
+  });
+});
+
+test('admin recovery requires two passwords, rotates recovery secret and revokes older sessions', async () => {
+  await setupTest(async (call) => {
+    const phone = '+94770000107', password = adminBody(phone).password;
+    const created = (await call('complete', { ...adminBody(phone), verification: 'setup-key' }).expect(201)).body;
+    await assert.rejects(auth.recoverAdmin(phone, 'incorrect-password', created.recoveryPassword), { code: 'INVALID_CREDENTIALS' });
+    await assert.rejects(auth.recoverAdmin(phone, password, 'incorrect-recovery-password'), { code: 'INVALID_CREDENTIALS' });
+    const otp = await adminOtp(phone);
+    const older = await auth.staffLogin(phone, password, undefined, otp.challengeId, otp.code);
+    const recovered = (await api.post('/v1/auth/admin/recover').send({ phone, password, recoveryPassword: created.recoveryPassword })
+      .expect(200).expect('Cache-Control', 'no-store')).body;
+    assert(recovered.accessToken);
+    assert.notEqual(recovered.recoveryPassword, created.recoveryPassword);
+    await assert.rejects(auth.authenticate(older.accessToken), { code: 'SESSION_REVOKED' });
+    await assert.rejects(auth.recoverAdmin(phone, password, created.recoveryPassword), { code: 'INVALID_CREDENTIALS' });
+    assert.equal((await auth.authenticate(recovered.accessToken)).id, created.id);
+    await pool.query('UPDATE users SET recovery_attempts=4 WHERE id=$1', [created.id]);
+    await assert.rejects(auth.recoverAdmin(phone, password, 'incorrect-recovery-password'), { code: 'INVALID_CREDENTIALS' });
+    await assert.rejects(auth.recoverAdmin(phone, password, recovered.recoveryPassword), { code: 'RECOVERY_LOCKED' });
+  });
+});
 test('admin provisions staff; idempotency responses containing enrollment secrets are encrypted', async () => {
   const admin = await login();
   await pool.query("UPDATE users SET roles='{ADMIN}' WHERE id=$1", [admin.user.id]);

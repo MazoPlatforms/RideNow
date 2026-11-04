@@ -3,7 +3,8 @@
 - JWT 15 நிமிடம்; rotating refresh session 30 நாட்கள்; reuse குடும்பத்தை revoke செய்யும். ஒவ்வொரு HTTP request மற்றும் socket command-லும் database session சரிபார்ப்பு.
 - Socket events அனுப்புவதற்கு முன்பும் session மறுசரிபார்ப்பு; idle connection-கள் 15 விநாடிக்கு ஒருமுறை சோதிக்கப்படும்.
 - OTP 5 நிமிடம், challenge-க்கு 5 attempts, resend 60 விநாடி, phone-க்கு மணிக்கு 10 requests; encrypted delivery payload; API-ல் OTP இல்லை.
-- Admin/Staff bcrypt password + single-use TOTP; secret AES-256-GCM; role elevation admin-க்கு மட்டும்; resource ownership backend-ல் கட்டாயம்.
+- Admin/Staff bcrypt password + single-use TOTP; TOTP அமைக்காத account-க்கு password + phone-bound single-use WhatsApp OTP. TOTP அமைத்திருந்தால் சாதாரண OTP மூலம் அதைத் தவிர்க்க முடியாது. Secret AES-256-GCM; role elevation admin-க்கு மட்டும்; resource ownership backend-ல் கட்டாயம்.
+- முதல் admin web setup தனிப்பட்ட காலாவதியாகும் setup key மூலம் பாதுகாக்கப்படும்; admin உருவானதும் நிரந்தர completion marker மூலம் மூடப்படும். OTP கிடைக்காவிட்டால் உரிமையாளர் setup key வழியைத் தெளிவாகத் தேர்வு செய்யலாம்; அந்த வழியில் phone ownership உறுதிப்படுத்தப்படாது. பின்னர் recovery login-க்கு login password + தனி rotating recovery password இரண்டும் தேவை; 5 தவறான recovery முயற்சிகளுக்குப் பின் 15 நிமிட lock.
 - Rate limiter Redis தோல்வியில் fail closed. Edge IP limit 10,000/min, authenticated user 180/min, auth endpoint IP 10/min, socket user 120 commands/min.
 - SQL parameterized; state transitions, assignment, idempotency, ledger transactions lock செய்யப்பட்ட database transactions-ல்.
 - Ledger entries/transactions, fare versions immutable; திருத்தத்திற்கு reversal/புதிய version.

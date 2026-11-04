@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ta">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>RideNow — Admin access</title>
+  <link rel="stylesheet" href="/admin-access-assets/setup.css">
+  <script type="module" src="/admin-access-assets/setup.js"></script>
+</head>
+<body>
+<main>
+  <a href="/">RideNow</a>
+  <h1 id="title">முதல் Admin அமைப்பு</h1>
+  <p id="intro">இந்தத் தற்காலிக அமைப்பை முடிக்க தனிப்பட்ட setup key தேவை. முதல் admin உருவானதும் setup மூடப்படும்.</p>
+  <form id="form">
+    <label id="key-field">Setup key<input id="key" type="password" autocomplete="off"></label>
+    <label id="name-field">பெயர்<input id="name" maxlength="100" autocomplete="name"></label>
+    <label>Admin தொலைபேசி எண்<input id="phone" type="tel" placeholder="+9477XXXXXXX" required autocomplete="tel"></label>
+    <p id="phone-note">தனி admin எண்ணைப் பயன்படுத்துவது சிறந்தது. ஏற்கெனவே rider ஆக உள்ள எண்ணைப் பயன்படுத்தினால் அதன் account admin ஆக மாறும்.</p>
+    <label>Password — குறைந்தது 12 எழுத்துகள்<input id="password" type="password" minlength="12" maxlength="72" required autocomplete="new-password"></label>
+    <button id="send" type="button">WhatsApp OTP அனுப்புக</button>
+    <label id="otp-field">WhatsApp OTP<input id="otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>
+    <label class="check"><input id="fallback" type="checkbox">OTP கிடைக்கவில்லை — recovery வழியைப் பயன்படுத்துக</label>
+    <p id="fallback-note" hidden>முதல் setup-ல் உங்கள் தனிப்பட்ட setup key உரிமையாளர் அனுமதியாகப் பயன்படுத்தப்படும். தொலைபேசி எண் WhatsApp மூலம் உறுதிப்படுத்தப்படாது.</p>
+    <label id="recovery-field" hidden>தனி recovery password<input id="recovery" type="password" autocomplete="off" minlength="20" maxlength="128"></label>
+    <section id="totp-section">
+      <label class="check"><input id="enable-totp" type="checkbox">TOTP authenticator அமைக்கவும் — விருப்பம்</label>
+      <div id="totp-fields" hidden>
+        <button id="enroll" type="button">Authenticator secret உருவாக்குக</button>
+        <label>Authenticator செயலியில் சேர்க்கும் secret<input id="totp-secret" readonly autocomplete="off"></label>
+        <label>Authenticator-ன் 6 இலக்க code<input id="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>
+        <p>RideNow, 6 digits, 30 seconds என்ற அமைப்புடன் secret-ஐ உங்கள் authenticator செயலியில் உள்ளிடுக.</p>
+      </div>
+    </section>
+    <label id="login-totp-field" hidden>TOTP code — அமைத்திருந்தால்<input id="login-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>
+    <button id="submit" type="submit">Admin account உருவாக்குக</button>
+  </form>
+  <p id="status" role="status" aria-live="polite"></p>
+  <section id="result" hidden>
+    <h2>Recovery password-ஐப் பாதுகாப்பாகச் சேமிக்கவும்</h2>
+    <p>இது ஒருமுறை மட்டுமே காட்டப்படும். OTP அல்லது TOTP கிடைக்காதபோது login password-உடன் இதையும் பயன்படுத்தலாம். Recovery login செய்தால் இது மாற்றப்பட்டு புதிய recovery password வழங்கப்படும்.</p>
+    <textarea id="recovery-result" readonly rows="3" autocomplete="off"></textarea>
+    <button id="copy" type="button">Recovery password நகலெடுக்கவும்</button>
+    <p id="saved-link"><a href="/admin-access/">Admin login பக்கத்திற்குச் செல்லவும்</a></p>
+  </section>
+  <button id="logout" type="button" hidden>Logout</button>
+</main>
+</body>
+</html>
