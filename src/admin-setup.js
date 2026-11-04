@@ -29,7 +29,7 @@ export function mountAdminSetup(app, { pool, redis, config, auth }) {
     res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
     next();
   };
-  app.get(['/admin-access', '/admin-access/'], noCache, (req, res) => res.sendFile('index.html', { root }));
+  app.get(['/admin-access', '/admin-access/'], noCache, (req, res) => res.redirect(303, '/admin/login/'));
   app.use('/admin-access-assets', noCache, express.static(root, { dotfiles: 'deny', index: false }));
   app.use('/admin-setup', noCache, async (req, res, next) => {
     if (!enabled() || !await unused()) throw new AppError(404, 'SETUP_UNAVAILABLE');

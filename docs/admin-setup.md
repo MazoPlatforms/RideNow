@@ -28,7 +28,7 @@
 - OTP/TOTP கிடைக்காவிட்டால்: login password + தனி recovery password. Recovery பயன்படுத்தியதும் பழைய sessions revoke செய்யப்படும், பழைய recovery password செல்லாது, புதிய recovery password ஒருமுறை வழங்கப்படும். புதியதைச் சேமிக்க வேண்டும்.
 - தவறான recovery password 5 முறை உள்ளிடப்பட்டால் 15 நிமிட recovery lock. API rate limiting கூடுதலாக இயங்கும்.
 
-இந்தப் பக்கம் login உறுதிப்படுத்தலும் logout வசதியும் வழங்குகிறது. Access token browser memory-ல் மட்டும் இருக்கும்; localStorage, cookies அல்லது URL-ல் சேமிக்கப்படாது. வேறு admin management UI இந்த மாற்றத்தில் உருவாக்கப்படவில்லை.
+`/admin-access/` தற்போது புதிய `/admin/login/` பல்பக்க sign-in-க்கு redirect செய்கிறது. Login முடிந்ததும் `/admin/` dashboard திறக்கும். Browser session ஒரு HttpOnly cookie மூலம் பாதுகாக்கப்படும்; API tokens server-side encrypted Redis state-ல் இருக்கும். Password/JWT browser storage அல்லது URL-ல் சேமிக்கப்படாது. [Dashboard விவரங்கள்](admin-dashboard.md).
 
 ## API
 

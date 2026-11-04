@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ta">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -11,38 +11,38 @@
 <body>
 <main>
   <a href="/">RideNow</a>
-  <h1 id="title">முதல் Admin அமைப்பு</h1>
-  <p id="intro">இந்தத் தற்காலிக அமைப்பை முடிக்க தனிப்பட்ட setup key தேவை. முதல் admin உருவானதும் setup மூடப்படும்.</p>
+  <h1 id="title">First administrator setup</h1>
+  <p id="intro">Use your private setup key to create the first administrator. Setup closes after the account is created.</p>
   <form id="form">
     <label id="key-field">Setup key<input id="key" type="password" autocomplete="off"></label>
-    <label id="name-field">பெயர்<input id="name" maxlength="100" autocomplete="name"></label>
-    <label>Admin தொலைபேசி எண்<input id="phone" type="tel" placeholder="+9477XXXXXXX" required autocomplete="tel"></label>
-    <p id="phone-note">தனி admin எண்ணைப் பயன்படுத்துவது சிறந்தது. ஏற்கெனவே rider ஆக உள்ள எண்ணைப் பயன்படுத்தினால் அதன் account admin ஆக மாறும்.</p>
-    <label>Password — குறைந்தது 12 எழுத்துகள்<input id="password" type="password" minlength="12" maxlength="72" required autocomplete="new-password"></label>
-    <button id="send" type="button">WhatsApp OTP அனுப்புக</button>
+    <label id="name-field">Full name<input id="name" maxlength="100" autocomplete="name"></label>
+    <label>Admin phone number<input id="phone" type="tel" placeholder="+9477XXXXXXX" required autocomplete="tel"></label>
+    <p id="phone-note">Use a separate admin number if possible. An existing rider account using this number will become an administrator.</p>
+    <label>Password — at least 12 characters<input id="password" type="password" minlength="12" maxlength="72" required autocomplete="new-password"></label>
+    <button id="send" type="button">Send WhatsApp code</button>
     <label id="otp-field">WhatsApp OTP<input id="otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>
-    <label class="check"><input id="fallback" type="checkbox">OTP கிடைக்கவில்லை — recovery வழியைப் பயன்படுத்துக</label>
-    <p id="fallback-note" hidden>முதல் setup-ல் உங்கள் தனிப்பட்ட setup key உரிமையாளர் அனுமதியாகப் பயன்படுத்தப்படும். தொலைபேசி எண் WhatsApp மூலம் உறுதிப்படுத்தப்படாது.</p>
-    <label id="recovery-field" hidden>தனி recovery password<input id="recovery" type="password" autocomplete="off" minlength="20" maxlength="128"></label>
+    <label class="check"><input id="fallback" type="checkbox">I cannot receive a code — use recovery</label>
+    <p id="fallback-note" hidden>For first-time setup, your private setup key authorizes account creation. WhatsApp phone ownership will not be verified.</p>
+    <label id="recovery-field" hidden>Separate recovery password<input id="recovery" type="password" autocomplete="off" minlength="20" maxlength="128"></label>
     <section id="totp-section">
-      <label class="check"><input id="enable-totp" type="checkbox">TOTP authenticator அமைக்கவும் — விருப்பம்</label>
+      <label class="check"><input id="enable-totp" type="checkbox">Set up an authenticator — optional</label>
       <div id="totp-fields" hidden>
-        <button id="enroll" type="button">Authenticator secret உருவாக்குக</button>
-        <label>Authenticator செயலியில் சேர்க்கும் secret<input id="totp-secret" readonly autocomplete="off"></label>
-        <label>Authenticator-ன் 6 இலக்க code<input id="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>
-        <p>RideNow, 6 digits, 30 seconds என்ற அமைப்புடன் secret-ஐ உங்கள் authenticator செயலியில் உள்ளிடுக.</p>
+        <button id="enroll" type="button">Generate authenticator secret</button>
+        <label>Authenticator enrollment secret<input id="totp-secret" readonly autocomplete="off"></label>
+        <label>6-digit authenticator code<input id="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>
+        <p>Add the secret to your authenticator using RideNow, 6 digits, and a 30-second period.</p>
       </div>
     </section>
-    <label id="login-totp-field" hidden>TOTP code — அமைத்திருந்தால்<input id="login-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>
-    <button id="submit" type="submit">Admin account உருவாக்குக</button>
+    <label id="login-totp-field" hidden>Authenticator code — if enabled<input id="login-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>
+    <button id="submit" type="submit">Create administrator account</button>
   </form>
   <p id="status" role="status" aria-live="polite"></p>
   <section id="result" hidden>
-    <h2>Recovery password-ஐப் பாதுகாப்பாகச் சேமிக்கவும்</h2>
-    <p>இது ஒருமுறை மட்டுமே காட்டப்படும். OTP அல்லது TOTP கிடைக்காதபோது login password-உடன் இதையும் பயன்படுத்தலாம். Recovery login செய்தால் இது மாற்றப்பட்டு புதிய recovery password வழங்கப்படும்.</p>
+    <h2>Save your recovery password securely</h2>
+    <p>This is shown once. Use it together with your login password if verification is unavailable. Recovery login replaces this password with a new one.</p>
     <textarea id="recovery-result" readonly rows="3" autocomplete="off"></textarea>
-    <button id="copy" type="button">Recovery password நகலெடுக்கவும்</button>
-    <p id="saved-link"><a href="/admin-access/">Admin login பக்கத்திற்குச் செல்லவும்</a></p>
+    <button id="copy" type="button">Copy recovery password</button>
+    <p id="saved-link"><a href="/admin-access/">Continue to admin sign-in</a></p>
   </section>
   <button id="logout" type="button" hidden>Logout</button>
 </main>

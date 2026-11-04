@@ -18,6 +18,7 @@ import * as ledger from './modules/ledger.js';
 import { acceptOffer } from './modules/dispatch.js';
 import { mountWebsite } from './website.js';
 import { mountAdminSetup } from './admin-setup.js';
+import { mountAdminWeb } from './admin-web.js';
 export const coordinate = z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]);
 export const locationSchema = z
   .object({
@@ -85,6 +86,7 @@ export function createApp({ pool, redis, config, maps, storage, logger }) {
   );
   app.use('/v1', rateLimiter(redis, config, { limit: 10000, seconds: 60, prefix: 'edge' }));
   app.use('/v1/auth', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+  mountAdminWeb(app, { pool, redis, config, auth });
   const sensitive = rateLimiter(redis, config, { limit: 10, seconds: 60, prefix: 'auth' });
   function route(
     method,
@@ -563,6 +565,17 @@ export function createApp({ pool, redis, config, maps, storage, logger }) {
       ).rows,
     };
   });
+  route('get', '/v1/admin/dashboard', { permission: 'rides.monitor' }, async ({ db }) => ({
+    counts: await one(db, `SELECT
+      (SELECT count(*)::int FROM users WHERE deleted_at IS NULL) AS users,
+      (SELECT count(*)::int FROM driver_profiles WHERE status='PENDING') AS pending_drivers,
+      (SELECT count(*)::int FROM rides WHERE state NOT IN ('SCHEDULED','COMPLETED','CANCELLED','NO_DRIVER','NO_SHOW')) AS active_rides,
+      (SELECT count(*)::int FROM rides WHERE created_at>=date_trunc('day',now() AT TIME ZONE 'Asia/Colombo') AT TIME ZONE 'Asia/Colombo') AS rides_today,
+      (SELECT count(*)::int FROM service_areas WHERE active) AS active_areas,
+      (SELECT count(*)::int FROM fare_plans) AS fare_plans`),
+    rides: (await db.query('SELECT state,count(*)::int AS count FROM rides GROUP BY state ORDER BY count(*) DESC')).rows,
+    recent: (await db.query('SELECT id,state,created_at,final_minor FROM rides ORDER BY created_at DESC LIMIT 6')).rows,
+  }));
   route('get', '/v1/admin/users', { permission: 'users.manage' }, async ({ db, req }) => {
     const p = page.parse(req.query);
     return {
@@ -625,6 +638,11 @@ export function createApp({ pool, redis, config, maps, storage, logger }) {
     },
     ({ db, user, req, body }) => drivers.review(db, user, req.params.id, body),
   );
+  route('get', '/v1/admin/drivers/:id', { permission: 'drivers.review' }, async ({ db, req }) => ({
+    driver: ensure(await one(db, 'SELECT d.*,u.name,u.phone FROM driver_profiles d JOIN users u ON u.id=d.user_id WHERE d.user_id=$1', [req.params.id]), 404, 'DRIVER_NOT_FOUND'),
+    vehicles: (await db.query('SELECT * FROM vehicles WHERE driver_id=$1 ORDER BY created_at', [req.params.id])).rows,
+    documents: (await db.query('SELECT id,kind,mime,bytes,scan_status,expires_at,created_at FROM documents WHERE driver_id=$1 ORDER BY created_at', [req.params.id])).rows,
+  }));
   route(
     'get',
     '/v1/admin/documents/:id',
@@ -658,6 +676,10 @@ export function createApp({ pool, redis, config, maps, storage, logger }) {
         'SELECT id,name,active,ST_AsGeoJSON(polygon)::json AS polygon FROM service_areas',
       )
     ).rows,
+  }));
+  route('get', '/v1/admin/service-areas/:id/fares', { permission: 'config.manage' }, async ({ db, req }) => ({
+    items: (await db.query('SELECT DISTINCT ON(category) * FROM fare_plans WHERE area_id=$1 ORDER BY category,version DESC', [req.params.id])).rows,
+    surge: (await db.query('SELECT * FROM surge_rules WHERE area_id=$1 ORDER BY category', [req.params.id])).rows,
   }));
   route(
     'post',
@@ -759,6 +781,11 @@ export function createApp({ pool, redis, config, maps, storage, logger }) {
     { permission: 'finance.manage' },
     ({ db, req }) => ledger.balance(db, req.params.id),
   );
+  route('get', '/v1/admin/finance/drivers', { permission: 'finance.manage' }, async ({ db, req }) => {
+    const search = z.string().trim().max(80).default('').parse(req.query.search);
+    return { items: (await db.query(`SELECT d.user_id,u.name,u.phone FROM driver_profiles d JOIN users u ON u.id=d.user_id
+      WHERE u.name ILIKE $1 OR u.phone ILIKE $1 ORDER BY u.name,d.user_id LIMIT 100`, ['%' + search + '%'])).rows };
+  });
   route(
     'post',
     '/v1/admin/finance/adjustments',

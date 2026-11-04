@@ -1,5 +1,5 @@
 name: backend
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
 jobs:
@@ -39,8 +39,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run build:admin
+      - run: git diff --exit-code -- admin
       - run: npm run check
       - run: npm run test:all
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:admin:browser
       - run: npm run test:storage
       - run: npm run docs:api
       - run: git diff --exit-code -- docs/openapi.json
@@ -51,3 +55,8 @@ jobs:
         with:
           name: load-report
           path: docs/load-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: admin-browser-screenshots
+          path: /tmp/ridenow-admin-*.png

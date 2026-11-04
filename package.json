@@ -17,7 +17,7 @@
     "test": "node --test tests/unit.test.js tests/whatsapp.test.js tests/pilot.test.js tests/website.test.js",
     "test:integration": "NODE_ENV=test node --test --test-concurrency=1 tests/integration.test.js",
     "test:all": "npm test && npm run test:integration",
-    "check": "find src scripts tests admin-setup -name '*.js' -exec node --check {} +",
+    "check": "find src scripts tests admin-setup admin/assets -name '*.js' -exec node --check {} +",
     "docs:api": "node scripts/export-openapi.js",
     "test:load": "node scripts/load-test.js",
     "storage:init": "node --env-file-if-exists=.env scripts/storage-init.js",
@@ -26,7 +26,9 @@
     "test:storage": "node --test tests/storage.test.js",
     "test:whatsapp:live": "node scripts/whatsapp-smoke.js",
     "test:services:live": "node scripts/services-smoke.js",
-    "test:storage:live": "node scripts/storage-smoke.js"
+    "test:storage:live": "node scripts/storage-smoke.js",
+    "build:admin": "node scripts/build-admin-pages.js && tailwindcss -i admin/assets/input.css -o admin/assets/admin.css --minify",
+    "test:admin:browser": "ADMIN_BROWSER_TEST=1 NODE_ENV=test node --test --test-concurrency=1 --test-name-pattern='admin browser staged' tests/integration.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.900.0",
@@ -49,8 +51,11 @@
     "zod": "^4.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@tailwindcss/cli": "^4.3.4",
     "socket.io-client": "^4.8.1",
     "supertest": "^7.1.4",
+    "tailwindcss": "^4.3.4",
     "yaml": "^2.8.1"
   },
   "overrides": {

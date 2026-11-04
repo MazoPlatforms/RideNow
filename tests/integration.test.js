@@ -1,6 +1,7 @@
 import test, { before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { io as socketClient } from 'socket.io-client';
@@ -10,7 +11,7 @@ import pino from 'pino';
 import { runner } from 'node-pg-migrate';
 import { database, one, transaction } from '../src/shared/db.js';
 import { loadConfig } from '../src/shared/config.js';
-import { decrypt, hash } from '../src/shared/crypto.js';
+import { decrypt, encrypt, hash } from '../src/shared/crypto.js';
 import { createApp } from '../src/app.js';
 import { createMaps } from '../src/adapters/maps.js';
 import { attachRealtime } from '../src/realtime.js';
@@ -997,4 +998,198 @@ test('private schema migrations are repeatable and backend role is constrained b
   } finally {
     await appPool.end();
   }
+});
+
+async function webAdmin({ totp = false } = {}) {
+  const bcrypt = await import('bcryptjs'), OTPAuth = await import('otpauth');
+  const password = 'admin-browser-password-1234', phone = '+94770000222';
+  const recovery = 'test-recovery-password-'.repeat(3);
+  const secret = totp ? new OTPAuth.Secret({size:20}) : null;
+  const user = await one(pool, "INSERT INTO users(phone,name,roles,password_hash,totp_secret,recovery_password_hash) VALUES($1,'Alex Administrator',ARRAY['ADMIN'],$2,$3,$4) RETURNING id",
+    [phone,await bcrypt.hash(password,4),secret?encrypt(secret.base32,config.ENCRYPTION_KEY):null,await bcrypt.hash(recovery,4)]);
+  return { user, phone, password, recovery, secret, client: supertest.agent(app) };
+}
+const web = (client, method, path, body) => client[method]('/v1/admin-web/'+path).set('X-Admin-Request','1').send(body);
+async function webOtp() {
+  const job = await one(pool,"SELECT j.payload FROM jobs j JOIN otp_challenges c ON c.id::text=j.payload->>'challengeId' WHERE j.kind='otp' ORDER BY c.created_at DESC LIMIT 1");
+  return decrypt(job.payload.encryptedCode,config.ENCRYPTION_KEY);
+}
+
+test('admin web flow protects pages and never exposes credentials in browser responses', async () => {
+  const a=await webAdmin();
+  await api.get('/admin/').expect(303).expect('Location','/admin/login/');
+  await api.get('/admin-access/').expect(303).expect('Location','/admin/login/');
+  await api.get('/admin/login/').expect(200).expect('Cache-Control','no-store');
+  await a.client.post('/v1/admin-web/begin').send({phone:a.phone,password:a.password}).expect(403);
+  await web(a.client,'post','begin',{phone:a.phone,password:'incorrect-password'}).expect(401);
+  const begin=await web(a.client,'post','begin',{phone:a.phone,password:a.password}).expect(200);
+  assert(begin.headers['set-cookie'].some(c=>c.includes('HttpOnly')&&c.includes('SameSite=Strict')));
+  assert.deepEqual(begin.body,{next:'/admin/verify/'});
+  const state=(await web(a.client,'get','flow').expect(200)).body;
+  assert.equal(state.method,'whatsapp');
+  assert(!JSON.stringify(state).includes(a.phone));
+  await web(a.client,'post','send-otp',{}).expect(200);
+  const verified=await web(a.client,'post','verify',{code:await webOtp()}).expect(200);
+  assert.deepEqual(verified.body,{next:'/admin/'});
+  assert(!JSON.stringify(verified.body).includes('Token'));
+  await a.client.get('/admin/').expect(200);
+  await a.client.get('/v1/admin/dashboard').expect(403);
+  await a.client.get('/v1/admin/dashboard').set('X-Admin-Request','1').expect(200);
+  await a.client.post('/v1/admin-web/logout').set('X-Admin-Request','1').set('Origin','https://untrusted.invalid').send({}).expect(403);
+  await web(a.client,'get','session').expect(200);
+  await web(a.client,'post','logout',{}).expect(200);
+  await web(a.client,'get','session').expect(401);
+});
+
+test('admin web password proof is invalid after password changes and cannot authenticate riders', async () => {
+  const a=await webAdmin();
+  await web(a.client,'post','begin',{phone:a.phone,password:a.password}).expect(200);
+  await pool.query("UPDATE users SET password_hash='changed-password-hash' WHERE id=$1",[a.user.id]);
+  await web(a.client,'post','verify',{recoveryPassword:a.recovery}).expect(401);
+  await pool.query("UPDATE users SET roles=ARRAY['RIDER'] WHERE id=$1",[a.user.id]);
+  await web(a.client,'post','begin',{phone:a.phone,password:a.password}).expect(401);
+});
+
+test('admin web enforces enrolled TOTP and recovery replacement is shown only once', async () => {
+  const a=await webAdmin({totp:true}), OTPAuth=await import('otpauth');
+  await web(a.client,'post','begin',{phone:a.phone,password:a.password}).expect(200);
+  await web(a.client,'post','send-otp',{}).expect(409);
+  const code=new OTPAuth.TOTP({secret:a.secret}).generate();
+  await web(a.client,'post','verify',{code}).expect(200);
+  await web(a.client,'post','begin',{phone:a.phone,password:a.password}).expect(200);
+  const recovered=await web(a.client,'post','verify',{recoveryPassword:a.recovery}).expect(200);
+  assert.equal(recovered.body.next,'/admin/recovery-saved/');
+  const replacement=(await web(a.client,'get','recovery-password').expect(200)).body.recoveryPassword;
+  assert(replacement&&replacement!==a.recovery);
+  await web(a.client,'get','recovery-password').expect(404);
+  await web(a.client,'post','verify',{code}).expect(401);
+});
+
+test('admin cookie session refresh is serialized across concurrent requests', async () => {
+  const a=await webAdmin();
+  await web(a.client,'post','begin',{phone:a.phone,password:a.password}).expect(200);
+  await web(a.client,'post','verify',{recoveryPassword:a.recovery}).expect(200);
+  const keys=await redis.keys('admin-web:session:*');assert.equal(keys.length,1);
+  const state=JSON.parse(decrypt(await redis.get(keys[0]),config.ENCRYPTION_KEY));
+  state.accessExpiresAt=Date.now()-1000;
+  await redis.set(keys[0],encrypt(JSON.stringify(state),config.ENCRYPTION_KEY),{EX:43200});
+  const results=await Promise.all(Array.from({length:4},()=>web(a.client,'get','session')));
+  assert(results.every(r=>r.status===200));
+  assert.equal((await one(pool,'SELECT count(*)::int AS n FROM sessions WHERE revoked_at IS NULL')).n,1);
+  await web(a.client,'post','logout',{}).expect(200);
+  assert.equal((await one(pool,'SELECT count(*)::int AS n FROM sessions WHERE revoked_at IS NULL')).n,0);
+});
+
+test('staff web sign-in uses granted permissions and cannot use administrator recovery', async () => {
+  const a=await webAdmin({totp:true}), OTPAuth=await import('otpauth');
+  await pool.query("UPDATE users SET roles=ARRAY['STAFF'],permissions=ARRAY['finance.manage'] WHERE id=$1",[a.user.id]);
+  await web(a.client,'post','begin',{phone:a.phone,password:a.password}).expect(200);
+  assert.equal((await web(a.client,'get','flow').expect(200)).body.recoveryAllowed,false);
+  const code=new OTPAuth.TOTP({secret:a.secret}).generate();
+  const result=await web(a.client,'post','verify',{code}).expect(200);
+  assert.equal(result.body.next,'/admin/finance/');
+  await a.client.get('/v1/admin/finance/payouts').set('X-Admin-Request','1').expect(200);
+  await a.client.get('/v1/admin/finance/drivers').set('X-Admin-Request','1').expect(200);
+  await a.client.get('/v1/admin/users').set('X-Admin-Request','1').expect(403);
+  await web(a.client,'post','begin',{phone:a.phone,password:a.password}).expect(200);
+  await web(a.client,'post','verify',{recoveryPassword:a.recovery}).expect(401);
+});
+
+test('admin dashboard read APIs report actual records and respect permissions', async () => {
+  const a=await login(),d=await driver();
+  await pool.query("UPDATE users SET roles=ARRAY['ADMIN'] WHERE id=$1",[a.user.id]);
+  const dashboard=(await request('get','/v1/admin/dashboard',a).expect(200)).body;
+  assert.equal(dashboard.counts.users,2);
+  const detail=(await request('get',`/v1/admin/drivers/${d.user.id}`,a).expect(200)).body;
+  assert.equal(detail.documents.length,4);
+  assert.equal(detail.vehicles.length,1);
+  assert(detail.documents.every(doc=>doc.kind&&!doc.object_key));
+  const fares=(await request('get',`/v1/admin/service-areas/${area.id}/fares`,a).expect(200)).body;
+  assert.equal(fares.items.length,3);
+  await request('get','/v1/admin/dashboard',d).expect(403);
+});
+
+test('admin browser staged sign-in, management pages, forms and logout', {skip:process.env.ADMIN_BROWSER_TEST!=='1'}, async () => {
+  const {chromium}=await import('@playwright/test');
+  const a=await webAdmin();
+  await driver();
+  const chromiumPath=process.env.CHROMIUM_PATH??(existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined);
+  const browser=await chromium.launch({...(chromiumPath?{executablePath:chromiumPath}:{}),args:['--no-sandbox']});
+  const context=await browser.newContext({viewport:{width:1440,height:1000}});
+  const page=await context.newPage(),base=`http://localhost:${server.address().port}`;
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  try{
+    await page.goto(base+'/admin/login/');
+    await page.getByLabel('Phone number').fill(a.phone);
+    await page.getByLabel('Password',{exact:true}).fill(a.password);
+    await page.getByRole('button',{name:/^Continue/}).click();
+    await page.waitForURL('**/admin/verify/');
+    await page.getByRole('button',{name:'Send WhatsApp code',exact:true}).click();
+    await page.getByText('Code requested.',{exact:false}).waitFor();
+    await page.getByLabel('6-digit verification code').fill(await webOtp());
+    await page.getByRole('button',{name:'Verify & sign in',exact:false}).click();
+    await page.waitForURL(base+'/admin/');
+    await page.getByText('Registered accounts',{exact:true}).waitFor();
+    await page.screenshot({path:'/tmp/ridenow-admin-overview.png',fullPage:true});
+    for(const [path,title] of [['users','Users'],['drivers','Drivers'],['rides','Rides'],['areas','Service areas'],['pricing','Pricing'],['finance','Finance'],['staff','Team & access'],['audit','Audit log'],['security','Account & security']]){
+      await page.goto(base+`/admin/${path}/`);
+      await page.getByRole('heading',{name:title,exact:true}).waitFor();
+      await page.waitForTimeout(150);
+      assert.equal(await page.locator('#notice.error:visible').count(),0,path);
+      assert(!/[\u0B80-\u0BFF]/.test(await page.locator('body').innerText()),path+' contains non-English UI');
+    }
+    await page.goto(base+'/admin/areas/');
+    await page.getByLabel('Area name',{exact:true}).fill('Browser test area');
+    await page.getByLabel('Boundary coordinates',{exact:false}).fill(JSON.stringify({type:'Polygon',coordinates:[[[81.69,7.70],[81.71,7.70],[81.71,7.72],[81.69,7.72],[81.69,7.70]]]}));
+    await page.getByRole('button',{name:'Create inactive area',exact:true}).click();
+    await page.getByText('Inactive service area created.',{exact:false}).waitFor();
+    assert(await one(pool,"SELECT 1 FROM service_areas WHERE name='Browser test area' AND NOT active"));
+    const browserArea=await one(pool,"SELECT id FROM service_areas WHERE name='Browser test area'");
+    await page.goto(base+'/admin/pricing/');
+    await page.locator('#area-select').selectOption(browserArea.id);
+    const fareForm=page.locator('#fare-form');
+    for(const [name,value] of Object.entries({base:'100.50',perKm:'80',perMinute:'10',waiting:'20',minimum:'100.50',cancellation:'0',commission:'20'}))
+      await fareForm.locator(`[name=${name}]`).fill(value);
+    page.once('dialog',dialog=>dialog.accept());
+    await fareForm.getByRole('button',{name:'Publish new version',exact:true}).click();
+    await page.getByText('New fare version published.',{exact:false}).waitFor();
+    assert.equal((await one(pool,'SELECT base_minor FROM fare_plans WHERE area_id=$1',[browserArea.id])).base_minor,10050);
+    await page.goto(base+'/admin/drivers/');
+    await page.getByRole('button',{name:'Review',exact:true}).first().click();
+    await page.getByRole('dialog').getByRole('heading',{name:'Driver review',exact:true}).waitFor();
+    await page.getByRole('button',{name:'Close dialog'}).click();
+    await page.goto(base+'/admin/finance/');
+    await page.getByLabel('Name or phone',{exact:true}).fill('Test driver');
+    await page.getByRole('button',{name:'Search drivers',exact:true}).click();
+    await page.getByText('Driver choices updated.',{exact:true}).waitFor();
+    assert.equal(await page.locator('[data-driver-select]').first().locator('option').count(),2);
+    await page.setViewportSize({width:390,height:844});
+    await page.goto(base+'/admin/');
+    await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('#sidebar').getBoundingClientRect().x>=-1);
+    await page.screenshot({path:'/tmp/ridenow-admin-mobile.png',fullPage:true});
+    await page.getByRole('button',{name:'Sign out',exact:false}).click();
+    await page.waitForURL('**/admin/login/');
+    await page.setViewportSize({width:1440,height:1000});
+    await page.screenshot({path:'/tmp/ridenow-admin-login.png',fullPage:true});
+    await page.getByLabel('Phone number').fill(a.phone);
+    await page.getByLabel('Password',{exact:true}).fill(a.password);
+    await page.getByRole('button',{name:/^Continue/}).click();
+    await page.waitForURL('**/admin/verify/');
+    await page.getByRole('link',{name:'Can’t access your code? Use recovery password'}).click();
+    await page.waitForURL('**/admin/recovery/');
+    await page.getByLabel('Recovery password',{exact:true}).fill(a.recovery);
+    await page.getByRole('button',{name:/^Recover & sign in/}).click();
+    await page.waitForURL('**/admin/recovery-saved/');
+    await page.waitForFunction(()=>document.querySelector('#new-recovery-password').value.length>=32);
+    assert(await page.getByRole('button',{name:/^Continue to workspace/}).isDisabled());
+    await page.getByLabel('I have saved my new recovery password securely.').check();
+    await page.getByRole('button',{name:/^Continue to workspace/}).click();
+    await page.waitForURL(base+'/admin/');
+    await page.getByRole('button',{name:'Sign out',exact:false}).click();
+    await page.waitForURL('**/admin/login/');
+    assert.deepEqual(errors,[]);
+    assert.equal((await context.cookies()).some(c=>c.name==='ridenow-admin'),false);
+  }catch(error){await page.screenshot({path:'/tmp/ridenow-admin-browser-failure.png',fullPage:true});throw error;}
+  finally{await context.close();await browser.close();}
 });

@@ -22,6 +22,11 @@ export async function consumeOtp(db, config, id, code, expectedPhone) {
 }
 export function createAuth(pool, config) {
   const key = new TextEncoder().encode(config.JWT_SECRET);
+  async function passwordMatches(user, password, proof) {
+    if (proof) return proof.userId === user.id && typeof proof.digest === 'string' &&
+      equal(proof.digest, hash(user.password_hash, config.JWT_SECRET));
+    return typeof password === 'string' && await bcrypt.compare(password, user.password_hash);
+  }
   async function issue(db, user, family) {
     const refreshToken = token();
     const session = await one(
@@ -45,6 +50,13 @@ export function createAuth(pool, config) {
     };
   }
   return {
+    async adminPasswordProof(phone, password) {
+      const user = await one(pool, "SELECT * FROM users WHERE phone=$1 AND roles && ARRAY['ADMIN','STAFF']::text[]", [normalizePhone(phone)]);
+      ensure(user?.password_hash && !user.suspended && !user.deleted_at &&
+        await passwordMatches(user, password), 401, 'INVALID_CREDENTIALS');
+      return { userId: user.id, phone: user.phone, digest: hash(user.password_hash, config.JWT_SECRET),
+        totp: Boolean(user.totp_secret), roles: user.roles };
+    },
     async requestOtp(input) {
       const phone = normalizePhone(input),
         code = String(randomInt(100000, 1000000));
@@ -99,7 +111,7 @@ export function createAuth(pool, config) {
       if (result.error) throw new AppError(401, result.error);
       return result;
     },
-    async staffLogin(phone, password, otp, challengeId, code) {
+    async staffLogin(phone, password, otp, challengeId, code, proof) {
       const user = await one(pool, 'SELECT * FROM users WHERE phone=$1', [normalizePhone(phone)]);
       ensure(
         user?.password_hash && user.roles.some((r) => ['ADMIN', 'STAFF'].includes(r)) &&
@@ -107,7 +119,7 @@ export function createAuth(pool, config) {
         401,
         'INVALID_CREDENTIALS',
       );
-      ensure(await bcrypt.compare(password, user.password_hash), 401, 'INVALID_CREDENTIALS');
+      ensure(await passwordMatches(user, password, proof), 401, 'INVALID_CREDENTIALS');
       if (!user.totp_secret) {
         ensure(challengeId && code, 401, 'WHATSAPP_OTP_REQUIRED');
         const result = await transaction(pool, async (db) => {
@@ -142,11 +154,11 @@ export function createAuth(pool, config) {
         return issue(db, updated);
       });
     },
-    async recoverAdmin(phone, password, recoveryPassword) {
+    async recoverAdmin(phone, password, recoveryPassword, proof) {
       const initial = await one(pool, "SELECT * FROM users WHERE phone=$1 AND 'ADMIN'=ANY(roles)", [normalizePhone(phone)]);
       ensure(initial && !initial.suspended && !initial.deleted_at && initial.password_hash && initial.recovery_password_hash,
         401, 'INVALID_CREDENTIALS');
-      ensure(await bcrypt.compare(password, initial.password_hash), 401, 'INVALID_CREDENTIALS');
+      ensure(await passwordMatches(initial, password, proof), 401, 'INVALID_CREDENTIALS');
       const nextRecovery = token();
       const nextHash = await bcrypt.hash(nextRecovery, 12);
       const result = await transaction(pool, async (db) => {

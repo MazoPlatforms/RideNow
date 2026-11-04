@@ -5,6 +5,13 @@ import { normalizePhone } from '../src/modules/auth.js';
 import { encrypt, decrypt, hash, equal } from '../src/shared/crypto.js';
 import { loadConfig } from '../src/shared/config.js';
 import { createMaps } from '../src/adapters/maps.js';
+import { decimalMinor } from '../admin/assets/api.js';
+test('admin money inputs preserve exact LKR cents and reject ambiguous amounts', () => {
+  assert.equal(decimalMinor('125.50'), 12550);
+  assert.equal(decimalMinor('0.01'), 1);
+  assert.equal(decimalMinor('20'), 2000);
+  for (const value of ['-1', '1.001', '1e3', 'NaN', '100,00']) assert.throws(() => decimalMinor(value));
+});
 const plan = {
   base_minor: 10000,
   per_km_minor: 8000,

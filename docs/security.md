@@ -11,6 +11,7 @@
 - Document scan CLEAN இல்லாமல் review download/driver approval கிடையாது. S3-ல் exact scanned version pin; R2-ல் SHA-256 அடையாளத்துடன் புதிய server-only key-க்கு scanned bytes சேமிக்கப்படும். Verified key-க்கு user upload URL வழங்கப்படாது.
 - Rider history-ல் driver-ன் தற்போதைய இடம் வெளியிடப்படாது; realtime GPS தற்போதைய assignment-க்கு மட்டும்.
 - OTP, password, JWT, Baileys credentials, முழு documents ஆகியவை logs-ல் எழுதப்படக்கூடாது. QR/TOTP enrollment secrets operator-க்கு ஒருமுறை வழங்கப்படுகின்றன.
+- Admin browser sessions: Secure/HttpOnly/SameSite=Strict cookies, encrypted server-side Redis state, same-origin/custom-header CSRF checks. Password step-ல் password சேமிக்கப்படாது; ஐந்து நிமிட password-hash fingerprint proof மட்டும் encrypted ஆக வைக்கப்படும். JWT/refresh tokens browser storage-ல் வழங்கப்படாது.
 
 ## Retention
 
