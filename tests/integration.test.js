@@ -1126,10 +1126,29 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
     await page.waitForURL('**/admin/verify/');
     await page.getByRole('button',{name:'Send WhatsApp code',exact:true}).click();
     await page.getByText('Code requested.',{exact:false}).waitFor();
-    await page.getByLabel('6-digit verification code').fill(await webOtp());
+    await page.getByLabel('WhatsApp verification code').fill(await webOtp());
     await page.getByRole('button',{name:'Verify & sign in',exact:false}).click();
     await page.waitForURL(base+'/admin/');
     await page.getByText('Registered accounts',{exact:true}).waitFor();
+    const otpJobsBeforeResume=(await one(pool,"SELECT count(*)::int AS n FROM jobs WHERE kind='otp'")).n;
+    await page.goto(base+'/admin/login/');
+    await page.waitForURL(base+'/admin/');
+    await page.goto(base+'/admin/login/?reauth=1');
+    await page.getByLabel('Password',{exact:true}).waitFor();
+    assert(page.url().endsWith('/admin/login/?reauth=1'));
+    await page.goto(base+'/admin/');
+    const savedBrowser=await context.storageState();
+    const reopened=await browser.newContext({storageState:savedBrowser});
+    try{
+      const reopenedPage=await reopened.newPage();
+      await reopenedPage.goto(base+'/admin/login/');
+      await reopenedPage.waitForURL(base+'/admin/');
+    }finally{await reopened.close();}
+    await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page.evaluate(url=>{location.href=url;},base+'/admin/');
+    await page.waitForURL(base+'/admin/');
+    await page.getByText('Registered accounts',{exact:true}).waitFor();
+    assert.equal((await one(pool,"SELECT count(*)::int AS n FROM jobs WHERE kind='otp'")).n,otpJobsBeforeResume);
     await page.screenshot({path:'/tmp/ridenow-admin-overview.png',fullPage:true});
     for(const [path,title] of [['users','Users'],['drivers','Drivers'],['rides','Rides'],['areas','Service areas'],['pricing','Pricing'],['finance','Finance'],['staff','Team & access'],['audit','Audit log'],['security','Account & security']]){
       await page.goto(base+`/admin/${path}/`);
@@ -1186,6 +1205,22 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
     await page.getByLabel('I have saved my new recovery password securely.').check();
     await page.getByRole('button',{name:/^Continue to workspace/}).click();
     await page.waitForURL(base+'/admin/');
+    await page.getByRole('button',{name:'Sign out',exact:false}).click();
+    await page.waitForURL('**/admin/login/');
+    const OTPAuth=await import('otpauth');
+    const secret=new OTPAuth.Secret({size:20});
+    await pool.query('UPDATE users SET totp_secret=$2,totp_counter=-1 WHERE id=$1',[a.user.id,encrypt(secret.base32,config.ENCRYPTION_KEY)]);
+    const jobsBeforeTotp=(await one(pool,"SELECT count(*)::int AS n FROM jobs WHERE kind='otp'")).n;
+    await page.getByLabel('Phone number').fill(a.phone);
+    await page.getByLabel('Password',{exact:true}).fill(a.password);
+    await page.getByRole('button',{name:/^Continue/}).click();
+    await page.waitForURL('**/admin/verify/');
+    await page.getByLabel('Authenticator app code').waitFor();
+    assert(await page.getByRole('button',{name:/Send WhatsApp code/}).isHidden());
+    await page.getByLabel('Authenticator app code').fill(new OTPAuth.TOTP({secret}).generate());
+    await page.getByRole('button',{name:'Verify & sign in',exact:false}).click();
+    await page.waitForURL(base+'/admin/');
+    assert.equal((await one(pool,"SELECT count(*)::int AS n FROM jobs WHERE kind='otp'")).n,jobsBeforeTotp);
     await page.getByRole('button',{name:'Sign out',exact:false}).click();
     await page.waitForURL('**/admin/login/');
     assert.deepEqual(errors,[]);

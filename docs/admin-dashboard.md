@@ -35,8 +35,10 @@ Recovery uses `/admin/recovery/` after the password step. Successful recovery ro
 - The password step stores a password-hash fingerprint and account identity in an encrypted Redis flow with a five-minute TTL. It does not store the password. A password change invalidates this proof.
 - Production cookies use the `__Host-` prefix, Secure, HttpOnly, SameSite=Strict, and Path=/ with no Domain attribute.
 - Authenticated browser tokens remain encrypted in Redis behind an opaque cookie. The browser session lasts at most 12 hours; refresh is serialized to prevent concurrent refresh-token reuse.
+- Returning to sign-in checks for an existing valid cookie-backed session and resumes the permitted workspace without requesting another code. This also handles entry from an external link with SameSite=Strict cookies. Explicit `?reauth=1` links let the user start fresh verification for recovery or switching accounts. Expired/revoked sessions and cleared cookies still require sign-in.
 - Same-origin checks and the `X-Admin-Request` header protect cookie-authenticated API calls. Existing bearer-token APIs remain available to the Android client.
 - Permissions and account suspension are checked against the database, including after session refresh. Verification flows are single-use and limited to five attempts.
+- The verification page labels authenticator and WhatsApp codes explicitly. TOTP-enrolled accounts use the authenticator; the normal sign-in flow does not request a WhatsApp code for them.
 - Sign-in and protected pages use no-store and noindex headers. Public admin assets use revalidation; the Inter font is cached.
 
 Redis loss requires browser users to sign in again. Provider heartbeat status is not proof of malware-engine scanning or Android background-notification delivery.

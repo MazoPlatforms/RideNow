@@ -139,7 +139,7 @@ export function mountAdminWeb(app, { pool, redis, config, auth }) {
   router.get('/session', async (req, res) => {
     const { user } = await session(req);
     res.json({ id: user.id, name: user.name, phone: user.phone, roles: user.roles, permissions: user.permissions,
-      environment: config.NODE_ENV, totpEnabled: Boolean(user.totp_secret) });
+      environment: config.NODE_ENV, totpEnabled: Boolean(user.totp_secret), next: landing(user) });
   });
   router.get('/recovery-password', async (req, res) => {
     const { id } = await session(req);
