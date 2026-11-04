@@ -1153,6 +1153,16 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
   const page=await context.newPage(),base=`http://localhost:${server.address().port}`;
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   try{
+    await page.route('**/v1/admin-web/captcha-config',route=>route.fulfill({json:{enabled:true,siteKey:'browser-test-site-key',testMode:false}}));
+    await page.route('https://www.google.com/recaptcha/api.js?*',route=>route.fulfill({contentType:'application/javascript',body:'window.grecaptcha={render:(node,options)=>{window.__captchaOptions=options;return 1},reset:()=>{}};window.rideNowRecaptchaLoaded();'}));
+    await page.goto(base+'/admin/login/?reauth=1');
+    const continueButton=page.getByRole('button',{name:/^Continue/});
+    await page.waitForFunction(()=>Boolean(window.__captchaOptions));
+    assert.equal(await continueButton.isDisabled(),true);
+    await page.evaluate(()=>window.__captchaOptions.callback('browser-test-captcha-token'));
+    assert.equal(await continueButton.isDisabled(),false);
+    await page.unroute('**/v1/admin-web/captcha-config');
+    await page.unroute('https://www.google.com/recaptcha/api.js?*');
     await page.goto(base+'/admin/login/');
     assert.equal(await page.locator('link[rel=icon]').getAttribute('href'),'/admin/assets/brand/ridenow-admin-icon.webp');
     assert.match(await page.locator('.auth-aside').evaluate(el=>getComputedStyle(el,'::before').backgroundImage),/admin-route-artwork\.webp/);

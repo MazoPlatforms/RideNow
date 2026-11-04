@@ -18,6 +18,7 @@ if(page==='login'){
   captcha.value='';
   const old=$('#recaptcha-widget'),next=document.createElement('div');next.id='recaptcha-widget';old.replaceWith(next);
   widgetId=window.grecaptcha.render(next,{sitekey:siteKey,theme:media.matches?'dark':'light',callback:value=>{captcha.value=value;updateSubmit();},'expired-callback':()=>{captcha.value='';updateSubmit();},'error-callback':()=>{captcha.value='';captchaHelp.textContent='Verification could not complete. Check your connection and try again.';updateSubmit();}});
+  captchaReady=true;
   updateSubmit();
  };
  submit.disabled=true;
