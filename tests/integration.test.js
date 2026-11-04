@@ -1133,6 +1133,17 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
     await page.waitForURL(base+'/admin/');
     await page.getByText('Registered accounts',{exact:true}).waitFor();
     assert(await page.locator('.brand-mark-image').evaluate(img=>img.complete&&img.naturalWidth>0));
+    await page.emulateMedia({colorScheme:'dark'});
+    assert.equal(await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(17, 18, 20)');
+    assert.equal(await page.locator('h1').evaluate(el=>getComputedStyle(el).color),'rgb(240, 241, 243)');
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('.nav-item.active')).color==='rgb(255, 189, 0)');
+    assert.equal(await page.locator('.nav-item.active').evaluate(el=>getComputedStyle(el).color),'rgb(255, 189, 0)');
+    assert(await page.locator('.brand-mark-image').evaluate(img=>img.currentSrc.endsWith('ridenow-mark-white.webp')));
+    await page.emulateMedia({colorScheme:'light'});
+    assert.equal(await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(245, 246, 248)');
+    assert.equal(await page.locator('h1').evaluate(el=>getComputedStyle(el).color),'rgb(23, 25, 28)');
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('.nav-item.active')).color==='rgb(147, 107, 0)');
+    assert(await page.locator('.brand-mark-image').evaluate(img=>img.currentSrc.endsWith('ridenow-mark-ink.webp')));
     const otpJobsBeforeResume=(await one(pool,"SELECT count(*)::int AS n FROM jobs WHERE kind='otp'")).n;
     await page.goto(base+'/admin/login/');
     await page.waitForURL(base+'/admin/');
