@@ -3,9 +3,14 @@ const page=document.body.dataset.page;
 if(page==='login'){
  const params=new URLSearchParams(location.search);
  const form=$('#login-form'),submit=$('button[type=submit]',form),captcha=$('#recaptcha-token'),captchaControl=$('#captcha-control'),captchaHelp=$('#captcha-help');
- let captchaReady=false,captchaEnabled=false,captchaTestMode=false,widgetId;
+ let captchaReady=false,captchaEnabled=false,captchaTestMode=false,widgetId,captchaPoll;
  const media=matchMedia('(prefers-color-scheme:dark)');
- const updateSubmit=()=>{submit.disabled=!captchaReady||(captchaEnabled&&!captcha.value);};
+ const updateSubmit=()=>{
+  if(captchaEnabled&&captchaReady&&typeof window.grecaptcha?.getResponse==='function'){
+   try{const response=window.grecaptcha.getResponse(widgetId);if(response)captcha.value=response;}catch{}
+  }
+  submit.disabled=!captchaReady||(captchaEnabled&&!captcha.value);
+ };
  const loadGoogleRecaptcha=()=>new Promise((resolve,reject)=>{
   window.rideNowRecaptchaLoaded=resolve;
   const script=document.createElement('script');script.async=true;script.defer=true;
@@ -37,6 +42,7 @@ if(page==='login'){
    captchaControl.hidden=false;
    await loadGoogleRecaptcha();
    renderWidget();
+   captchaPoll=window.setInterval(updateSubmit,250);
    media.addEventListener('change',renderWidget);
   }
  }catch(error){captchaHelp.textContent='Human verification is temporarily unavailable. Refresh the page to try again.';notice('Human verification could not be loaded. Please try again shortly.',true);}

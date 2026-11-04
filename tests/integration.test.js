@@ -1027,6 +1027,14 @@ async function fillWebCode(page, value) {
   }, value);
   assert.equal(await page.locator('[data-code-digit]').evaluateAll(fields => fields.map(field => field.value).join('')), value);
 }
+async function solveBrowserCaptcha(page, responseOnly = false) {
+  await page.waitForFunction(() => Boolean(window.__captchaOptions));
+  await page.evaluate((withoutCallback) => {
+    window.__captchaResponse = 'captcha-test-token-value';
+    if (!withoutCallback) window.__captchaOptions.callback(window.__captchaResponse);
+  }, responseOnly);
+  await page.waitForFunction(() => !document.querySelector('#login-form button[type=submit]').disabled);
+}
 
 test('admin web flow protects pages and never exposes credentials in browser responses', async () => {
   const a=await webAdmin();
@@ -1154,20 +1162,17 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   try{
     await page.route('**/v1/admin-web/captcha-config',route=>route.fulfill({json:{enabled:true,siteKey:'browser-test-site-key',testMode:false}}));
-    await page.route('https://www.google.com/recaptcha/api.js?*',route=>route.fulfill({contentType:'application/javascript',body:'window.grecaptcha={render:(node,options)=>{window.__captchaOptions=options;return 1},reset:()=>{}};window.rideNowRecaptchaLoaded();'}));
+    await page.route('https://www.google.com/recaptcha/api.js?*',route=>route.fulfill({contentType:'application/javascript',body:'window.__captchaResponse="";window.grecaptcha={render:(node,options)=>{window.__captchaOptions=options;return 1},getResponse:()=>window.__captchaResponse,reset:()=>{window.__captchaResponse=""}};window.rideNowRecaptchaLoaded();'}));
     await page.goto(base+'/admin/login/?reauth=1');
+    await page.getByLabel('Phone number').fill(a.phone);
+    await page.getByLabel('Password',{exact:true}).fill(a.password);
     const continueButton=page.getByRole('button',{name:/^Continue/});
     await page.waitForFunction(()=>Boolean(window.__captchaOptions));
     assert.equal(await continueButton.isDisabled(),true);
-    await page.evaluate(()=>window.__captchaOptions.callback('browser-test-captcha-token'));
+    await solveBrowserCaptcha(page,true);
     assert.equal(await continueButton.isDisabled(),false);
-    await page.unroute('**/v1/admin-web/captcha-config');
-    await page.unroute('https://www.google.com/recaptcha/api.js?*');
-    await page.goto(base+'/admin/login/');
     assert.equal(await page.locator('link[rel=icon]').getAttribute('href'),'/admin/assets/brand/ridenow-admin-icon.webp');
     assert.match(await page.locator('.auth-aside').evaluate(el=>getComputedStyle(el,'::before').backgroundImage),/admin-route-artwork\.webp/);
-    await page.getByLabel('Phone number').fill(a.phone);
-    await page.getByLabel('Password',{exact:true}).fill(a.password);
     await page.getByRole('button',{name:/^Continue/}).click();
     await page.waitForURL('**/admin/verify/');
     assert.equal(await page.locator('[data-code-digit]').count(),6);
@@ -1262,6 +1267,7 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
     await page.screenshot({path:'/tmp/ridenow-admin-login.png',fullPage:true});
     await page.getByLabel('Phone number').fill(a.phone);
     await page.getByLabel('Password',{exact:true}).fill(a.password);
+    await solveBrowserCaptcha(page);
     await page.getByRole('button',{name:/^Continue/}).click();
     await page.waitForURL('**/admin/verify/');
     await page.getByRole('link',{name:'Can’t access your code? Use recovery password'}).click();
@@ -1282,6 +1288,7 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
     const jobsBeforeTotp=(await one(pool,"SELECT count(*)::int AS n FROM jobs WHERE kind='otp'")).n;
     await page.getByLabel('Phone number').fill(a.phone);
     await page.getByLabel('Password',{exact:true}).fill(a.password);
+    await solveBrowserCaptcha(page);
     await page.getByRole('button',{name:/^Continue/}).click();
     await page.waitForURL('**/admin/verify/');
     await page.getByLabel('Authenticator app code').waitFor();
