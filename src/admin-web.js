@@ -16,7 +16,7 @@ function landing(user) {
     .find(([permission]) => user.permissions.includes(permission))?.[1] ?? '/admin/security/';
 }
 
-export function mountAdminWeb(app, { pool, redis, config, auth }) {
+export function mountAdminWeb(app, { pool, redis, config, auth, captchaVerifier }) {
   const secure = config.NODE_ENV === 'production';
   const cookie = secure ? '__Host-ridenow-admin' : 'ridenow-admin';
   const flowCookie = secure ? '__Host-ridenow-flow' : 'ridenow-flow';
@@ -84,8 +84,21 @@ export function mountAdminWeb(app, { pool, redis, config, auth }) {
   }
   const router = express.Router();
   router.use(noCache, sameOrigin, rateLimiter(redis, config, { limit: 60, seconds: 60, prefix: 'admin-web' }));
-  router.post('/begin', rateLimiter(redis, config, { limit: 10, seconds: 60, prefix: 'admin-web-password' }), async (req, res) => {
-    const body = z.object({ phone: z.string().min(9).max(30), password: z.string().min(12).max(128) }).strict().parse(req.body);
+  router.get('/captcha-config', (req, res) => res.json({
+    enabled: Boolean(config.RECAPTCHA_V2_SITE_KEY && config.RECAPTCHA_V2_SECRET_KEY),
+    siteKey: config.RECAPTCHA_V2_SITE_KEY,
+    testMode: config.NODE_ENV === 'test',
+  }));
+  const loginIpLimit = rateLimiter(redis, config, { limit: 10, seconds: 300, prefix: 'admin-web-login-ip' });
+  const loginPhoneLimit = rateLimiter(redis, config, {
+    limit: 5, seconds: 900, prefix: 'admin-web-login-phone',
+    identity: (req) => String(req.body?.phone ?? '').replace(/\D/g, '').slice(-15) || 'missing-phone',
+  });
+  router.post('/begin', loginIpLimit, loginPhoneLimit, async (req, res) => {
+    const body = z.object({ phone: z.string().min(9).max(30), password: z.string().min(12).max(128),
+      captchaToken: z.string().min(20).max(4096).optional() }).strict().parse(req.body);
+    ensure(typeof captchaVerifier === 'function', 503, 'CAPTCHA_UNAVAILABLE');
+    await captchaVerifier({ token: body.captchaToken, hostname: req.hostname });
     const proof = await auth.adminPasswordProof(body.phone, body.password);
     const previous = readCookie(req, flowCookie);
     if (previous) await redis.del(key('flow', previous));

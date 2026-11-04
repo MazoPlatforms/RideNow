@@ -4,6 +4,7 @@ import { calculateFare } from '../src/modules/pricing.js';
 import { normalizePhone } from '../src/modules/auth.js';
 import { encrypt, decrypt, hash, equal } from '../src/shared/crypto.js';
 import { loadConfig } from '../src/shared/config.js';
+import { createRecaptchaVerifier } from '../src/shared/recaptcha.js';
 import { createMaps } from '../src/adapters/maps.js';
 import { decimalMinor } from '../admin/assets/api.js';
 test('admin money inputs preserve exact LKR cents and reject ambiguous amounts', () => {
@@ -61,6 +62,8 @@ test('production fixes Baileys regardless of environment provider and enforces H
     CORS_ORIGINS: 'https://example.com',
     FCM_ENABLED: 'true',
     S3_BUCKET: 'test-private-documents',
+    RECAPTCHA_V2_SITE_KEY: 'site-key',
+    RECAPTCHA_V2_SECRET_KEY: 'secret-key',
   };
   for (const OTP_PROVIDER of [undefined, 'database', 'baileys', 'invalid'])
     assert.equal(loadConfig({ ...env, OTP_PROVIDER }).OTP_PROVIDER, 'baileys');
@@ -72,6 +75,26 @@ test('production fixes Baileys regardless of environment provider and enforces H
   assert.equal(loadConfig({ ...env, FCM_ENABLED: undefined }).FCM_ENABLED, 'false');
   assert.throws(() => loadConfig({ ...env, FCM_ENABLED: 'false', S3_BUCKET: undefined }),
     /Production requires private S3 storage/);
+});
+test('reCAPTCHA verifier checks Google result and exact hostname, and fails closed', async () => {
+  let submitted;
+  const verifier = createRecaptchaVerifier({ NODE_ENV: 'production', RECAPTCHA_V2_SECRET_KEY: 'secret-value' },
+    async (url, options) => {
+      submitted = { url, body: options.body };
+      return { ok: true, json: async () => ({ success: true, hostname: 'admin.example.com' }) };
+    });
+  await verifier({ token: 'captcha-response-token-value', hostname: 'admin.example.com' });
+  assert.equal(submitted.url, 'https://www.google.com/recaptcha/api/siteverify');
+  assert.equal(submitted.body.get('secret'), 'secret-value');
+  await assert.rejects(verifier({ token: 'captcha-response-token-value', hostname: 'untrusted.example.com' }),
+    { code: 'CAPTCHA_INVALID' });
+  const failed = createRecaptchaVerifier({ NODE_ENV: 'production', RECAPTCHA_V2_SECRET_KEY: 'secret-value' },
+    async () => ({ ok: true, json: async () => ({ success: false, hostname: 'admin.example.com' }) }));
+  await assert.rejects(failed({ token: 'captcha-response-token-value', hostname: 'admin.example.com' }),
+    { code: 'CAPTCHA_INVALID' });
+  const unavailable = createRecaptchaVerifier({ NODE_ENV: 'production', RECAPTCHA_V2_SECRET_KEY: '' });
+  await assert.rejects(unavailable({ token: 'captcha-response-token-value', hostname: 'admin.example.com' }),
+    { code: 'CAPTCHA_UNAVAILABLE' });
 });
 test('real Mazo graph verifies checksum, routes, matrix, search and coverage', async () => {
   const maps = await createMaps({

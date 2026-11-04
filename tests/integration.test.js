@@ -18,6 +18,7 @@ import { attachRealtime } from '../src/realtime.js';
 import { dispatchTick } from '../src/modules/dispatch.js';
 import { publishOutbox, maintenance, claimJob, finishJob, processJobs } from '../src/worker.js';
 import { idempotent } from '../src/shared/idempotency.js';
+import { AppError } from '../src/shared/errors.js';
 import { post, adjustment, createPayout, payoutAction } from '../src/modules/ledger.js';
 const dbUrl = process.env.TEST_DATABASE_URL ?? 'postgres://ride:ride@localhost:5432/ride_test';
 if (!new URL(dbUrl).pathname.endsWith('_test'))
@@ -29,6 +30,8 @@ const config = loadConfig({
   JWT_SECRET: 't'.repeat(64),
   OTP_PEPPER: 'p'.repeat(64),
   ENCRYPTION_KEY: 'ab'.repeat(32),
+  RECAPTCHA_V2_SITE_KEY: 'test-site-key',
+  RECAPTCHA_V2_SECRET_KEY: 'test-secret-key',
 });
 const logger = pino({ level: 'silent' }),
   pool = database(dbUrl),
@@ -65,7 +68,8 @@ before(async () => {
   });
   await redis.connect();
   maps = await createMaps(config);
-  ({ app, auth } = createApp({ pool, redis, maps, storage, config, logger }));
+  ({ app, auth } = createApp({ pool, redis, maps, storage, config, logger,
+    captchaVerifier: async ({ token }) => { if (token !== 'captcha-test-token-value') throw new AppError(403,'CAPTCHA_INVALID'); return true; } }));
   api = supertest(app);
   server = createServer(app);
   realtime = await attachRealtime(server, { pool, redis, config, logger, auth });
@@ -1009,7 +1013,8 @@ async function webAdmin({ totp = false } = {}) {
     [phone,await bcrypt.hash(password,4),secret?encrypt(secret.base32,config.ENCRYPTION_KEY):null,await bcrypt.hash(recovery,4)]);
   return { user, phone, password, recovery, secret, client: supertest.agent(app) };
 }
-const web = (client, method, path, body) => client[method]('/v1/admin-web/'+path).set('X-Admin-Request','1').send(body);
+const web = (client, method, path, body) => client[method]('/v1/admin-web/'+path).set('X-Admin-Request','1')
+  .send(path==='begin'?{...body,captchaToken:body?.captchaToken??'captcha-test-token-value'}:body);
 async function webOtp() {
   const job = await one(pool,"SELECT j.payload FROM jobs j JOIN otp_challenges c ON c.id::text=j.payload->>'challengeId' WHERE j.kind='otp' ORDER BY c.created_at DESC LIMIT 1");
   return decrypt(job.payload.encryptedCode,config.ENCRYPTION_KEY);
@@ -1039,6 +1044,27 @@ test('admin web flow protects pages and never exposes credentials in browser res
   await web(a.client,'get','session').expect(200);
   await web(a.client,'post','logout',{}).expect(200);
   await web(a.client,'get','session').expect(401);
+});
+
+test('admin login requires a verified captcha and exposes only the public site key', async () => {
+  const a = await webAdmin();
+  const captcha = (await web(a.client, 'get', 'captcha-config').expect(200)).body;
+  assert.deepEqual(captcha, { enabled: true, siteKey: 'test-site-key', testMode: true });
+  await web(a.client, 'post', 'begin', {
+    phone: a.phone, password: a.password, captchaToken: '',
+  }).expect(400);
+  await web(a.client, 'post', 'begin', {
+    phone: a.phone, password: a.password, captchaToken: 'x'.repeat(30),
+  }).expect(403);
+  await web(a.client, 'post', 'begin', { phone: a.phone, password: a.password }).expect(200);
+});
+
+test('admin login rate limits password attempts by phone', async () => {
+  const a = await webAdmin();
+  for (let i = 0; i < 5; i++)
+    await web(a.client, 'post', 'begin', { phone: a.phone, password: 'incorrect-password' }).expect(401);
+  await web(a.client, 'post', 'begin', { phone: a.phone, password: a.password })
+    .expect(429).expect('Retry-After', '900');
 });
 
 test('admin web password proof is invalid after password changes and cannot authenticate riders', async () => {

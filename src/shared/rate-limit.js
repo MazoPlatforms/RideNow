@@ -1,12 +1,13 @@
 import { AppError } from './errors.js';
 import { hash } from './crypto.js';
 const lua = `local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]) end; return n`;
-export function rateLimiter(redis, config, { limit = 120, seconds = 60, prefix = 'api' } = {}) {
+export function rateLimiter(redis, config, { limit = 120, seconds = 60, prefix = 'api', identity } = {}) {
   return async (req, res, next) => {
     try {
-      const identity = hash(`${req.user?.id ?? req.ip}:${prefix}`, config.OTP_PEPPER);
+      const value = identity ? identity(req) : req.user?.id ?? req.ip;
+      const hashedIdentity = hash(`${value}:${prefix}`, config.OTP_PEPPER);
       const n = await redis.eval(lua, {
-        keys: [`limit:${identity}`],
+        keys: [`limit:${hashedIdentity}`],
         arguments: [String(seconds)],
       });
       if (n > limit) {

@@ -10,6 +10,7 @@ import { AppError, ensure, errorHandler } from './shared/errors.js';
 import { decrypt, encrypt } from './shared/crypto.js';
 import { idempotent } from './shared/idempotency.js';
 import { rateLimiter } from './shared/rate-limit.js';
+import { createRecaptchaVerifier } from './shared/recaptcha.js';
 import { createAuth, permission } from './modules/auth.js';
 import { quote } from './modules/pricing.js';
 import * as rides from './modules/rides.js';
@@ -45,7 +46,7 @@ const quoteSchema = z
     scheduledAt: z.iso.datetime().optional(),
   })
   .strict();
-export function createApp({ pool, redis, config, maps, storage, logger }) {
+export function createApp({ pool, redis, config, maps, storage, logger, captchaVerifier = createRecaptchaVerifier(config) }) {
   const app = express(),
     auth = createAuth(pool, config),
     paths = {};
@@ -80,13 +81,17 @@ export function createApp({ pool, redis, config, maps, storage, logger }) {
     next();
   });
   app.use(
-    helmet(),
+    helmet({ contentSecurityPolicy: { directives: {
+      scriptSrc: ["'self'", 'https://www.google.com/recaptcha/', 'https://www.gstatic.com/recaptcha/'],
+      frameSrc: ["'self'", 'https://www.google.com/recaptcha/', 'https://recaptcha.google.com/recaptcha/'],
+      connectSrc: ["'self'", 'https://www.google.com/recaptcha/', 'https://www.gstatic.com/recaptcha/'],
+    } } }),
     cors({ origin: config.CORS_ORIGINS.split(',') }),
     express.json({ limit: '256kb' }),
   );
   app.use('/v1', rateLimiter(redis, config, { limit: 10000, seconds: 60, prefix: 'edge' }));
   app.use('/v1/auth', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
-  mountAdminWeb(app, { pool, redis, config, auth });
+  mountAdminWeb(app, { pool, redis, config, auth, captchaVerifier });
   const sensitive = rateLimiter(redis, config, { limit: 10, seconds: 60, prefix: 'auth' });
   function route(
     method,

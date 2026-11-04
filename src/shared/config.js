@@ -16,6 +16,8 @@ export function loadConfig(env = process.env) {
       MAP_MANIFEST_PATH: z.string().default('data/kattankudy-routing-manifest.json'),
       MAP_CATEGORY_APPROVALS: z.string().default(''),
       FCM_ENABLED: z.enum(['true', 'false']).default('false'),
+      RECAPTCHA_V2_SITE_KEY: z.string().default(''),
+      RECAPTCHA_V2_SECRET_KEY: z.string().default(''),
     })
     .passthrough();
   // Production always sends OTPs through WhatsApp; environment values cannot
@@ -23,6 +25,10 @@ export function loadConfig(env = process.env) {
   const c = schema.parse(
     env.NODE_ENV === 'production' ? { ...env, OTP_PROVIDER: 'baileys' } : env,
   );
+  if (Boolean(c.RECAPTCHA_V2_SITE_KEY) !== Boolean(c.RECAPTCHA_V2_SECRET_KEY))
+    throw new Error('reCAPTCHA v2 requires both site and secret keys');
+  if (c.NODE_ENV === 'production' && !c.RECAPTCHA_V2_SECRET_KEY)
+    throw new Error('Production requires reCAPTCHA v2 keys');
   if (
     c.NODE_ENV === 'production' &&
     !c.CORS_ORIGINS.split(',').every((origin) => {
