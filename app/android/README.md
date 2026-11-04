@@ -12,5 +12,5 @@ Package: `com.ridenow.app` · minSdk 26 · targetSdk 35
 - Android 12+ system splash handoff, edge-to-edge, adaptive and monochrome launcher icon.
 - Reduced motion: the splash is static when system animations are off.
 
-## Next
+## Next: phone number screen.
 `AppRoot.kt` shows a placeholder after the splash. Replace it with the Welcome screen.

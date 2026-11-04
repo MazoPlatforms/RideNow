@@ -2,4 +2,13 @@
     <string name="app_name">RideNow</string>
     <string name="splash_description">RideNow. Your ride, before you ask.</string>
     <string name="splash_tagline">Your ride, before you ask.</string>
+
+    <string name="welcome_title">Hello, new rider.</string>
+    <string name="welcome_subtitle">Tell us where. A vehicle finds you, quietly and on time.</string>
+    <string name="welcome_feature_pickup">Set your pickup point</string>
+    <string name="welcome_feature_destination">Choose where you are going</string>
+    <string name="welcome_feature_pay">Ride, then pay your driver in cash</string>
+    <string name="welcome_get_started">Get started</string>
+    <string name="welcome_have_account">I already have an account</string>
+    <string name="welcome_help">Help</string>
 </resources>

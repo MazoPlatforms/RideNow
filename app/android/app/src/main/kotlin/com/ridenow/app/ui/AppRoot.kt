@@ -1,5 +1,6 @@
 package com.ridenow.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -16,20 +17,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
 import com.ridenow.app.ui.splash.SplashScreen
 import com.ridenow.app.ui.theme.RideTheme
+import com.ridenow.app.ui.welcome.WelcomeScreen
+
+enum class Screen { Splash, Welcome, Phone }
 
 @Composable
 fun AppRoot() {
-    var splashDone by rememberSaveable { mutableStateOf(false) }
-    Crossfade(targetState = splashDone, animationSpec = tween(400), label = "root") { done ->
-        if (!done) SplashScreen(onFinished = { splashDone = true }) else NextScreenPlaceholder()
+    var screen by rememberSaveable { mutableStateOf(Screen.Splash) }
+    Crossfade(targetState = screen, animationSpec = tween(400), label = "root") { current ->
+        when (current) {
+            Screen.Splash -> SplashScreen(onFinished = { screen = Screen.Welcome })
+            Screen.Welcome -> WelcomeScreen(
+                onGetStarted = { screen = Screen.Phone },
+                onHaveAccount = { screen = Screen.Phone },
+                onHelp = { /* Help & Support screen */ },
+            )
+            Screen.Phone -> {
+                BackHandler { screen = Screen.Welcome }
+                Placeholder("Phone number screen goes here")
+            }
+        }
     }
 }
 
-/** Replace with the Welcome screen once it is built. */
+/** Temporary stand-in until the next screen is built. */
 @Composable
-private fun NextScreenPlaceholder() {
+private fun Placeholder(label: String) {
     val c = RideTheme.colors
     Box(Modifier.fillMaxSize().background(c.bg), contentAlignment = Alignment.Center) {
-        Text("Welcome screen goes here", color = c.muted, fontSize = 14.sp)
+        Text(label, color = c.muted, fontSize = 14.sp)
     }
 }

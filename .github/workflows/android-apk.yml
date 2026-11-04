@@ -1,6 +1,12 @@
 name: Android APK preview
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/android/**'
+      - '.github/workflows/android-apk.yml'
   workflow_dispatch:
 
 permissions:
@@ -93,7 +99,7 @@ jobs:
           cat > "$RUNNER_TEMP/android-release-notes.md" <<EOF
           Android splash-screen preview built from commit ${GITHUB_SHA}.
 
-          - Contains only the supplied splash screen and its existing placeholder screen.
+          - Contains the screens and UI components currently present in the supplied Android project; the app remains an incomplete preview.
           - Original Kotlin, resources, manifest, and Gradle project files are unchanged.
           - The missing wrapper scripts and JAR were generated only in GitHub Actions using Gradle 8.9 and Java 17.
           - APK is debug-signed for installation and testing, not a production or Play Store release. Debug signing keys may differ between workflow runs; installing a later preview can require uninstalling the previous one.

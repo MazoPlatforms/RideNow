@@ -51,3 +51,6 @@ fun RideNowTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composabl
         MaterialTheme(colorScheme = scheme, content = content)
     }
 }
+
+/** Primary button colour is the same mint in both themes. */
+val Mint = Color(0xFF7CF5D0)
