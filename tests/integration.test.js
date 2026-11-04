@@ -1120,6 +1120,8 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   try{
     await page.goto(base+'/admin/login/');
+    assert.equal(await page.locator('link[rel=icon]').getAttribute('href'),'/admin/assets/brand/ridenow-admin-icon.webp');
+    assert.match(await page.locator('.auth-aside').evaluate(el=>getComputedStyle(el,'::before').backgroundImage),/admin-route-artwork\.webp/);
     await page.getByLabel('Phone number').fill(a.phone);
     await page.getByLabel('Password',{exact:true}).fill(a.password);
     await page.getByRole('button',{name:/^Continue/}).click();
@@ -1130,6 +1132,7 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
     await page.getByRole('button',{name:'Verify & sign in',exact:false}).click();
     await page.waitForURL(base+'/admin/');
     await page.getByText('Registered accounts',{exact:true}).waitFor();
+    assert(await page.locator('.brand-mark-image').evaluate(img=>img.complete&&img.naturalWidth>0));
     const otpJobsBeforeResume=(await one(pool,"SELECT count(*)::int AS n FROM jobs WHERE kind='otp'")).n;
     await page.goto(base+'/admin/login/');
     await page.waitForURL(base+'/admin/');
@@ -1165,12 +1168,17 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
     assert(await one(pool,"SELECT 1 FROM service_areas WHERE name='Browser test area' AND NOT active"));
     const browserArea=await one(pool,"SELECT id FROM service_areas WHERE name='Browser test area'");
     await page.goto(base+'/admin/pricing/');
-    await page.locator('#area-select').selectOption(browserArea.id);
+    await page.getByRole('button',{name:'Service area'}).click();
+    await page.getByRole('option',{name:'Browser test area · inactive'}).click();
+    assert.equal(await page.locator('#area-select').inputValue(),browserArea.id);
     const fareForm=page.locator('#fare-form');
     for(const [name,value] of Object.entries({base:'100.50',perKm:'80',perMinute:'10',waiting:'20',minimum:'100.50',cancellation:'0',commission:'20'}))
       await fareForm.locator(`[name=${name}]`).fill(value);
-    page.once('dialog',dialog=>dialog.accept());
     await fareForm.getByRole('button',{name:'Publish new version',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:'Cancel',exact:true}).click();
+    assert.equal(await one(pool,'SELECT count(*)::int AS n FROM fare_plans WHERE area_id=$1',[browserArea.id]).then(r=>r.n),0);
+    await fareForm.getByRole('button',{name:'Publish new version',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:'Publish fare plan',exact:true}).click();
     await page.getByText('New fare version published.',{exact:false}).waitFor();
     assert.equal((await one(pool,'SELECT base_minor FROM fare_plans WHERE area_id=$1',[browserArea.id])).base_minor,10050);
     await page.goto(base+'/admin/drivers/');
