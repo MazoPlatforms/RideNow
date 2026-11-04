@@ -1019,6 +1019,14 @@ async function webOtp() {
   const job = await one(pool,"SELECT j.payload FROM jobs j JOIN otp_challenges c ON c.id::text=j.payload->>'challengeId' WHERE j.kind='otp' ORDER BY c.created_at DESC LIMIT 1");
   return decrypt(job.payload.encryptedCode,config.ENCRYPTION_KEY);
 }
+async function fillWebCode(page, value) {
+  await page.locator('[data-code-digit="0"]').evaluate((field, code) => {
+    const data = new DataTransfer();
+    data.setData('text/plain', code);
+    field.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  }, value);
+  assert.equal(await page.locator('[data-code-digit]').evaluateAll(fields => fields.map(field => field.value).join('')), value);
+}
 
 test('admin web flow protects pages and never exposes credentials in browser responses', async () => {
   const a=await webAdmin();
@@ -1152,9 +1160,15 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
     await page.getByLabel('Password',{exact:true}).fill(a.password);
     await page.getByRole('button',{name:/^Continue/}).click();
     await page.waitForURL('**/admin/verify/');
+    assert.equal(await page.locator('[data-code-digit]').count(),6);
+    await page.setViewportSize({width:360,height:800});
+    const digitRects=await page.locator('[data-code-digit]').evaluateAll(fields=>fields.map(field=>field.getBoundingClientRect().toJSON()));
+    assert(digitRects.every(rect=>rect.width>=36&&rect.left>=0&&rect.right<=360));
+    assert(digitRects.every(rect=>Math.abs(rect.top-digitRects[0].top)<1));
     await page.getByRole('button',{name:'Send WhatsApp code',exact:true}).click();
     await page.getByText('Code requested.',{exact:false}).waitFor();
-    await page.getByLabel('WhatsApp verification code').fill(await webOtp());
+    const otp=await webOtp();
+    await fillWebCode(page,otp);
     await page.getByRole('button',{name:'Verify & sign in',exact:false}).click();
     await page.waitForURL(base+'/admin/');
     await page.getByText('Registered accounts',{exact:true}).waitFor();
@@ -1262,7 +1276,7 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
     await page.waitForURL('**/admin/verify/');
     await page.getByLabel('Authenticator app code').waitFor();
     assert(await page.getByRole('button',{name:/Send WhatsApp code/}).isHidden());
-    await page.getByLabel('Authenticator app code').fill(new OTPAuth.TOTP({secret}).generate());
+    await fillWebCode(page,new OTPAuth.TOTP({secret}).generate());
     await page.getByRole('button',{name:'Verify & sign in',exact:false}).click();
     await page.waitForURL(base+'/admin/');
     assert.equal((await one(pool,"SELECT count(*)::int AS n FROM jobs WHERE kind='otp'")).n,jobsBeforeTotp);
