@@ -461,3 +461,77 @@ dialog .btn{margin-top:22px;padding:0 26px}
 .hnone{margin-top:30px;font-size:18px;color:var(--ink2)}
 @media (max-width:1020px){.hero--help .duo--map{min-height:0;margin-top:10px}.hero--help{display:block}}
 @media (max-width:720px){.hgroup details p{padding-right:0}.hsearch kbd{display:none}}
+
+/* RideNow editorial refresh: restrained surfaces, generous spacing, clear product status. */
+:root{
+  --bg:#f5f6f8;--sand:#edf0f2;--ink:#17191c;--ink2:#454c55;--mut:#707883;
+  --saf:#ffbd00;--saf-d:#d99d00;--coral:#d99528;--tea:#15191e;--tea2:#252b33;--mint:#e4eee9;
+  --line:rgba(23,25,28,.12);--line-l:rgba(255,255,255,.16);--r:24px;
+}
+.hd{top:16px;width:min(1220px,calc(100% - 40px));height:66px;padding:0 11px 0 22px;border-color:rgba(255,255,255,.88);background:rgba(255,255,255,.82);box-shadow:0 8px 30px rgba(23,25,28,.06)}
+.hd.is-scrolled{background:rgba(255,255,255,.94);box-shadow:0 12px 36px rgba(23,25,28,.1)}
+.brand{font-size:18px;letter-spacing:-.045em}.nav{gap:2px}.nav summary{height:40px;padding-inline:14px;font-size:13px;color:var(--ink2)}
+.nav details[open] summary,.nav summary:hover{background:#f1f3f5}.nav .pn{top:46px;border:1px solid #e6e9ed;border-radius:16px;background:rgba(255,255,255,.97);box-shadow:0 20px 50px rgba(23,25,28,.13)}
+.pn a{border-radius:9px}.hd__cta{height:43px;padding-inline:18px;border-radius:12px;background:var(--ink);font-size:13px}.hd__cta:hover{background:#343a42}
+.btn{height:52px;padding-left:21px;border-radius:12px;font-size:13px;box-shadow:0 2px 4px rgba(17,19,23,.08)}.btn b{width:34px;height:34px}.btn--ghost{border:1px solid rgba(23,25,28,.12);background:rgba(255,255,255,.72);box-shadow:none}
+.burger{border-radius:12px;background:var(--ink)}
+.ft{border-radius:24px 24px 0 0}.bx{border:1px solid rgba(23,25,28,.06);box-shadow:0 12px 40px rgba(23,25,28,.045)}
+body[data-page="rider"]{background:#f5f6f8}
+body[data-page="rider"] .hero{min-height:clamp(760px,94svh,910px);background:radial-gradient(ellipse at 82% 30%,#fff1d1 0,rgba(255,241,209,.48) 18%,transparent 48%),linear-gradient(135deg,#f7f8fa 0%,#f2f4f7 58%,#edf0f4 100%);color:var(--ink)}
+body[data-page="rider"] .hero__grain{z-index:-2;opacity:1;background:radial-gradient(54% 56% at 83% 50%,rgba(255,255,255,.8),transparent 72%),linear-gradient(90deg,rgba(245,246,248,.96) 0%,rgba(245,246,248,.9) 35%,rgba(245,246,248,.18) 73%,transparent 100%)}
+body[data-page="rider"] .hero__copy{padding-top:clamp(142px,17vh,184px);padding-bottom:95px}
+body[data-page="rider"] .hero .eyebrow{gap:9px;padding:8px 12px;border:1px solid #e4e7eb;border-radius:999px;background:rgba(255,255,255,.78);color:#525a63;font-size:10px;letter-spacing:.09em;box-shadow:0 2px 8px rgba(23,25,28,.035)}
+body[data-page="rider"] .hero .eyebrow i{width:7px;height:7px;background:#c98d00;box-shadow:0 0 0 4px rgba(255,189,0,.18)}
+body[data-page="rider"] .hero h1{max-width:780px;margin-top:28px;font-size:clamp(58px,7.2vw,104px);line-height:.97;letter-spacing:-.075em;font-weight:600}
+body[data-page="rider"] .hero h1 strong{font-weight:650;color:#343a42}
+body[data-page="rider"] .hero h1 strong svg path{stroke:var(--saf);stroke-width:5}
+body[data-page="rider"] .hero__lede{max-width:470px;margin-top:25px;color:#59616a;font-size:clamp(15px,1.35vw,18px);font-weight:450;line-height:1.7}
+body[data-page="rider"] .hero__cta{gap:10px;margin-top:29px}
+body[data-page="rider"] .hero__cta .btn:first-child{background:var(--ink);border-color:var(--ink);color:#fff}
+body[data-page="rider"] .hero__cta .btn--ghost{color:var(--ink)}
+body[data-page="rider"] .hero__cta .btn--ghost:hover{background:#fff;border-color:#c9cfd5;color:var(--ink)}
+body[data-page="rider"] .scene{right:-2.5vw;bottom:-4%;width:min(87vw,1200px);opacity:.92;filter:saturate(.84)}
+body[data-page="rider"] .chip{border:1px solid rgba(23,25,28,.08);background:rgba(255,255,255,.88);box-shadow:0 12px 34px rgba(23,25,28,.11);backdrop-filter:blur(14px)}
+body[data-page="rider"] .chip--a{left:60%;top:43%}body[data-page="rider"] .chip--b{left:76%;top:62%}
+body[data-page="rider"] .hero__foot{padding-bottom:20px}
+body[data-page="rider"] .hero__foot .wrap{color:#636b73;font-size:9px;letter-spacing:.13em}
+body[data-page="rider"] .hero__foot .wrap span:last-child{color:rgba(255,255,255,.78)}
+body[data-page="rider"] .kinetic-tape{padding:15px 0;border-block:1px solid #e6e9ed;background:#fff;color:#555d66}
+body[data-page="rider"] .kinetic-tape__track{gap:34px;font-size:12px;font-weight:650;letter-spacing:.04em;animation-duration:54s}
+body[data-page="rider"] .kinetic-tape__track span{gap:34px}.kinetic-tape__track em{color:#966d00;font-style:normal;font-weight:750}.kinetic-tape__track i{color:#c99500}
+body[data-page="rider"] #the-ride{background:#fff}
+body[data-page="rider"] .sec__head{gap:60px}
+body[data-page="rider"] .sec__head p{color:#626a73;font-size:15px;line-height:1.8}
+body[data-page="rider"] .bx{border-radius:22px}
+body[data-page="rider"] .sec--tea{background:#171b20;color:#f5f6f8}
+body[data-page="rider"] .sec--tea::before{background:radial-gradient(circle,rgba(255,189,0,.12),transparent 64%)}
+body[data-page="rider"] .phone{border-radius:38px;box-shadow:0 36px 80px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.16)}
+body[data-page="rider"] .cash{background:#fff1c9}
+body[data-page="rider"] .dl{background:#fff}
+body[data-page="rider"] .faq details{border-color:#e3e7eb}
+body[data-page="rider"] .faq summary{min-height:66px;font-size:15px}
+@media(max-width:1020px){.hd{width:calc(100% - 32px)}.nav{gap:0}}
+@media(max-width:760px){
+  .hd{top:10px;width:calc(100% - 24px);height:58px;padding:0 8px 0 15px}.brand{font-size:17px}.hd__cta{height:40px;padding-inline:13px;font-size:11px}
+  body[data-page="rider"] .hero{min-height:840px;min-height:94svh}
+  body[data-page="rider"] .hero__copy{padding-top:clamp(125px,17vh,156px);padding-bottom:320px}
+  body[data-page="rider"] .hero .eyebrow{max-width:100%;font-size:9px;letter-spacing:.055em}
+  body[data-page="rider"] .hero h1{max-width:560px;margin-top:23px;font-size:clamp(48px,12.7vw,70px);line-height:.99;letter-spacing:-.075em}
+  body[data-page="rider"] .hero__lede{max-width:430px;margin-top:19px;font-size:14px;line-height:1.65}
+  body[data-page="rider"] .hero__cta{gap:9px;margin-top:22px}
+  body[data-page="rider"] .hero__cta .btn{height:47px;padding-inline:15px;font-size:11px}
+  body[data-page="rider"] .hero__cta .btn b{width:27px;height:27px}
+  body[data-page="rider"] .scene{position:absolute;left:auto;right:-210px;bottom:-1%;width:780px;max-width:none;margin:0;opacity:.82}
+  body[data-page="rider"] .chip{gap:8px;padding:7px 12px 7px 7px;font-size:10px}
+  body[data-page="rider"] .chip b{width:30px;height:30px;font-size:12px}
+  body[data-page="rider"] .chip small{font-size:8px}
+  body[data-page="rider"] .chip--a{left:28%;top:55%}body[data-page="rider"] .chip--b{left:58%;top:70%}
+  body[data-page="rider"] .hero__foot{padding-bottom:13px}
+  body[data-page="rider"] .hero__foot .wrap{font-size:7px;letter-spacing:.1em}
+  body[data-page="rider"] .kinetic-tape{padding:12px 0}
+  body[data-page="rider"] .kinetic-tape__track{font-size:10px;gap:22px}
+  body[data-page="rider"] .kinetic-tape__track span{gap:22px}
+  body[data-page="rider"] .sec__head{gap:24px}
+}
+@media(max-width:400px){body[data-page="rider"] .hero__cta{align-items:flex-start;flex-direction:column}body[data-page="rider"] .hero__cta .btn--ghost{min-width:0}}
+@media(prefers-reduced-motion:reduce){body[data-page="rider"] .kinetic-tape__track{animation:none}}
