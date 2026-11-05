@@ -2,6 +2,7 @@ package com.ridenow.app.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -10,6 +11,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import com.ridenow.app.R
 
 /** RideNow brand yellow, sampled from the supplied logo. */
 val BrandYellow = Color(0xFFFEC604)
@@ -39,6 +44,38 @@ val LightRideColors = RideColors(
 
 val LocalRideColors = staticCompositionLocalOf { DarkRideColors }
 
+private val SoraFontFamily = FontFamily(
+    Font(R.font.sora_variable, weight = FontWeight.Thin),
+    Font(R.font.sora_variable, weight = FontWeight.ExtraLight),
+    Font(R.font.sora_variable, weight = FontWeight.Light),
+    Font(R.font.sora_variable, weight = FontWeight.Normal),
+    Font(R.font.sora_variable, weight = FontWeight.Medium),
+    Font(R.font.sora_variable, weight = FontWeight.SemiBold),
+    Font(R.font.sora_variable, weight = FontWeight.Bold),
+    Font(R.font.sora_variable, weight = FontWeight.ExtraBold),
+    Font(R.font.sora_variable, weight = FontWeight.Black),
+)
+
+private val SoraTypography = Typography().let { base ->
+    base.copy(
+        displayLarge = base.displayLarge.copy(fontFamily = SoraFontFamily),
+        displayMedium = base.displayMedium.copy(fontFamily = SoraFontFamily),
+        displaySmall = base.displaySmall.copy(fontFamily = SoraFontFamily),
+        headlineLarge = base.headlineLarge.copy(fontFamily = SoraFontFamily),
+        headlineMedium = base.headlineMedium.copy(fontFamily = SoraFontFamily),
+        headlineSmall = base.headlineSmall.copy(fontFamily = SoraFontFamily),
+        titleLarge = base.titleLarge.copy(fontFamily = SoraFontFamily),
+        titleMedium = base.titleMedium.copy(fontFamily = SoraFontFamily),
+        titleSmall = base.titleSmall.copy(fontFamily = SoraFontFamily),
+        bodyLarge = base.bodyLarge.copy(fontFamily = SoraFontFamily),
+        bodyMedium = base.bodyMedium.copy(fontFamily = SoraFontFamily),
+        bodySmall = base.bodySmall.copy(fontFamily = SoraFontFamily),
+        labelLarge = base.labelLarge.copy(fontFamily = SoraFontFamily),
+        labelMedium = base.labelMedium.copy(fontFamily = SoraFontFamily),
+        labelSmall = base.labelSmall.copy(fontFamily = SoraFontFamily),
+    )
+}
+
 object RideTheme {
     val colors: RideColors @Composable @ReadOnlyComposable get() = LocalRideColors.current
 }
@@ -48,5 +85,7 @@ fun RideNowTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composabl
     val c = if (darkTheme) DarkRideColors else LightRideColors
     val scheme = if (darkTheme) darkColorScheme(primary = c.accent, background = c.bg, surface = c.bg, onBackground = c.fg, onSurface = c.fg)
     else lightColorScheme(primary = c.accent, background = c.bg, surface = c.bg, onBackground = c.fg, onSurface = c.fg)
-    CompositionLocalProvider(LocalRideColors provides c) { MaterialTheme(colorScheme = scheme, content = content) }
+    CompositionLocalProvider(LocalRideColors provides c) {
+        MaterialTheme(colorScheme = scheme, typography = SoraTypography, content = content)
+    }
 }

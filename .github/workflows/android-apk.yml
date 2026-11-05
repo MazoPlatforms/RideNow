@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/temporary/sora-android-release'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -101,6 +101,7 @@ jobs:
 
           - Contains the screens and UI components currently present in the supplied Android project; app flows remain incomplete.
           - The uploaded ZIP is preserved byte-for-byte. The extracted source adds the missing Compose `dp` import required to compile `Backdrop.kt`.
+          - Sora variable font is bundled and used for this temporary preview APK only. The font is licensed under the SIL Open Font License; its license is bundled in the APK resources. No Sora changes are merged into `main`.
           - The missing wrapper scripts and JAR were generated only in GitHub Actions using Gradle 8.9 and Java 17.
           - APK is debug-signed for installation and testing, not a production or Play Store release. Debug signing keys may differ between workflow runs; installing a later preview can require uninstalling the previous one.
           - Minimum Android version: Android 8.0 (API 26).
@@ -111,7 +112,7 @@ jobs:
           else
             gh release create "$tag" android-release/* --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --prerelease \
-              --title "RideNow Android preview #${GITHUB_RUN_NUMBER}" \
+              --title "RideNow Android preview #${GITHUB_RUN_NUMBER} (temporary Sora)" \
               --notes-file "$RUNNER_TEMP/android-release-notes.md"
           fi
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"
