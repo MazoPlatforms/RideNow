@@ -31,8 +31,8 @@ export async function sanitizeProfilePhotoBytes(data, mime) {
   try {
     return await sharp(data, { failOn: 'error', limitInputPixels: 16_777_216 })
       .rotate()
-      .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 85 })
+      .resize({ width: 320, height: 320, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 82, mozjpeg: true, chromaSubsampling: '4:2:0' })
       .toBuffer();
   } catch {
     throw new AppError(422, 'PROFILE_PHOTO_INVALID');
