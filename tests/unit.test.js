@@ -50,6 +50,21 @@ test('profile photos are decoded, bounded, and re-encoded as metadata-free JPEGs
   assert.equal(metadata.height, 16);
   assert.equal(metadata.exif, undefined);
   await assert.rejects(sanitizeProfilePhotoBytes(Buffer.from('not an image'), 'image/jpeg'), { code: 'PROFILE_PHOTO_INVALID' });
+
+  const pixels = Buffer.alloc(1024 * 1024 * 3);
+  let seed = 0x12345678;
+  for (let i = 0; i < pixels.length; i++) {
+    seed ^= seed << 13;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    pixels[i] = seed & 255;
+  }
+  const largePng = await sharp(pixels, { raw: { width: 1024, height: 1024, channels: 3 } }).png().toBuffer();
+  const compactJpeg = await sanitizeProfilePhotoBytes(largePng, 'image/png');
+  const compactMetadata = await sharp(compactJpeg).metadata();
+  assert.equal(compactMetadata.format, 'jpeg');
+  assert(Math.max(compactMetadata.width, compactMetadata.height) <= 320);
+  assert(compactJpeg.length < largePng.length / 4);
 });
 test('Sri Lankan mobile normalization rejects other countries', () => {
   assert.equal(normalizePhone('077 123 4567'), '+94771234567');
