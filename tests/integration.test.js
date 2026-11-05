@@ -43,6 +43,7 @@ const storage = {
   upload: async () => 'http://storage.test/upload',
   download: async () => 'http://storage.test/download',
   scan: async () => ({ status: 'CLEAN', version: 'profile-photo-test-version' }),
+  sanitizeProfilePhoto: async () => ({ status: 'CLEAN', version: 'profile-photo-test-version' }),
 };
 before(async () => {
   const admin = database(new URL('/postgres', dbUrl).href);
@@ -205,7 +206,7 @@ test('PostGIS and real API authentication; OTP failures persist and single use h
   await api.post('/v1/auth/otp/verify').send({ challengeId: c.challengeId, code }).expect(401);
   await api.post('/v1/auth/otp/request').send({ phone: '0771234567' }).expect(429);
 });
-test('rider profile creation stores name, email and only a scanned private profile photo', async () => {
+test('rider profile creation stores name, email and only a normalized private profile photo', async () => {
   const session = await login();
   const saved = await request('patch', '/v1/me', session, {
     name: 'RideNow Rider',

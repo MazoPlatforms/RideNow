@@ -8,8 +8,36 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createHash, randomUUID } from 'node:crypto';
 import net from 'node:net';
-import { ensure } from '../shared/errors.js';
+import sharp from 'sharp';
+import { AppError, ensure } from '../shared/errors.js';
 import { storageSettings } from './storage-settings.js';
+
+export async function sanitizeProfilePhotoBytes(data, mime) {
+  ensure(mime === 'image/jpeg' || mime === 'image/png', 400, 'PROFILE_PHOTO_TYPE_INVALID');
+  ensure(Buffer.isBuffer(data) && data.length > 0 && data.length <= 5 * 1024 * 1024, 400, 'PROFILE_PHOTO_SIZE_INVALID');
+  const signatureValid = mime === 'image/png'
+    ? data.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))
+    : data[0] === 255 && data[1] === 216 && data[2] === 255;
+  ensure(signatureValid, 422, 'PROFILE_PHOTO_INVALID');
+  let metadata;
+  try {
+    metadata = await sharp(data, { failOn: 'error', limitInputPixels: 16_777_216 }).metadata();
+  } catch {
+    throw new AppError(422, 'PROFILE_PHOTO_INVALID');
+  }
+  const expectedFormat = mime === 'image/png' ? 'png' : 'jpeg';
+  ensure(metadata.format === expectedFormat && metadata.width > 0 && metadata.height > 0, 422, 'PROFILE_PHOTO_INVALID');
+  ensure(!metadata.pages || metadata.pages === 1, 422, 'PROFILE_PHOTO_ANIMATION_UNSUPPORTED');
+  try {
+    return await sharp(data, { failOn: 'error', limitInputPixels: 16_777_216 })
+      .rotate()
+      .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+  } catch {
+    throw new AppError(422, 'PROFILE_PHOTO_INVALID');
+  }
+}
 
 function scanBytes(data, config) {
   return new Promise((resolve, reject) => {
@@ -131,6 +159,43 @@ export function createStorage(config) {
         result.version = null;
       }
       return result;
+    },
+    async sanitizeProfilePhoto(doc) {
+      const head = await send(new HeadObjectCommand({ Bucket, Key: doc.object_key }));
+      ensure(
+        head.ContentLength === doc.bytes && head.ContentType === doc.mime,
+        422,
+        'PROFILE_PHOTO_METADATA_MISMATCH',
+      );
+      if (mode === 'versioned') ensure(head.VersionId && head.VersionId !== 'null', 503, 'BUCKET_VERSIONING_REQUIRED');
+      ensure(head.ETag, 503, 'PROFILE_PHOTO_OBJECT_UNAVAILABLE');
+      const response = await send(new GetObjectCommand({
+        Bucket,
+        Key: doc.object_key,
+        IfMatch: head.ETag,
+        ...(mode === 'versioned' ? { VersionId: head.VersionId } : {}),
+      }));
+      const original = Buffer.from(await response.Body.transformToByteArray());
+      ensure(original.length === doc.bytes, 422, 'PROFILE_PHOTO_LENGTH_MISMATCH');
+      const sanitized = await sanitizeProfilePhotoBytes(original, doc.mime);
+      const versionKey = `verified/${doc.id}/${createHash('sha256').update(sanitized).digest('hex')}-${randomUUID()}`;
+      const key = mode === 'immutable' ? versionKey : doc.object_key;
+      const saved = await send(new PutObjectCommand({
+        Bucket,
+        Key: key,
+        Body: sanitized,
+        ContentLength: sanitized.length,
+        ContentType: 'image/jpeg',
+        ContentMD5: createHash('md5').update(sanitized).digest('base64'),
+        ...(mode === 'immutable' ? { IfNoneMatch: '*' } : {}),
+        Metadata: { sanitized: 'true', sha256: createHash('sha256').update(sanitized).digest('hex') },
+      }));
+      if (mode === 'versioned') ensure(saved.VersionId && saved.VersionId !== 'null', 503, 'BUCKET_VERSIONING_REQUIRED');
+      return {
+        status: 'CLEAN',
+        version: mode === 'versioned' ? saved.VersionId : null,
+        ...(mode === 'immutable' ? { verifiedKey: key } : {}),
+      };
     },
   };
 }
