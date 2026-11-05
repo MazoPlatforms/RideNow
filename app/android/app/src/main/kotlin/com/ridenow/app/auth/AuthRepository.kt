@@ -184,7 +184,7 @@ class AuthRepository(context: Context) {
         "OTP_INVALID" -> "That code is incorrect, expired, or already used. Request a new code."
         "STAFF_LOGIN_REQUIRED" -> "This number belongs to a staff account. Use the staff sign-in portal."
         "ACCOUNT_UNAVAILABLE" -> "This account is currently unavailable. Contact RideNow support."
-        "PROFILE_PHOTO_REJECTED" -> "The selected photo could not be accepted. Please choose another image."
+        "PROFILE_PHOTO_REJECTED", "PROFILE_PHOTO_INVALID", "PROFILE_PHOTO_ANIMATION_UNSUPPORTED" -> "Choose a valid, non-animated JPEG or PNG profile photo."
         "PROFILE_PHOTO_UPLOAD_EXPIRED" -> "The upload expired. Please select the photo again."
         "PROFILE_PHOTO_UPLOAD_FAILED" -> "Could not upload the profile photo. Please try again."
         "PROFILE_PHOTO_NOT_SUPPORTED" -> "Your profile details were saved, but this backend does not support photo uploads yet. Continue without the photo for now."
