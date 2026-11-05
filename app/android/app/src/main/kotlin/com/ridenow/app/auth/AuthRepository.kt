@@ -66,7 +66,20 @@ class AuthRepository(context: Context) {
         val session = sessions.read() ?: throw AuthApiException("SESSION_REVOKED", "Sign in again to continue.")
         val fields = JSONObject().put("name", name)
         if (email.isNotBlank()) fields.put("email", email)
-        val saved = requestJson("PATCH", "/v1/me", fields, accessToken = session.accessToken)
+        val saved = try {
+            requestJson("PATCH", "/v1/me", fields, accessToken = session.accessToken)
+        } catch (failure: AuthApiException) {
+            // The currently deployed API accepts only `name`; retry that contract so an
+            // optional email cannot prevent account creation while the profile API rolls out.
+            if (email.isNotBlank() && failure.status == 400 && failure.code == "VALIDATION_ERROR") {
+                requestJson(
+                    "PATCH",
+                    "/v1/me",
+                    JSONObject().put("name", name),
+                    accessToken = session.accessToken,
+                )
+            } else throw failure
+        }
         if (photoBytes == null) decodeProfile(saved)
         else {
             val staged = requestJson(
@@ -123,7 +136,9 @@ class AuthRepository(context: Context) {
             val payload = stream?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }.orEmpty()
             val json = try { JSONObject(payload) } catch (_: Exception) { JSONObject() }
             if (status != expected) {
-                val code = json.optString("code", "NETWORK_ERROR")
+                val code = if (status == 404 && path.startsWith("/v1/me/profile-photo")) {
+                    "PROFILE_PHOTO_NOT_SUPPORTED"
+                } else json.optString("code", "NETWORK_ERROR")
                 throw AuthApiException(code, friendlyMessage(code), status)
             }
             return json
@@ -172,6 +187,7 @@ class AuthRepository(context: Context) {
         "PROFILE_PHOTO_REJECTED" -> "The selected photo could not be accepted. Please choose another image."
         "PROFILE_PHOTO_UPLOAD_EXPIRED" -> "The upload expired. Please select the photo again."
         "PROFILE_PHOTO_UPLOAD_FAILED" -> "Could not upload the profile photo. Please try again."
+        "PROFILE_PHOTO_NOT_SUPPORTED" -> "Your profile details were saved, but this backend does not support photo uploads yet. Continue without the photo for now."
         "NETWORK_ERROR" -> "Could not reach RideNow. Check your internet connection and try again."
         else -> "Could not complete verification. Please try again."
     }

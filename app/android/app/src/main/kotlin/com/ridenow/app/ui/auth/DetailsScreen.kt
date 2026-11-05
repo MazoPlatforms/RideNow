@@ -101,6 +101,7 @@ fun DetailsScreen(
     var showSheet by rememberSaveable { mutableStateOf(false) }
     var emailFocused by remember { mutableStateOf(false) }
     var submitting by remember { mutableStateOf(false) }
+    var photoUploadUnavailable by rememberSaveable { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -117,7 +118,7 @@ fun DetailsScreen(
             submitting = true
             errorMessage = null
             try {
-                val jpeg = photo?.let { bitmap ->
+                val jpeg = (if (photoUploadUnavailable) null else photo)?.let { bitmap ->
                     ByteArrayOutputStream().use { output ->
                         check(bitmap.compress(Bitmap.CompressFormat.JPEG, 88, output)) { "Could not prepare the profile photo." }
                         output.toByteArray()
@@ -125,6 +126,9 @@ fun DetailsScreen(
                 }
                 onDone(name.trim(), email.trim(), jpeg)
             } catch (failure: Exception) {
+                if (failure is com.ridenow.app.auth.AuthApiException && failure.code == "PROFILE_PHOTO_NOT_SUPPORTED") {
+                    photoUploadUnavailable = true
+                }
                 errorMessage = failure.message ?: "Could not save your profile. Try again."
             } finally {
                 submitting = false
@@ -181,7 +185,7 @@ fun DetailsScreen(
         }
         errorMessage?.let { Text(it, color = c.danger, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(bottom = 6.dp)) }
         RideButton(
-            stringResource(R.string.details_continue),
+            stringResource(if (photoUploadUnavailable) R.string.details_continue_without_photo else R.string.details_continue),
             onClick = { submit() },
             enabled = canContinue && !submitting,
             loading = submitting,
@@ -192,9 +196,9 @@ fun DetailsScreen(
     if (showSheet) {
         PhotoSheet(
             hasPhoto = photo != null,
-            onCamera = { camera.launch(null) },
-            onGallery = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-            onRemove = { photo = null },
+            onCamera = { photoUploadUnavailable = false; camera.launch(null) },
+            onGallery = { photoUploadUnavailable = false; gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            onRemove = { photo = null; photoUploadUnavailable = true },
             onDismiss = { showSheet = false },
         )
     }

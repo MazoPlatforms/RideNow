@@ -40,6 +40,7 @@
     <string name="details_email_error">Enter a valid email address</string>
     <string name="details_email_hint">Used only for receipts. You can add it later in settings.</string>
     <string name="details_continue">Continue</string>
+    <string name="details_continue_without_photo">Continue without photo</string>
     <string name="photo_title">Profile photo</string>
     <string name="photo_camera">Take a photo</string>
     <string name="photo_gallery">Choose from gallery</string>
