@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -109,7 +110,6 @@ fun OtpScreen(
         resendKey++
     }
     LaunchedEffect(resendKey) { seconds = 60; while (seconds > 0) { delay(1000); seconds-- } }
-    LaunchedEffect(code) { if (code.length == CODE_LENGTH) verify() }
     fun verify() {
         if (code.length != CODE_LENGTH || verifying) return
         val submittedCode = code
@@ -148,6 +148,7 @@ fun OtpScreen(
             }
         }
     }
+    LaunchedEffect(code) { if (code.length == CODE_LENGTH) verify() }
     LaunchedEffect(errorTick) {
         if (errorTick > 0) {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
