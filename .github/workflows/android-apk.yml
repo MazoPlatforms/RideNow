@@ -39,7 +39,16 @@ jobs:
       - name: Record unchanged source checksums
         run: |
           mkdir -p "$RUNNER_TEMP/android-release"
-          git ls-files -z app/android | sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
+          sha256sum app/android/RideNow-Android.zip > "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
+          project_dir="$RUNNER_TEMP/ridenow-supplied-project"
+          mkdir -p "$project_dir"
+          unzip -q app/android/RideNow-Android.zip -d "$project_dir"
+          test -f "$project_dir/RideNow/settings.gradle.kts"
+          test -f "$project_dir/RideNow/app/src/main/AndroidManifest.xml"
+          backdrop="$project_dir/RideNow/app/src/main/kotlin/com/ridenow/app/ui/components/Backdrop.kt"
+          if ! rg -q '^import androidx.compose.ui.unit.dp$' "$backdrop"; then
+            sed -i '/^import androidx.compose.ui.geometry.Offset$/a import androidx.compose.ui.unit.dp' "$backdrop"
+          fi
       - name: Generate wrapper outside the supplied project
         run: |
           wrapper_dir="$RUNNER_TEMP/ridenow-wrapper"
@@ -52,18 +61,18 @@ jobs:
           chmod +x app/android/gradlew
       - uses: gradle/actions/wrapper-validation@v4
       - name: Build the supplied Android project
-        working-directory: app/android
         run: |
           set -o pipefail
-          ./gradlew --no-daemon --stacktrace :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
+          app/android/gradlew --no-daemon --stacktrace --project-dir "$RUNNER_TEMP/ridenow-supplied-project/RideNow" :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
       - name: Verify APK and preserve original sources
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/android/app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/android/app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/android-apk-metadata.txt"
+          apk="$RUNNER_TEMP/ridenow-supplied-project/RideNow/app/build/outputs/apk/debug/app-debug.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/android-apk-metadata.txt"
           head -5 "$RUNNER_TEMP/android-apk-metadata.txt"
           sha256sum --check "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
           git diff --exit-code -- app/android
-          cp app/android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/android-release/RideNow-Android-debug.apk"
+          cp "$apk" "$RUNNER_TEMP/android-release/RideNow-Android-debug.apk"
           cp app/android/RideNow-Android.zip "$RUNNER_TEMP/android-release/RideNow-Android.zip"
           cd "$RUNNER_TEMP/android-release"
           sha256sum RideNow-Android-debug.apk RideNow-Android.zip ANDROID_SOURCE_SHA256SUMS.txt > SHA256SUMS.txt
@@ -91,7 +100,7 @@ jobs:
         with:
           name: ridenow-android-${{ github.run_id }}
           path: android-release
-      - name: Publish installable splash preview
+      - name: Publish Android preview
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -99,9 +108,9 @@ jobs:
           cat > "$RUNNER_TEMP/android-release-notes.md" <<EOF
           RideNow Android UI preview built from commit ${GITHUB_SHA}.
 
-          - Contains the screens and UI components currently present in the supplied Android project; app flows remain incomplete.
-          - The uploaded ZIP is preserved byte-for-byte. The extracted source adds the missing Compose `dp` import required to compile `Backdrop.kt`.
-          - The missing wrapper scripts and JAR were generated only in GitHub Actions using Gradle 8.9 and Java 17.
+          - The APK is built from the supplied project ZIP in `app/android/RideNow-Android.zip`; the ZIP is included byte-for-byte, and its SHA-256 is verified before and after the build.
+          - The temporary build copy receives a missing Compose `dp` import in `Backdrop.kt` so it compiles; the supplied ZIP itself is not modified.
+          - The missing wrapper scripts and JAR are generated in GitHub Actions using Gradle 8.9 and Java 17; they are not added to the supplied ZIP.
           - APK is debug-signed for installation and testing, not a production or Play Store release. Debug signing keys may differ between workflow runs; installing a later preview can require uninstalling the previous one.
           - Minimum Android version: Android 8.0 (API 26).
           - The original uploaded ZIP and SHA-256 checksums are included.
