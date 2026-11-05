@@ -15,12 +15,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
+import com.ridenow.app.ui.auth.DetailsScreen
+import com.ridenow.app.ui.auth.OtpScreen
 import com.ridenow.app.ui.auth.PhoneScreen
 import com.ridenow.app.ui.splash.SplashScreen
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.welcome.WelcomeScreen
 
-enum class Screen { Splash, Welcome, Phone, Otp }
+enum class Screen { Splash, Welcome, Phone, Otp, Details, Location }
 
 @Composable
 fun AppRoot() {
@@ -40,7 +42,15 @@ fun AppRoot() {
             }
             Screen.Otp -> {
                 BackHandler { screen = Screen.Phone }
-                Placeholder("Code screen for $phone goes here")
+                OtpScreen(phone = phone, onBack = { screen = Screen.Phone }, onVerified = { screen = Screen.Details })
+            }
+            Screen.Details -> {
+                BackHandler { screen = Screen.Otp }
+                DetailsScreen(onBack = { screen = Screen.Otp }, onDone = { _, _ -> screen = Screen.Location })
+            }
+            Screen.Location -> {
+                BackHandler { screen = Screen.Details }
+                Placeholder("Location access screen goes here")
             }
         }
     }

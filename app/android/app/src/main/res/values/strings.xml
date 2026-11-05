@@ -23,4 +23,26 @@
     <string name="country_suggested">SUGGESTED</string>
     <string name="country_all">ALL COUNTRIES</string>
     <string name="country_none">No countries found</string>
+
+    <string name="otp_title">Enter the code.</string>
+    <string name="otp_subtitle">We sent a 6-digit code to %1$s.</string>
+    <string name="otp_edit">Wrong number? Edit</string>
+    <string name="otp_resend_in">Resend code in %1$d:%2$02d</string>
+    <string name="otp_resend">Resend code</string>
+    <string name="otp_error">That code is not right. Try again.</string>
+    <string name="otp_verify">Verify and continue</string>
+
+    <string name="details_title">Tell us about you.</string>
+    <string name="details_subtitle">Add a photo and your name so drivers know who to look for.</string>
+    <string name="details_upload">Upload a photo</string>
+    <string name="details_name">Full name</string>
+    <string name="details_email">Email (optional)</string>
+    <string name="details_email_error">Enter a valid email address</string>
+    <string name="details_email_hint">Used only for receipts. You can add it later in settings.</string>
+    <string name="details_continue">Continue</string>
+    <string name="photo_title">Profile photo</string>
+    <string name="photo_camera">Take a photo</string>
+    <string name="photo_gallery">Choose from gallery</string>
+    <string name="photo_remove">Remove current photo</string>
+    <string name="photo_cancel">Cancel</string>
 </resources>
