@@ -13,11 +13,11 @@
     <string name="welcome_help">Help</string>
 
     <string name="phone_title">What is your number?</string>
-    <string name="phone_subtitle">We will send a 6-digit code to confirm it is you. No password needed.</string>
+    <string name="phone_subtitle">We will send a 6-digit WhatsApp code to confirm it is you. No password needed.</string>
     <string name="phone_label">Mobile number</string>
     <string name="phone_privacy">Your number stays private and is only shared with your driver as a masked call.</string>
     <string name="phone_send">Send code</string>
-    <string name="phone_terms">By continuing you agree to the Terms and Privacy Policy. Message rates may apply.</string>
+    <string name="phone_terms">By continuing you agree to the Terms and Privacy Policy.</string>
     <string name="country_title">Select country</string>
     <string name="country_search">Search country or code</string>
     <string name="country_suggested">SUGGESTED</string>

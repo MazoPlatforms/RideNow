@@ -4,6 +4,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val rideNowApiBaseUrl = providers.gradleProperty("RIDE_NOW_API_BASE_URL")
+    .orElse("https://mzn-api.onrender.com")
+    .get()
+    .trimEnd('/')
+
 android {
     namespace = "com.ridenow.app"
     compileSdk = 35
@@ -14,6 +19,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "2100.1"
+        buildConfigField("String", "API_BASE_URL", "\"$rideNowApiBaseUrl\"")
     }
     buildTypes {
         release {
@@ -26,7 +32,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 }
 
 dependencies {

@@ -61,26 +61,44 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Step 1 of 3: ask for the rider's mobile number. [onCodeSent] receives the number in +E.164 style. */
 @Composable
-fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modifier = Modifier) {
+fun PhoneScreen(
+    onBack: () -> Unit,
+    onRequestCode: suspend (String) -> String,
+    onCodeSent: (String, String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val c = RideTheme.colors
-    var iso by rememberSaveable { mutableStateOf("US") }
+    var iso by rememberSaveable { mutableStateOf("LK") }
     var digits by rememberSaveable { mutableStateOf("") }
     var showPicker by rememberSaveable { mutableStateOf(false) }
     var sending by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     var focused by remember { mutableStateOf(false) }
     val country = Countries.byIso(iso)
     val valid = digits.length >= country.min
     val focusRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
     val borderColor by animateColorAsState(if (focused) c.accent else c.border, label = "border")
 
     LaunchedEffect(Unit) { delay(400); focusRequester.requestFocus() }
-    LaunchedEffect(sending) {
-        if (sending) { delay(900); onCodeSent(country.dial + digits) }
+    fun send() {
+        if (valid && !sending) scope.launch {
+            sending = true
+            errorMessage = null
+            try {
+                val fullPhone = country.dial + digits
+                onCodeSent(fullPhone, onRequestCode(fullPhone))
+            } catch (error: Exception) {
+                errorMessage = error.message ?: "Could not send a code. Try again."
+            } finally {
+                sending = false
+            }
+        }
     }
-    fun send() { if (valid && !sending) sending = true }
 
     Column(
         modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding()
@@ -149,6 +167,7 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modi
                 Spacer(Modifier.width(10.dp))
                 Text(stringResource(R.string.phone_privacy), color = c.muted, fontSize = 13.sp, lineHeight = 19.sp)
             }
+            errorMessage?.let { Text(it, color = c.danger, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 12.dp)) }
         }
 
         Spacer(Modifier.weight(1f))
@@ -172,8 +191,8 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modi
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun PhoneDarkPreview() = RideNowTheme(darkTheme = true) { PhoneScreen({}, {}) }
+private fun PhoneDarkPreview() = RideNowTheme(darkTheme = true) { PhoneScreen({}, { "" }, { _, _ -> }) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun PhoneLightPreview() = RideNowTheme(darkTheme = false) { PhoneScreen({}, {}) }
+private fun PhoneLightPreview() = RideNowTheme(darkTheme = false) { PhoneScreen({}, { "" }, { _, _ -> }) }

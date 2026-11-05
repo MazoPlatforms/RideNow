@@ -18,29 +18,11 @@ data class Country(val iso: String, val name: String, val dial: String, val patt
 
 object Countries {
     val all = listOf(
-        Country("AU", "Australia", "+61", "### ### ###", 9, 9),
-        Country("BD", "Bangladesh", "+880", "#### ######", 10, 10),
-        Country("BR", "Brazil", "+55", "## #####-####", 10, 11),
-        Country("CA", "Canada", "+1", "(###) ### ####", 10, 10),
-        Country("FR", "France", "+33", "# ## ## ## ##", 9, 9),
-        Country("DE", "Germany", "+49", "### ########", 10, 11),
-        Country("IN", "India", "+91", "##### #####", 10, 10),
-        Country("IT", "Italy", "+39", "### ### ####", 9, 10),
-        Country("JP", "Japan", "+81", "## #### ####", 10, 10),
-        Country("MX", "Mexico", "+52", "## #### ####", 10, 10),
-        Country("NL", "Netherlands", "+31", "# ########", 9, 9),
-        Country("NZ", "New Zealand", "+64", "## ### ####", 8, 10),
-        Country("PK", "Pakistan", "+92", "### #######", 10, 10),
-        Country("SG", "Singapore", "+65", "#### ####", 8, 8),
-        Country("ZA", "South Africa", "+27", "## ### ####", 9, 9),
-        Country("ES", "Spain", "+34", "### ## ## ##", 9, 9),
         Country("LK", "Sri Lanka", "+94", "## ### ####", 9, 9),
-        Country("AE", "United Arab Emirates", "+971", "## ### ####", 9, 9),
-        Country("GB", "United Kingdom", "+44", "#### ######", 10, 10),
-        Country("US", "United States", "+1", "(###) ### ####", 10, 10),
     )
-    val default = byIso("US")
-    val suggested = listOf(byIso("US"), byIso("GB"), byIso("IN"))
+    // The current RideNow authentication API accepts Sri Lankan mobile numbers only.
+    val default = byIso("LK")
+    val suggested = listOf(byIso("LK"))
     fun byIso(iso: String) = all.first { it.iso == iso }
 }
 
