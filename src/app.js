@@ -34,6 +34,7 @@ const uuid = z.uuid(),
   text = z.string().trim().min(1).max(500),
   money = z.number().int().positive().max(1000000000);
 const phone = z.string().min(9).max(30),
+  profileEmail = z.string().trim().max(254).email().or(z.literal('')).optional(),
   page = z.object({
     cursor: uuid.optional(),
     limit: z.coerce.number().int().min(1).max(100).default(30),
@@ -60,6 +61,19 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       next(e);
     }
   };
+  async function profileView(user) {
+    return {
+      id: user.id,
+      phone: user.phone,
+      name: user.name,
+      email: user.email ?? '',
+      profilePhotoUrl: user.profile_photo_key
+        ? await storage.download(user.profile_photo_key, user.profile_photo_version)
+        : null,
+      roles: user.roles,
+      permissions: user.permissions,
+    };
+  }
   app.disable('x-powered-by');
   app.set('trust proxy', Number(config.TRUST_PROXY_HOPS ?? 0));
   app.use((req, res, next) => {
@@ -244,18 +258,75 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     ]);
     return { revoked: true };
   });
-  route('get', '/v1/me', {}, ({ user }) => ({
-    id: user.id,
-    phone: user.phone,
-    name: user.name,
-    roles: user.roles,
-    permissions: user.permissions,
-  }));
-  route('patch', '/v1/me', { body: z.object({ name: text }).strict() }, ({ db, user, body }) =>
-    one(db, 'UPDATE users SET name=$2 WHERE id=$1 RETURNING id,phone,name,roles', [
-      user.id,
-      body.name,
-    ]),
+  route('get', '/v1/me', {}, async ({ user }) => profileView(user));
+  route(
+    'patch',
+    '/v1/me',
+    { body: z.object({ name: text, email: profileEmail }).strict() },
+    async ({ db, user, body }) => {
+      const updated = await one(
+        db,
+        "UPDATE users SET name=$2,email=COALESCE(NULLIF($3,''),email) WHERE id=$1 RETURNING *",
+        [user.id, body.name, body.email ?? null],
+      );
+      return profileView(updated);
+    },
+  );
+  route(
+    'post',
+    '/v1/me/profile-photo',
+    {
+      idem: true,
+      body: z.object({
+        mime: z.enum(['image/jpeg', 'image/png']),
+        bytes: z.number().int().positive().max(5 * 1024 * 1024),
+      }).strict(),
+    },
+    async ({ db, user, body }) => {
+      const id = randomUUID();
+      const key = 'profiles/' + user.id + '/' + id;
+      const upload = await one(
+        db,
+        "INSERT INTO profile_photo_uploads(id,user_id,object_key,mime,bytes,expires_at) VALUES($1,$2,$3,$4,$5,now()+interval '10 minutes') RETURNING id,expires_at",
+        [id, user.id, key, body.mime, body.bytes],
+      );
+      return {
+        photoId: upload.id,
+        uploadUrl: await storage.upload(key, body.mime, body.bytes),
+        expiresAt: upload.expires_at,
+      };
+    },
+  );
+  route(
+    'post',
+    '/v1/me/profile-photo/:id/complete',
+    {},
+    async ({ db, user, req }) => {
+      const upload = await one(
+        db,
+        'SELECT * FROM profile_photo_uploads WHERE id=$1 AND user_id=$2',
+        [req.params.id, user.id],
+      );
+      ensure(upload, 404, 'PROFILE_PHOTO_UPLOAD_NOT_FOUND');
+      if (upload.status === 'CLEAN') return profileView(await one(db, 'SELECT * FROM users WHERE id=$1', [user.id]));
+      ensure(upload.status === 'PENDING' && upload.expires_at > Date.now(), 409, 'PROFILE_PHOTO_UPLOAD_EXPIRED');
+      const result = await storage.scan(upload);
+      if (result.status !== 'CLEAN') {
+        await db.query("UPDATE profile_photo_uploads SET status='REJECTED' WHERE id=$1", [upload.id]);
+        throw new AppError(422, 'PROFILE_PHOTO_REJECTED');
+      }
+      const key = result.verifiedKey ?? upload.object_key;
+      await db.query(
+        "UPDATE profile_photo_uploads SET status='CLEAN',object_key=$2,object_version=$3 WHERE id=$1 AND status='PENDING'",
+        [upload.id, key, result.version ?? null],
+      );
+      const updated = await one(
+        db,
+        'UPDATE users SET profile_photo_key=$2,profile_photo_version=$3 WHERE id=$1 RETURNING *',
+        [user.id, key, result.version ?? null],
+      );
+      return profileView(updated);
+    },
   );
   route(
     'put',
