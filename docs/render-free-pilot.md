@@ -64,7 +64,7 @@ Render Secret Files:
 - `supabase-ca.crt`: GitHub Variable `SUPABASE_CA_CERT`-ல் இருக்கும் public CA PEM. TLS verification-ஐ முடக்க வேண்டாம்.
 - Firebase credential இந்த self-hosted notification அமைப்புக்குத் தேவையில்லை. பின்னர் FCM சேர்த்தால் மட்டும் `FCM_ENABLED=true` மற்றும் `GOOGLE_APPLICATION_CREDENTIALS=/etc/secrets/firebase-service-account.json` அமைத்து உண்மையான push delivery-ஐச் சோதிக்கவும்.
 
-ஆவண malware scanning-க்கு Render-இலிருந்து அணுகக்கூடிய உண்மையான ClamAV endpoint தேவை: `CLAMAV_HOST`, `CLAMAV_PORT`. ClamAV TCP protocol-ல் authentication/TLS இல்லை; public internet-க்கு scanner port-ஐ நேரடியாகத் திறக்க வேண்டாம். பாதுகாக்கப்பட்ட network/tunnel அமைக்க வேண்டும். Scanner இல்லாமல் driver documents CLEAN ஆகாது. Free instance-க்குள் ClamAV-ஐயும் சேர்த்து இயக்குவது இந்த deployment அமைப்பின் பகுதி அல்ல.
+ஆவண malware scanning-க்கு Render-இலிருந்து அணுகக்கூடிய உண்மையான ClamAV endpoint தேவை: `CLAMAV_HOST`, `CLAMAV_PORT`. ClamAV TCP protocol-ல் authentication/TLS இல்லை; public internet-க்கு scanner port-ஐ நேரடியாகத் திறக்க வேண்டாம். பாதுகாக்கப்பட்ட network/tunnel அமைக்க வேண்டும். Scanner இல்லாமல் driver documents CLEAN ஆகாது. Free instance-க்குள் ClamAV-ஐயும் சேர்த்து இயக்குவது இந்த deployment அமைப்பின் பகுதி அல்ல. Rider profile avatars மட்டும் JPEG-ஆக decode/re-encode செய்யப்பட்டு metadata நீக்கப்படும்; அவற்றுக்கு ClamAV endpoint தேவையில்லை.
 
 ## UptimeRobot
 

@@ -12,6 +12,7 @@ import {
   DeleteBucketCommand,
   ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
+import sharp from 'sharp';
 import { createStorage } from '../src/adapters/storage.js';
 
 function scannerFixture() {
@@ -202,6 +203,31 @@ test('non-versioned storage publishes only scanned bytes under a server-only ver
         .length,
       1,
     );
+
+    const photoKey = `staging/${randomUUID()}.png`,
+      photoId = randomUUID(),
+      photoBytes = await sharp({
+        create: { width: 32, height: 24, channels: 3, background: '#ffcc00' },
+      }).png().toBuffer(),
+      photoUpload = await storage.upload(photoKey, 'image/png', photoBytes.length);
+    assert((await fetch(photoUpload, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'image/png' },
+      body: photoBytes,
+    })).ok);
+    await new Promise((resolve) => scanner.close(resolve));
+    const photo = await storage.sanitizeProfilePhoto({
+      id: photoId,
+      object_key: photoKey,
+      mime: 'image/png',
+      bytes: photoBytes.length,
+    });
+    assert.equal(photo.status, 'CLEAN');
+    assert.match(photo.verifiedKey, new RegExp(`^verified/${photoId}/`));
+    assert.equal(photo.version, null);
+    const profileImage = await fetch(await storage.download(photo.verifiedKey));
+    assert.equal(profileImage.headers.get('content-type'), 'image/jpeg');
+    assert.equal((await sharp(Buffer.from(await profileImage.arrayBuffer())).metadata()).format, 'jpeg');
   } finally {
     await new Promise((resolve) => scanner.close(resolve));
     const objects = (await s3.send(new ListObjectsV2Command({ Bucket }))).Contents ?? [];

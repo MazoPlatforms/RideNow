@@ -310,7 +310,7 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       ensure(upload, 404, 'PROFILE_PHOTO_UPLOAD_NOT_FOUND');
       if (upload.status === 'CLEAN') return profileView(await one(db, 'SELECT * FROM users WHERE id=$1', [user.id]));
       ensure(upload.status === 'PENDING' && upload.expires_at > Date.now(), 409, 'PROFILE_PHOTO_UPLOAD_EXPIRED');
-      const result = await storage.scan(upload);
+      const result = await storage.sanitizeProfilePhoto(upload);
       if (result.status !== 'CLEAN') {
         await db.query("UPDATE profile_photo_uploads SET status='REJECTED' WHERE id=$1", [upload.id]);
         throw new AppError(422, 'PROFILE_PHOTO_REJECTED');

@@ -7,6 +7,8 @@ import { loadConfig } from '../src/shared/config.js';
 import { createRecaptchaVerifier } from '../src/shared/recaptcha.js';
 import { createMaps } from '../src/adapters/maps.js';
 import { decimalMinor } from '../admin/assets/api.js';
+import sharp from 'sharp';
+import { sanitizeProfilePhotoBytes } from '../src/adapters/storage.js';
 test('admin money inputs preserve exact LKR cents and reject ambiguous amounts', () => {
   assert.equal(decimalMinor('125.50'), 12550);
   assert.equal(decimalMinor('0.01'), 1);
@@ -36,6 +38,18 @@ test('money rounds once to minor unit and enforces minimum', () => {
     ),
     2,
   );
+});
+test('profile photos are decoded, bounded, and re-encoded as metadata-free JPEGs', async () => {
+  const source = await sharp({
+    create: { width: 24, height: 16, channels: 3, background: '#f0b000' },
+  }).png().toBuffer();
+  const sanitized = await sanitizeProfilePhotoBytes(Buffer.concat([source, Buffer.from('<script>ignored</script>')]), 'image/png');
+  const metadata = await sharp(sanitized).metadata();
+  assert.equal(metadata.format, 'jpeg');
+  assert.equal(metadata.width, 24);
+  assert.equal(metadata.height, 16);
+  assert.equal(metadata.exif, undefined);
+  await assert.rejects(sanitizeProfilePhotoBytes(Buffer.from('not an image'), 'image/jpeg'), { code: 'PROFILE_PHOTO_INVALID' });
 });
 test('Sri Lankan mobile normalization rejects other countries', () => {
   assert.equal(normalizePhone('077 123 4567'), '+94771234567');
