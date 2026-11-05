@@ -20,7 +20,6 @@ object Countries {
     val all = listOf(
         Country("LK", "Sri Lanka", "+94", "## ### ####", 9, 9),
     )
-    // The current RideNow authentication API accepts Sri Lankan mobile numbers only.
     val default = byIso("LK")
     val suggested = listOf(byIso("LK"))
     fun byIso(iso: String) = all.first { it.iso == iso }

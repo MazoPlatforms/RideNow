@@ -13,11 +13,11 @@
     <string name="welcome_help">Help</string>
 
     <string name="phone_title">What is your number?</string>
-    <string name="phone_subtitle">We will send a 6-digit WhatsApp code to confirm it is you. No password needed.</string>
+    <string name="phone_subtitle">We will send a 6-digit code to confirm it is you. No password needed.</string>
     <string name="phone_label">Mobile number</string>
     <string name="phone_privacy">Your number stays private and is only shared with your driver as a masked call.</string>
     <string name="phone_send">Send code</string>
-    <string name="phone_terms">By continuing you agree to the Terms and Privacy Policy.</string>
+    <string name="phone_terms">By continuing you agree to the Terms and Privacy Policy. Message rates may apply.</string>
     <string name="country_title">Select country</string>
     <string name="country_search">Search country or code</string>
     <string name="country_suggested">SUGGESTED</string>
@@ -45,4 +45,61 @@
     <string name="photo_gallery">Choose from gallery</string>
     <string name="photo_remove">Remove current photo</string>
     <string name="photo_cancel">Cancel</string>
+
+    <string name="loc_title">Where should we find you?</string>
+    <string name="loc_subtitle">Allow location access so your vehicle arrives at the exact spot.</string>
+    <string name="loc_b1">Pinpoint your pickup automatically</string>
+    <string name="loc_b2">See vehicles available near you</string>
+    <string name="loc_b3">Guide your driver to the right spot</string>
+    <string name="loc_allow">Allow location access</string>
+    <string name="loc_note">Only used while the app is open. Change anytime in Settings.</string>
+    <string name="loc_off_title">Location is off</string>
+    <string name="loc_off_subtitle">RideNow needs your location to find you and show nearby vehicles.</string>
+    <string name="loc_off_manual">Enter pickup manually</string>
+    <string name="loc_step1">Open Settings</string>
+    <string name="loc_step2">Tap Permissions, then Location</string>
+    <string name="loc_step3">Choose While using the app</string>
+    <string name="ntf_title">Stay updated.</string>
+    <string name="ntf_subtitle">Get a heads-up when your ride is close, arriving, or when something changes.</string>
+    <string name="ntf_b1">Know when your driver is arriving</string>
+    <string name="ntf_b2">Trip updates and receipts</string>
+    <string name="ntf_b3">Safety alerts, never missed</string>
+    <string name="ntf_allow">Allow notifications</string>
+    <string name="ntf_note">No spam. Turn off any time in Settings.</string>
+    <string name="ntf_off_title">Notifications are off</string>
+    <string name="ntf_off_subtitle">Turn them on to know when your driver is arriving.</string>
+    <string name="ntf_step2">Tap Notifications</string>
+    <string name="ntf_step3">Turn on Allow notifications</string>
+    <string name="perm_open_settings">Open settings</string>
+    <string name="perm_not_now">Not now</string>
+
+    <string name="home_title">Where to?</string>
+    <string name="home_later">Later</string>
+    <string name="home_pickup">Pickup · %1$s</string>
+    <string name="home_pickup_edit">Edit pickup location</string>
+    <string name="home_destination">Enter destination</string>
+    <string name="home_saved_home">Home</string>
+    <string name="home_saved_work">Work</string>
+    <string name="home_menu">Open menu</string>
+    <string name="home_notifications">Notifications</string>
+
+    <string name="search_friend">Book for a friend</string>
+    <string name="search_one_way">One way</string>
+    <string name="search_return">Return trip</string>
+    <string name="search_pickup">PICKUP</string>
+    <string name="search_stop">STOP</string>
+    <string name="search_drop">DROP</string>
+    <string name="search_current">Current location</string>
+    <string name="search_same">Same as pickup</string>
+    <string name="search_hint">Where are you going?</string>
+    <string name="search_saved">Saved addresses</string>
+    <string name="search_map">Set location on map</string>
+    <string name="search_add_home">Add Home</string>
+    <string name="search_add_work">Add Work</string>
+    <string name="search_none">No places found for “%1$s”</string>
+    <string name="search_none_tip">Check the spelling or try a nearby landmark, street or area.</string>
+    <string name="search_choose_map">Choose on map</string>
+    <string name="search_edit_pickup">Edit pickup location</string>
+    <string name="search_add_stop">Add a stop</string>
+    <string name="search_clear">Clear</string>
 </resources>

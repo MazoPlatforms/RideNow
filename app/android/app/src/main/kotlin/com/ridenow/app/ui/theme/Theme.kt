@@ -42,8 +42,6 @@ val LightRideColors = RideColors(
     ring1 = Color(0xFFD5DCE3), ring2 = Color(0xFFBFC9D3), field = Color.White, danger = Color(0xFFB3261E), isDark = false,
 )
 
-val LocalRideColors = staticCompositionLocalOf { DarkRideColors }
-
 private val SoraFontFamily = FontFamily(
     Font(R.font.sora_variable, weight = FontWeight.Thin),
     Font(R.font.sora_variable, weight = FontWeight.ExtraLight),
@@ -75,6 +73,8 @@ private val SoraTypography = Typography().let { base ->
         labelSmall = base.labelSmall.copy(fontFamily = SoraFontFamily),
     )
 }
+
+val LocalRideColors = staticCompositionLocalOf { DarkRideColors }
 
 object RideTheme {
     val colors: RideColors @Composable @ReadOnlyComposable get() = LocalRideColors.current

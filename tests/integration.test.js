@@ -42,7 +42,7 @@ const pickup = [81.6973617, 7.7060005],
 const storage = {
   upload: async () => 'http://storage.test/upload',
   download: async () => 'http://storage.test/download',
-  scan: async () => 'CLEAN',
+  scan: async () => ({ status: 'CLEAN', version: 'profile-photo-test-version' }),
 };
 before(async () => {
   const admin = database(new URL('/postgres', dbUrl).href);
@@ -204,6 +204,40 @@ test('PostGIS and real API authentication; OTP failures persist and single use h
   await request('get', '/v1/me', s).expect(200);
   await api.post('/v1/auth/otp/verify').send({ challengeId: c.challengeId, code }).expect(401);
   await api.post('/v1/auth/otp/request').send({ phone: '0771234567' }).expect(429);
+});
+test('rider profile creation stores name, email and only a scanned private profile photo', async () => {
+  const session = await login();
+  const saved = await request('patch', '/v1/me', session, {
+    name: 'RideNow Rider',
+    email: 'rider@example.test',
+  }).expect(200);
+  assert.equal(saved.body.name, 'RideNow Rider');
+  assert.equal(saved.body.email, 'rider@example.test');
+  assert.equal(saved.body.profilePhotoUrl, null);
+
+  const staged = await request('post', '/v1/me/profile-photo', session, {
+    mime: 'image/jpeg',
+    bytes: 1024,
+  }).expect(200);
+  assert.match(staged.body.uploadUrl, /^http:\/\/storage\.test\/upload$/);
+  assert.ok(staged.body.photoId);
+
+  const completed = await request(
+    'post',
+    '/v1/me/profile-photo/' + staged.body.photoId + '/complete',
+    session,
+  ).expect(200);
+  assert.equal(completed.body.profilePhotoUrl, 'http://storage.test/download');
+  const stored = await one(pool, 'SELECT email,profile_photo_key,profile_photo_version FROM users WHERE id=$1', [session.user.id]);
+  assert.equal(stored.email, 'rider@example.test');
+  assert.equal(stored.profile_photo_version, 'profile-photo-test-version');
+  assert.ok(stored.profile_photo_key.startsWith('profiles/' + session.user.id + '/'));
+  await request('get', '/v1/me', session).expect(200);
+
+  await request('post', '/v1/me/profile-photo', session, {
+    mime: 'image/jpeg',
+    bytes: 5 * 1024 * 1024 + 1,
+  }).expect(400);
 });
 test('refresh token reuse revokes the entire family', async () => {
   const s = await login(),

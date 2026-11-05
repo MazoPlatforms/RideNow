@@ -93,8 +93,8 @@ fun PhoneScreen(
             try {
                 val fullPhone = country.dial + digits
                 onCodeSent(fullPhone, onRequestCode(fullPhone))
-            } catch (error: Exception) {
-                errorMessage = error.message ?: "Could not send a code. Try again."
+            } catch (failure: Exception) {
+                errorMessage = failure.message ?: "Could not send a code. Try again."
             } finally {
                 sending = false
             }
@@ -192,8 +192,8 @@ fun PhoneScreen(
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun PhoneDarkPreview() = RideNowTheme(darkTheme = true) { PhoneScreen({}, { "" }, { _, _ -> }) }
+private fun PhoneDarkPreview() = RideNowTheme(darkTheme = true) { PhoneScreen({}, { "preview" }, { _, _ -> }) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun PhoneLightPreview() = RideNowTheme(darkTheme = false) { PhoneScreen({}, { "" }, { _, _ -> }) }
+private fun PhoneLightPreview() = RideNowTheme(darkTheme = false) { PhoneScreen({}, { "preview" }, { _, _ -> }) }

@@ -1,0 +1,75 @@
+name: Sora Android auth preview
+
+on:
+  push:
+    branches:
+      - feature/sora-auth-otp
+    paths:
+      - 'app/android/**'
+      - '.github/workflows/android-sora-auth.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-sora-auth-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/feature/sora-auth-otp'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: false
+      - name: Install Android SDK 35 and build tools
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Generate Gradle wrapper outside the supplied source archive
+        run: |
+          wrapper_dir="$RUNNER_TEMP/ridenow-wrapper"
+          mkdir -p "$wrapper_dir"
+          printf 'rootProject.name = "wrapper-bootstrap"\n' > "$wrapper_dir/settings.gradle.kts"
+          gradle --no-daemon --project-dir "$wrapper_dir" wrapper --gradle-version 8.9 --distribution-type bin
+          cp "$wrapper_dir/gradlew" app/android/gradlew
+          cp "$wrapper_dir/gradlew.bat" app/android/gradlew.bat
+          cp "$wrapper_dir/gradle/wrapper/gradle-wrapper.jar" app/android/gradle/wrapper/gradle-wrapper.jar
+          chmod +x app/android/gradlew
+      - uses: gradle/actions/wrapper-validation@v4
+      - name: Build Sora Android app
+        working-directory: app/android
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
+      - name: Verify APK and source ZIP
+        run: |
+          apk=app/android/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+          sha256sum app/android/RideNow-Android.zip > "$RUNNER_TEMP/source-zip.sha256"
+          mkdir -p "$RUNNER_TEMP/android-preview"
+          cp "$apk" "$RUNNER_TEMP/android-preview/RideNow-Android-debug.apk"
+          cp app/android/RideNow-Android.zip "$RUNNER_TEMP/android-preview/RideNow-Android.zip"
+          cp "$RUNNER_TEMP/source-zip.sha256" "$RUNNER_TEMP/android-preview/ANDROID_SOURCE_SHA256SUMS.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ridenow-sora-auth-${{ github.run_id }}
+          path: ${{ runner.temp }}/android-preview/
+          retention-days: 30
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ridenow-sora-auth-build-log-${{ github.run_id }}
+          path: ${{ runner.temp }}/android-build.log
+          if-no-files-found: ignore

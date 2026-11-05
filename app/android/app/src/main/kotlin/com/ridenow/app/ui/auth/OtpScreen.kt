@@ -75,7 +75,7 @@ import kotlinx.coroutines.launch
 
 private const val CODE_LENGTH = 6
 
-/** Step 2 of 3: verifies the provider-issued code against the backend. */
+/** Step 2 of 3: verifies the provider-issued code against the RideNow backend. */
 @Composable
 fun OtpScreen(
     phone: String,
@@ -124,7 +124,7 @@ fun OtpScreen(
                 code = ""
                 error = true
                 errorTick++
-                errorMessage = failure.message ?: "We could not verify that code. Try again."
+                errorMessage = failure.message ?: "Could not verify that code. Try again."
             } finally {
                 verifying = false
             }
