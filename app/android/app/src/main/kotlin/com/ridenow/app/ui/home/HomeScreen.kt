@@ -3,7 +3,6 @@ package com.ridenow.app.ui.home
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,11 +44,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.toArgb
-import android.webkit.WebResourceRequest
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import com.ridenow.app.R
+import com.ridenow.app.maps.MapPlace
+import com.ridenow.app.maps.MazoMapSurface
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
 import com.ridenow.app.ui.theme.BrandYellow
@@ -64,12 +61,12 @@ import com.ridenow.app.ui.util.entrance
 fun HomeScreen(
     onMenu: () -> Unit, onNotifications: () -> Unit, onSearch: () -> Unit, onLater: () -> Unit,
     onEditPickup: () -> Unit, onSaved: (String) -> Unit, onRecent: (String) -> Unit,
-    modifier: Modifier = Modifier, hasUnread: Boolean = true,
+    modifier: Modifier = Modifier, hasUnread: Boolean = true, selectedPlace: MapPlace? = null,
 ) {
     val c = RideTheme.colors
     var expanded by rememberSaveable { mutableStateOf(true) }
     Box(modifier.fillMaxSize().background(c.bg)) {
-        MazoMapPreview(Modifier.fillMaxSize())
+        MazoMapSurface(Modifier.fillMaxSize(), selectedPlace)
 
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0), horizontalArrangement = Arrangement.SpaceBetween) {
             RoundButton(RideIcons.Menu, stringResource(R.string.home_menu), onMenu)
@@ -171,32 +168,6 @@ private fun RecentRow(title: String, distance: String, onClick: () -> Unit) {
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.line))
     }
-}
-
-@Composable
-private fun MazoMapPreview(modifier: Modifier = Modifier) {
-    val background = RideTheme.colors.bg.toArgb()
-    AndroidView(
-        modifier = modifier,
-        factory = { viewContext ->
-            WebView(viewContext).apply {
-                setBackgroundColor(background)
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                settings.allowFileAccess = false
-                settings.allowContentAccess = false
-                settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                settings.safeBrowsingEnabled = true
-                webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                        val url = request.url
-                        return !(url.scheme == "https" && url.host == "mazoplatforms.github.io" && url.path?.startsWith("/newmaps") == true)
-                    }
-                }
-                loadUrl("https://mazoplatforms.github.io/newmaps/")
-            }
-        },
-    )
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)

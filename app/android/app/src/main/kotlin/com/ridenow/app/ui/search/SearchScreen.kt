@@ -56,6 +56,10 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import com.ridenow.app.maps.MapPlace
+import com.ridenow.app.maps.MazoMapsClient
 import com.ridenow.app.R
 import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideButtonStyle
@@ -67,32 +71,42 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 
-data class Place(val name: String, val area: String, val distance: String)
-
-private val Places = listOf(
-    Place("Helix Garden Plaza", "Sector 9, Garden Loop", "6.2 km"),
-    Place("Helix City Hall", "Sector 2, Civic Square", "3.1 km"),
-    Place("Helios Medical Centre", "Sector 5, Skyline Way", "4.8 km"),
-    Place("Hello Bakery & Café", "Sector 7, Meridian Walk", "0.4 km"),
-    Place("Nova Terminal, Gate 4", "Sector 12, Orbit Ring", "6.2 km"),
-    Place("Orbit Ring Station", "Sector 1, Ring Road", "5.5 km"),
-    Place("Aurora Medical Centre", "Sector 3, Skyline Way", "4.1 km"),
-    Place("Zenith Café", "Sector 7, Meridian Walk", "0.9 km"),
-)
-
 /** Destination search: trip type, route card with live search field, suggestions and shortcuts. */
 @Composable
 fun SearchScreen(
-    onBack: () -> Unit, onPlace: (Place, Boolean) -> Unit, onFriend: () -> Unit, onEditPickup: () -> Unit,
+    onBack: () -> Unit, onPlace: (MapPlace, Boolean) -> Unit, onFriend: () -> Unit, onEditPickup: () -> Unit,
     onSaved: () -> Unit, onMap: () -> Unit, onAdd: (String) -> Unit, modifier: Modifier = Modifier,
 ) {
     val c = RideTheme.colors
     var returnTrip by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<MapPlace>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf<String?>(null) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     val q = query.trim()
-    val results = remember(q) { if (q.isEmpty()) emptyList() else Places.filter { it.name.contains(q, true) || it.area.contains(q, true) } }
+    LaunchedEffect(q) {
+        if (q.isBlank()) {
+            results = emptyList()
+            searchError = null
+            loading = false
+            return@LaunchedEffect
+        }
+        delay(300)
+        loading = true
+        searchError = null
+        try {
+            results = MazoMapsClient.searchPlaces(q)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            results = emptyList()
+            searchError = failure.message ?: "Map search is unavailable."
+        } finally {
+            loading = false
+        }
+    }
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
@@ -124,11 +138,13 @@ fun SearchScreen(
                 item { OptionRow(RideIcons.Map, stringResource(R.string.search_map), null, chevron = true, onClick = onMap) }
                 item { OptionRow(RideIcons.Home, stringResource(R.string.search_add_home), null, plus = true) { onAdd("Home") } }
                 item { OptionRow(RideIcons.Work, stringResource(R.string.search_add_work), null, plus = true) { onAdd("Work") } }
-                item { OptionRow(RideIcons.Clock, "Nova Terminal, Gate 4", "Sector 12, Orbit Ring", chevron = true) { onPlace(Places[4], returnTrip) } }
+                item { CoverageNote() }
             }
+            loading -> SearchLoading(Modifier.weight(1f))
+            searchError != null -> SearchError(searchError.orEmpty(), Modifier.weight(1f))
             results.isEmpty() -> EmptyResults(q, onMap, Modifier.weight(1f))
             else -> LazyColumn(Modifier.weight(1f).padding(top = 6.dp)) {
-                items(results, key = { it.name }) { p -> SuggestionRow(p, q) { onPlace(p, returnTrip) } }
+                items(results, key = { it.id }) { p -> SuggestionRow(p, q) { onPlace(p, returnTrip) } }
             }
         }
     }
@@ -236,7 +252,7 @@ private fun OptionRow(icon: List<String>, title: String, subtitle: String?, chev
 }
 
 @Composable
-private fun SuggestionRow(place: Place, query: String, onClick: () -> Unit) {
+private fun SuggestionRow(place: MapPlace, query: String, onClick: () -> Unit) {
     val c = RideTheme.colors
     val title = buildAnnotatedString {
         val i = place.name.indexOf(query, ignoreCase = true)
@@ -252,11 +268,39 @@ private fun SuggestionRow(place: Place, query: String, onClick: () -> Unit) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, color = c.fg, fontSize = 15.sp)
-                Text(place.area, color = c.muted, fontSize = 12.sp)
+                Text(place.address ?: place.category?.replaceFirstChar(Char::uppercase) ?: "Place", color = c.muted, fontSize = 12.sp, maxLines = 1)
             }
-            Text(place.distance, color = c.muted, fontSize = 12.sp)
+            place.category?.let { Text(it.replaceFirstChar(Char::uppercase), color = c.muted, fontSize = 10.sp) }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.line))
+    }
+}
+
+@Composable
+private fun CoverageNote() {
+    val c = RideTheme.colors
+    Column(
+        Modifier.fillMaxWidth().padding(top = 18.dp).clip(RoundedCornerShape(16.dp)).background(c.field)
+            .border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(16.dp),
+    ) {
+        Text("Mazo Maps place search", color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text("The current map shows place points only. Full road and building layers are still in progress; local routing is limited to Kattankudy.", color = c.muted, fontSize = 11.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 5.dp))
+    }
+}
+
+@Composable
+private fun SearchLoading(modifier: Modifier = Modifier) {
+    val c = RideTheme.colors
+    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Text("Searching Mazo Maps…", color = c.muted, fontSize = 14.sp)
+    }
+}
+
+@Composable
+private fun SearchError(message: String, modifier: Modifier = Modifier) {
+    val c = RideTheme.colors
+    Box(modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.TopCenter) {
+        Text(message, color = c.danger, fontSize = 13.sp, lineHeight = 19.sp)
     }
 }
 

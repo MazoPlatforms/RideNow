@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import com.ridenow.app.auth.AuthRepository
 import com.ridenow.app.auth.RiderProfile
+import com.ridenow.app.maps.MapPlace
 import com.ridenow.app.ui.auth.DetailsScreen
 import com.ridenow.app.ui.auth.OtpScreen
 import com.ridenow.app.ui.auth.PhoneScreen
@@ -42,6 +43,7 @@ fun AppRoot() {
     var challengeId by rememberSaveable { mutableStateOf("") }
     var stub by rememberSaveable { mutableStateOf("") }
     var verifiedProfile by remember { mutableStateOf<RiderProfile?>(null) }
+    var selectedDestination by remember { mutableStateOf<MapPlace?>(null) }
     var restoredDestination by remember { mutableStateOf(Screen.Welcome) }
     var restoreChecked by remember { mutableStateOf(false) }
     var splashFinished by remember { mutableStateOf(false) }
@@ -114,12 +116,17 @@ fun AppRoot() {
                 onMenu = { open("Menu drawer") }, onNotifications = { open("Notifications") },
                 onSearch = { screen = Screen.Search }, onLater = { open("Schedule a ride") },
                 onEditPickup = { open("Change pickup") }, onSaved = { open("$it address") }, onRecent = { open("Ride options to $it") },
+                selectedPlace = selectedDestination,
             )
             Screen.Search -> {
                 BackHandler { screen = Screen.Home }
                 SearchScreen(
                     onBack = { screen = Screen.Home },
-                    onPlace = { place, ret -> open(if (ret) "Ride options (return) to ${place.name}" else "Ride options to ${place.name}") },
+                    onPlace = { place, _ ->
+                        selectedDestination = place
+                        // Show the selected place on the live map; route preview is user initiated.
+                        screen = Screen.Home
+                    },
                     onFriend = { open("Book for a friend") }, onEditPickup = { open("Change pickup") },
                     onSaved = { open("Saved addresses") }, onMap = { open("Set location on map") }, onAdd = { open("Add $it address") },
                 )
