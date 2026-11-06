@@ -51,8 +51,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
-import org.maplibre.android.components.LocationComponentActivationOptions
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
