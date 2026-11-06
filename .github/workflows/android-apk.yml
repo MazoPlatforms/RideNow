@@ -46,7 +46,11 @@ jobs:
         run: |
           file="$RUNNER_TEMP/ridenow-supplied-project/RideNow/app/src/main/kotlin/com/ridenow/app/ui/home/VectorScreen.kt"
           test -f "$file"
-          if ! grep -q '^import androidx.compose.ui.draw.scale
+          if ! grep -q '^import androidx.compose.ui.draw.scale$' "$file"; then
+            sed -i '/^package com.ridenow.app.ui.home$/a import androidx.compose.ui.draw.scale' "$file"
+          fi
+          grep -n '^import androidx.compose.ui.draw.scale$' "$file"
+      - name: Generate wrapper outside the supplied project
         run: |
           wrapper_dir="$RUNNER_TEMP/ridenow-wrapper"
           mkdir -p "$wrapper_dir"
