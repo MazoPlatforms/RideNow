@@ -1,12 +1,6 @@
 name: Android APK preview
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'app/android/**'
-      - '.github/workflows/android-apk.yml'
   workflow_dispatch:
 
 permissions:
@@ -18,7 +12,6 @@ concurrency:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -49,7 +42,11 @@ jobs:
           if ! rg -q '^import androidx.compose.ui.unit.dp$' "$backdrop"; then
             sed -i '/^import androidx.compose.ui.geometry.Offset$/a import androidx.compose.ui.unit.dp' "$backdrop"
           fi
-      - name: Generate wrapper outside the supplied project
+      - name: Temporary compile-only scale import fix
+        run: |
+          file="$RUNNER_TEMP/ridenow-supplied-project/RideNow/app/src/main/kotlin/com/ridenow/app/ui/home/VectorScreen.kt"
+          test -f "$file"
+          if ! grep -q '^import androidx.compose.ui.draw.scale
         run: |
           wrapper_dir="$RUNNER_TEMP/ridenow-wrapper"
           mkdir -p "$wrapper_dir"
@@ -88,39 +85,3 @@ jobs:
           name: android-build-log-${{ github.run_id }}
           path: ${{ runner.temp }}/android-build.log
           if-no-files-found: ignore
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: ridenow-android-${{ github.run_id }}
-          path: android-release
-      - name: Publish Android preview
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="android-splash-${GITHUB_RUN_ID}"
-          cat > "$RUNNER_TEMP/android-release-notes.md" <<EOF
-          RideNow Android UI preview built from commit ${GITHUB_SHA}.
-
-          - The APK is built from the supplied project ZIP in `app/android/RideNow-Android.zip`; the ZIP is included byte-for-byte, and its SHA-256 is verified before and after the build.
-          - The temporary build copy receives a missing Compose `dp` import in `Backdrop.kt` so it compiles; the supplied ZIP itself is not modified.
-          - The missing wrapper scripts and JAR are generated in GitHub Actions using Gradle 8.9 and Java 17; they are not added to the supplied ZIP.
-          - APK is debug-signed for installation and testing, not a production or Play Store release. Debug signing keys may differ between workflow runs; installing a later preview can require uninstalling the previous one.
-          - Minimum Android version: Android 8.0 (API 26).
-          - The original uploaded ZIP and SHA-256 checksums are included.
-          EOF
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" android-release/* --repo "$GITHUB_REPOSITORY" --clobber
-          else
-            gh release create "$tag" android-release/* --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" --prerelease \
-              --title "RideNow Android preview #${GITHUB_RUN_NUMBER}" \
-              --notes-file "$RUNNER_TEMP/android-release-notes.md"
-          fi
-          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"
