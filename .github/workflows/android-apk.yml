@@ -44,12 +44,25 @@ jobs:
           fi
       - name: Temporary compile-only scale import fix
         run: |
-          file="$RUNNER_TEMP/ridenow-supplied-project/RideNow/app/src/main/kotlin/com/ridenow/app/ui/home/VectorScreen.kt"
-          test -f "$file"
-          if ! grep -q '^import androidx.compose.ui.draw.scale$' "$file"; then
-            sed -i '/^package com.ridenow.app.ui.home$/a import androidx.compose.ui.draw.scale' "$file"
-          fi
-          grep -n '^import androidx.compose.ui.draw.scale$' "$file"
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path(__import__('os').environ['RUNNER_TEMP']) / 'ridenow-supplied-project' / 'RideNow'
+          matches = list(root.rglob('VectorScreen.kt'))
+          print('VectorScreen.kt matches:', [str(p) for p in matches])
+          if len(matches) != 1:
+              raise SystemExit('Expected exactly one VectorScreen.kt in extracted project')
+          path = matches[0]
+          content = path.read_text()
+          import_line = 'import androidx.compose.ui.draw.scale'
+          if import_line not in content:
+              lines = content.splitlines(keepends=True)
+              package_index = next((i for i, line in enumerate(lines) if line.strip().startswith('package ')), None)
+              if package_index is None:
+                  raise SystemExit('Kotlin package declaration not found')
+              lines.insert(package_index + 1, '\\n' + import_line + '\\n')
+              path.write_text(''.join(lines))
+          print('Temporary import applied to:', path)
+          PY
       - name: Generate wrapper outside the supplied project
         run: |
           wrapper_dir="$RUNNER_TEMP/ridenow-wrapper"
