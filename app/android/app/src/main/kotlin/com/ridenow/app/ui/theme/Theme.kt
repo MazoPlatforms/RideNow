@@ -50,3 +50,6 @@ fun RideNowTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composabl
     else lightColorScheme(primary = c.accent, background = c.bg, surface = c.bg, onBackground = c.fg, onSurface = c.fg)
     CompositionLocalProvider(LocalRideColors provides c) { MaterialTheme(colorScheme = scheme, content = content) }
 }
+
+/** Appearance setting: follow the phone, or force light or dark. */
+enum class ThemeMode(val label: String) { System("System default"), Light("Light"), Dark("Dark") }

@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -129,7 +130,7 @@ private fun Star(filled: Boolean, size: androidx.compose.ui.unit.Dp) {
     val c = RideTheme.colors
     androidx.compose.foundation.Canvas(Modifier.size(size)) {
         val path = androidx.compose.ui.graphics.vector.PathParser().parsePathString(RideIcons.Star[0]).toPath()
-        androidx.compose.ui.graphics.drawscope.scale(this.size.width / 20f, Offset0) {
+        scale(this.size.width / 20f, Offset0) {
             if (filled) drawPath(path, c.accent)
             drawPath(path, if (filled) c.accent else c.muted, style = androidx.compose.ui.graphics.drawscope.Stroke(1.3f, join = androidx.compose.ui.graphics.StrokeJoin.Round))
         }
