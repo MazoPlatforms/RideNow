@@ -1,14 +1,14 @@
-# இயக்கம் மற்றும் மீட்பு
+# Operations and recovery
 
 ## Deployment
 
-ஒரே code image-ல் மூன்று process commands:
+Three process commands use the same code image:
 
-- API: `node src/processes/api.js`; பல instances அனுமதி.
-- Worker: `node src/processes/worker.js`; பல instances; jobs/dispatch database locking மூலம் பாதுகாப்பு.
-- WhatsApp: `node src/processes/whatsapp.js`; ஒரு account-க்கு ஒரே active gateway.
+- API: `node src/processes/api.js`; multiple instances are allowed.
+- Worker: `node src/processes/worker.js`; multiple instances; jobs and dispatch are protected by database locks.
+- WhatsApp: `node src/processes/whatsapp.js`; only one active gateway per account.
 
-Database migrations deployment-க்கு முன் ஒரு release job-ல் `npm run migrate`. பழைய API instances இயங்கிக்கொண்டிருக்கும்போது பொருந்தும் additive migrations மட்டும் பயன்படுத்தவும். இங்குள்ள down migrations destructive rollback செய்யாது.
+Run database migrations in a release job with `npm run migrate` before deployment. Use only additive migrations compatible with running older API instances. The down migrations here do not perform destructive rollbacks.
 
 Docker build:
 
@@ -16,67 +16,67 @@ Docker build:
 docker build -t mazo-ride-backend:local .
 ```
 
-Managed proxy CA தேவைப்படும் சூழலில்:
+When a managed proxy CA is needed:
 
 ```sh
 docker build --secret id=proxy_ca,src="$CODEX_PROXY_CERT" -t mazo-ride-backend:local .
 ```
 
-TLS verification அணைக்க வேண்டாம். Production image non-root user-ல் இயங்கும். Runtime secrets-ஐ image-ல் சேர்க்கக்கூடாது. Database/Redis/S3 hostnames container network-க்கு ஏற்ப மாற்றவும். Reverse proxy-ல் TLS, WebSocket upgrade, request-size limits, timeouts அமைக்கவும். `TRUST_PROXY_HOPS`-ஐ நம்பகமான proxy எண்ணிக்கைக்கு மட்டுமே அமைக்கவும்.
+Do not disable TLS verification. The production image runs as a non-root user. Do not embed runtime secrets in the image. Adjust Database/Redis/S3 hostnames to the container network. Configure TLS, WebSocket upgrades, request-size limits, and timeouts on the reverse proxy. Set `TRUST_PROXY_HOPS` only to the number of trusted proxy hops.
 
-## Provider அமைப்பு
+## Provider configuration
 
-- PostgreSQL: PostGIS, pgcrypto extensions; migrations-க்கு DDL role; application-க்கு குறைந்த permissions; TLS மற்றும் connection pool budget.
-- Redis: private network, authentication/TLS; rate limits மற்றும் socket adapter; business jobs PostgreSQL-ல் இருப்பதால் Redis restart-ல் அவை இழக்கப்படாது.
-- Storage: private bucket. Versioned S3-க்கு object-version read permission; R2-க்கு Object Read & Write மற்றும் verified நகல்கள். Public read மறுப்பு; browser upload origin-க்கு குறுகிய CORS policy.
-- `S3_ENDPOINT`: backend internal endpoint. விருப்பமான `S3_PUBLIC_ENDPOINT`: browser அணுகக்கூடிய presign endpoint. இரண்டும் அதே bucket/credentials-ஐ குறிக்க வேண்டும்.
-- ClamAV: `CLAMAV_HOST`, `CLAMAV_PORT` (default 3310); private network; fresh signatures. Scanner இல்லாவிட்டால் documents PENDING-ல் இருக்கும்; approval முடியாது.
-- FCM: `FCM_ENABLED=true`; Application Default Credentials அல்லது mounted `GOOGLE_APPLICATION_CREDENTIALS`; valid app registration token-உடன் dry-run smoke test.
-- Baileys: pair செய்து gateway heartbeat புதிதாக இருப்பதைச் சரிபார்க்கவும்; சோதனை எண்ணிற்கு OTP request/verify-ஐ launch முன் operator இயக்க வேண்டும். Account logout-ல் manual re-pairing தேவை.
+- PostgreSQL: PostGIS and pgcrypto extensions; a DDL role for migrations, minimal application permissions, TLS, and a connection pool budget.
+- Redis: private network and authentication/TLS; rate limiting and socket adapter. Business jobs live in PostgreSQL and are not lost when Redis restarts.
+- Storage: private bucket. Versioned S3 requires object-version read permission; R2 requires Object Read & Write and verified copies. Deny public reads and set a narrow CORS policy for the browser upload origin.
+- `S3_ENDPOINT`: backend internal endpoint. Optional `S3_PUBLIC_ENDPOINT`: browser-accessible presigning endpoint. Both must refer to the same bucket and credentials.
+- ClamAV: `CLAMAV_HOST`, `CLAMAV_PORT` (default 3310); private network and current signatures. Without the scanner, documents remain PENDING and cannot be approved.
+- FCM: `FCM_ENABLED=true`; Application Default Credentials or mounted `GOOGLE_APPLICATION_CREDENTIALS`; dry-run smoke test with a valid app registration token.
+- Baileys: pair the account and confirm the gateway heartbeat is fresh; before launch an operator must request and verify an OTP with a test number. Account logout requires manual pairing again.
 
-## கண்காணிப்பு
+## Monitoring
 
-`/health/live` process liveness; `/health/ready` database, Redis, map startup மற்றும் production-ல் worker heartbeat. Ready response OTP/FCM delivery உத்தரவாதம் அல்ல.
+`/health/live` checks process liveness. `/health/ready` checks database, Redis, map startup, and the production worker heartbeat. A ready response does not guarantee OTP/FCM delivery.
 
-`GET /v1/admin/operations`-ல் ride counts, outbox backlog, jobs/dead jobs, provider timestamps. Structured request logs-ல் requestId, status, durationMs; worker logs-ல் jobId, retry code. Monitoring platform-ல் கீழ்கண்ட alerts அமைக்கவும்:
+`GET /v1/admin/operations` provides ride counts, outbox backlog, jobs/dead jobs, and provider timestamps. Structured request logs include requestId, status, and durationMs; worker logs include jobId and retry code. Configure these alerts in the monitoring platform:
 
-- Worker heartbeat 30 விநாடிக்கு மேல் பழையது.
-- WhatsApp ready=false / heartbeat 30 விநாடிக்கு மேல் பழையது.
-- பழைய pending outbox, attempts ≥10, dead jobs.
-- Dispatch/no-driver விகிதம் மற்றும் scheduled pickup தாமதம்.
-- REST p95 >500 ms, realtime p95 >2 seconds, அதிக GPS rejection.
-- Database connections, disk, backup failures, scanner failures.
+- Worker heartbeat older than 30 seconds.
+- WhatsApp ready=false or heartbeat older than 30 seconds.
+- Stale pending outbox, attempts ≥10, and dead jobs.
+- Dispatch/no-driver ratio and scheduled pickup delays.
+- REST p95 >500 ms, realtime p95 >2 seconds, and excessive GPS rejection.
+- Database connections, disk, backup failures, and scanner failures.
 
-Ledger SQL சோதனை:
+Ledger SQL check:
 
 ```sql
 SELECT transaction_id, SUM(debit-credit)
 FROM ledger_entries GROUP BY transaction_id HAVING SUM(debit-credit)<>0;
 ```
 
-பதில் காலியாக இருக்க வேண்டும். Commit-time trigger imbalance-ஐத் தடுக்கிறது.
+The result should be empty. A commit-time trigger prevents imbalance.
 
-## Job மீட்பு
+## Job recovery
 
-Job leases 60 விநாடிகள்; scanner timeout 30 விநாடிகள்; WhatsApp send timeout 20 விநாடிகள். Crash-ல் lease முடிந்தபின் மீண்டும் முயலும். 8 தோல்விகளுக்குப் பிறகு dead. வெளிச்சேவை timeout-ல் push/WhatsApp duplicate delivery சாத்தியம்; OTP ஒரே challenge-க்கு மட்டும் செல்லும்.
+Job leases last 60 seconds; scanner timeout is 30 seconds and WhatsApp send timeout is 20 seconds. After a crash, retries resume when the lease expires. Jobs are marked dead after eight failures. External-service timeouts can cause duplicate push/WhatsApp delivery; OTPs are tied to a single challenge.
 
-காரணத்தைச் சரிசெய்த பிறகு குறிப்பிட்ட dead job-ஐ மட்டும் operator மீண்டும் இயக்கலாம்:
+After fixing the underlying cause, an operator may retry only the reviewed dead job:
 
 ```sql
 UPDATE jobs SET dead=false,attempts=0,run_at=now(),lease_until=NULL,lease_token=NULL
 WHERE id='<reviewed-job-uuid>' AND done_at IS NULL;
 ```
 
-OTP காலாவதியான job-ஐ replay செய்ய வேண்டாம்; புதிய OTP கேட்க வேண்டும். Outbox ≥10 attempts-க்கு reviewed event-ல் மட்டும் attempts reset செய்யலாம். Notifications event ID மூலம் deduplicate ஆகும்.
+Do not replay a job for an expired OTP; request a new OTP. Outbox attempts ≥10 may be reset only for reviewed events. Notifications are deduplicated by event ID.
 
-## Backups மற்றும் rollback
+## Backups and rollback
 
-- Managed PostgreSQL PITR இயக்கவும்; தினசரி encrypted backup; மாதந்தோறும் isolated restore drill.
-- S3 versions அல்லது R2 verified objects-க்கு backup/lifecycle policy; approved ஆவணங்களை retention முடியும் முன் purge செய்யக்கூடாது.
-- `ENCRYPTION_KEY`, JWT/OTP secrets-ஐ secret manager-ல் backup செய்யவும். Encryption key இழந்தால் Baileys, MFA, PIN/idempotency பதிவுகளை decrypt செய்ய முடியாது.
-- Application rollback-ல் பழைய image-க்கு திரும்பவும்; additive database migration-ஐ அப்படியே வைத்திருக்கவும். Data rollback-க்கு PITR restore மற்றும் reconciliation தேவை.
-- SIGTERM API-ல் connections drain; worker தற்போதைய tick முடித்து நிற்கும். குறைந்தது 60 விநாடி termination grace கொடுக்கவும்.
+- Enable managed PostgreSQL PITR, make daily encrypted backups, and perform monthly isolated restore drills.
+- Apply a backup/lifecycle policy to S3 versions or R2 verified objects; do not purge approved documents before retention ends.
+- Back up `ENCRYPTION_KEY` and JWT/OTP secrets in a secret manager. Losing the encryption key prevents decryption of Baileys, MFA, and PIN/idempotency records.
+- For application rollback, restore the previous image but preserve additive database migrations. Data rollback requires PITR restore and reconciliation.
+- On SIGTERM, API connections are drained and workers finish the current tick. Allow at least a 60-second termination grace period.
 
-## தற்போதைய சோதனை ஆதாரம்
+## Current test evidence
 
-`docs/load-report.json` ஒரு local API instance, உண்மையான PostGIS/Redis, 1,000 drivers, 100 active rides ஆகியவற்றின் அளவீடு. அது provider delivery, S3 throughput, dispatch capacity அல்லது multi-region failover சோதனை அல்ல. Dockerfile வழங்கப்பட்டுள்ளது; application image build இந்தப் பணிச்சூழலில் disk அளவு காரணமாக இயக்கப்படவில்லை.
+`docs/load-report.json` measures a local API instance with real PostGIS/Redis, 1,000 drivers, and 100 active rides. It does not test provider delivery, S3 throughput, dispatch capacity, or multi-region failover. A Dockerfile is provided, but the application image was not built in this environment because of disk space limitations.
