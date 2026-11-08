@@ -1,5 +1,16 @@
 package com.ridenow.app.ui.trip
 
+import androidx.compose.foundation.layout.PaddingValues
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.ridenow.app.ui.map.MapPin
+import com.ridenow.app.ui.map.PinKind
+import com.ridenow.app.ui.map.RideMap
+import com.ridenow.app.ui.map.RouteInfo
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -68,9 +79,6 @@ import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
 import com.ridenow.app.ui.theme.BrandYellow
 import com.ridenow.app.ui.theme.Ink
-import com.ridenow.app.ui.map.MazoMap
-import com.ridenow.app.ui.map.MapCoordinate
-import com.ridenow.app.ui.map.MazoRoute
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
@@ -85,8 +93,7 @@ private val Reasons = listOf("Driver is taking too long", "Booked by mistake", "
 
 /** Live ride: 0 driver assigned, 1 driver arriving, 2 on the way. Demo timers move through the phases. */
 @Composable
-fun TripScreen(destination: String, vehicleIndex: Int, onCancelled: () -> Unit, onComplete: () -> Unit, onShare: () -> Unit, onSafety: () -> Unit, modifier: Modifier = Modifier,
-    mapStart: MapCoordinate? = null, mapEnd: MapCoordinate? = null, mapRoute: MazoRoute? = null) {
+fun TripScreen(destination: String, vehicleIndex: Int, onCancelled: () -> Unit, onComplete: () -> Unit, onShare: () -> Unit, onSafety: () -> Unit, pickup: LatLng, drop: LatLng, route: RouteInfo?, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val v = Vehicles[vehicleIndex]
     var phase by rememberSaveable { mutableIntStateOf(0) }
@@ -102,8 +109,25 @@ fun TripScreen(destination: String, vehicleIndex: Int, onCancelled: () -> Unit, 
     val target = if (phase < 2) Pickup else Drop
 
     Box(modifier.fillMaxSize().background(c.bg)) {
-        MazoMap(Modifier.fillMaxSize(), initialCenter = mapEnd ?: mapStart,
-            start = mapStart, selected = mapEnd, route = mapRoute)
+        val start = LatLng(pickup.latitude + 0.010, pickup.longitude + 0.008)
+        val near = LatLng(pickup.latitude + 0.002, pickup.longitude + 0.0015)
+        fun mix(a: LatLng, b: LatLng, f: Float) = LatLng(a.latitude + (b.latitude - a.latitude) * f, a.longitude + (b.longitude - a.longitude) * f)
+        val driver = when (phase) {
+            0 -> mix(start, near, t); 1 -> mix(near, pickup, t)
+            else -> route?.points?.takeIf { it.size > 1 }?.let { it[((it.size - 1) * t).toInt().coerceIn(0, it.lastIndex)] } ?: mix(pickup, drop, t)
+        }
+        val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(pickup, 14f) }
+        var loaded by remember { mutableStateOf(false) }
+        LaunchedEffect(loaded, route) {
+            if (loaded) runCatching {
+                val b = LatLngBounds.Builder().include(pickup).include(drop).include(start); route?.points?.forEach { b.include(it) }
+                cam.animate(CameraUpdateFactory.newLatLngBounds(b.build(), 90))
+            }
+        }
+        RideMap(
+            Modifier.fillMaxSize(), cam, pins = listOf(MapPin(pickup, PinKind.Pickup), MapPin(drop, PinKind.Drop), MapPin(driver, PinKind.Vehicle)),
+            route = route?.points ?: emptyList(), padding = PaddingValues(top = 70.dp, bottom = 400.dp), onLoaded = { loaded = true },
+        )
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).height(48.dp).clip(RoundedCornerShape(24.dp)).background(c.bg).border(1.dp, c.line, RoundedCornerShape(24.dp)).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -220,4 +244,4 @@ private fun CancelSheet(onKeep: () -> Unit, onCancel: () -> Unit) {
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun TripPreview() = RideNowTheme(darkTheme = true) { TripScreen("Helix Garden Plaza", 1, {}, {}, {}, {}) }
+private fun TripPreview() = RideNowTheme(darkTheme = true) { TripScreen("Helix Garden Plaza", 1, {}, {}, {}, {}, LatLng(0.0, 0.0), LatLng(0.01, 0.01), null) }

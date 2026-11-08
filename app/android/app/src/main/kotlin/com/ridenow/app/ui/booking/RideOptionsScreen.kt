@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.booking
 
+import com.google.android.gms.maps.model.LatLng
+import com.ridenow.app.ui.map.RouteInfo
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,9 +46,6 @@ import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideButtonStyle
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
-import com.ridenow.app.ui.map.MazoMap
-import com.ridenow.app.ui.map.MapCoordinate
-import com.ridenow.app.ui.map.MazoRoute
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
@@ -54,16 +54,13 @@ import com.ridenow.app.ui.util.entrance
 @Composable
 fun RideOptionsScreen(
     destination: String, returnTrip: Boolean, initial: Int, onBack: () -> Unit,
-    onContinue: (Int) -> Unit, onLater: (Int) -> Unit, modifier: Modifier = Modifier,
-    mapStart: MapCoordinate? = null, mapEnd: MapCoordinate? = null, mapRoute: MazoRoute? = null,
-    mapError: String? = null,
+    onContinue: (Int) -> Unit, onLater: (Int) -> Unit, route: RouteInfo?, from: LatLng, to: LatLng?, modifier: Modifier = Modifier,
 ) {
     val c = RideTheme.colors
     var selected by rememberSaveable { mutableIntStateOf(initial) }
     val v = Vehicles[selected]
     Box(modifier.fillMaxSize().background(c.bg)) {
-        MazoMap(Modifier.fillMaxSize(), initialCenter = mapEnd ?: mapStart,
-            start = mapStart, selected = mapEnd, route = mapRoute)
+        RouteMap(Modifier.fillMaxSize(), from, to, route, "${route?.km ?: TripKm} km · ${route?.minutes ?: TripMinutes} min", bottomPadding = 430.dp)
 
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -86,17 +83,13 @@ fun RideOptionsScreen(
         ) {
             Box(Modifier.align(Alignment.CenterHorizontally).size(width = 40.dp, height = 4.dp).clip(CircleShape).background(c.border))
             Text(stringResource(R.string.ride_choose), color = c.fg, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 14.dp))
-            Text(mapError ?: if (mapRoute == null) "Calculating a local route…" else
-                "Mazo Maps route · local road estimate",
-                color = if (mapError == null) c.muted else c.danger,
-                fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
             if (returnTrip) Text(stringResource(R.string.ride_return_note), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
             Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Vehicles.forEachIndexed { i, veh -> VehicleRow(veh, returnTrip, i == selected) { selected = i } }
             }
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Stat(stringResource(R.string.ride_distance), mapRoute?.let { "%.1f km".format(it.distanceMeters / 1000) } ?: "—", Modifier.weight(1f))
-                Stat(stringResource(R.string.ride_time), mapRoute?.let { "${(it.durationSeconds / 60).toInt()} min" } ?: "—", Modifier.weight(1f))
+                Stat(stringResource(R.string.ride_distance), "${route?.km ?: TripKm} km", Modifier.weight(1f))
+                Stat(stringResource(R.string.ride_time), "${route?.minutes ?: TripMinutes} min", Modifier.weight(1f))
                 Stat(stringResource(R.string.ride_seats), "${v.seats}", Modifier.weight(1f))
                 Stat(stringResource(R.string.ride_luggage), "${v.luggage} bags", Modifier.weight(1f))
             }
@@ -144,8 +137,8 @@ private fun Stat(label: String, value: String, modifier: Modifier) {
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun RideOptionsDarkPreview() = RideNowTheme(darkTheme = true) { RideOptionsScreen("Helix Garden Plaza", false, 1, {}, {}, {}) }
+private fun RideOptionsDarkPreview() = RideNowTheme(darkTheme = true) { RideOptionsScreen("Helix Garden Plaza", false, 1, {}, {}, {}, null, LatLng(0.0, 0.0), null) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun RideOptionsLightPreview() = RideNowTheme(darkTheme = false) { RideOptionsScreen("Helix Garden Plaza", true, 1, {}, {}, {}) }
+private fun RideOptionsLightPreview() = RideNowTheme(darkTheme = false) { RideOptionsScreen("Helix Garden Plaza", true, 1, {}, {}, {}, null, LatLng(0.0, 0.0), null) }

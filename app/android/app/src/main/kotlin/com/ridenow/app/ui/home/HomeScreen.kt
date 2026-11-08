@@ -1,5 +1,16 @@
 package com.ridenow.app.ui.home
 
+import androidx.compose.foundation.layout.PaddingValues
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.ridenow.app.ui.map.MapPin
+import com.ridenow.app.ui.map.PinKind
+import com.ridenow.app.ui.map.RideMap
+import com.ridenow.app.ui.map.rememberUserLocation
+import androidx.compose.runtime.LaunchedEffect
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -60,8 +71,6 @@ import androidx.compose.ui.unit.sp
 import com.ridenow.app.R
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
-import com.ridenow.app.ui.map.MazoMap
-import com.ridenow.app.ui.map.MapCoordinate
 import com.ridenow.app.ui.theme.BrandYellow
 import com.ridenow.app.ui.theme.RideColors
 import com.ridenow.app.ui.theme.RideNowTheme
@@ -71,19 +80,22 @@ import com.ridenow.app.ui.util.rememberReducedMotion
 
 /**
  * Home ("Where to?"): full-screen map, menu and notification buttons, and a bottom sheet.
- * Mazo Maps is a live MapLibre surface; place vector coverage is not a complete road basemap.
+ * The map is a drawn placeholder with moving vehicles; swap [CityMap] for a Google Maps view later.
  */
 @Composable
 fun HomeScreen(
     onMenu: () -> Unit, onNotifications: () -> Unit, onSearch: () -> Unit, onLater: () -> Unit,
     onEditPickup: () -> Unit, onSaved: (String) -> Unit, onRecent: (String) -> Unit,
-    modifier: Modifier = Modifier, hasUnread: Boolean = true, pickup: String = "Current location",
-    onGpsLocation: (MapCoordinate) -> Unit = {},
+    modifier: Modifier = Modifier, hasUnread: Boolean = true, pickup: String = "128 Meridian Walk",
 ) {
     val c = RideTheme.colors
     var expanded by rememberSaveable { mutableStateOf(true) }
+    val me = rememberUserLocation()
+    val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(me.position, 15f) }
+    LaunchedEffect(me.position) { cam.animate(CameraUpdateFactory.newLatLngZoom(me.position, 15.5f)) }
+    val cars = remember(me.position) { listOf(0.003 to 0.004, -0.004 to 0.002, 0.002 to -0.005, -0.003 to -0.003).map { (a, b) -> MapPin(LatLng(me.position.latitude + a, me.position.longitude + b), PinKind.Vehicle) } }
     Box(modifier.fillMaxSize().background(c.bg)) {
-        MazoMap(Modifier.fillMaxSize(), showLocate = true, onGpsLocation = onGpsLocation)
+        RideMap(Modifier.fillMaxSize(), cam, pins = cars, myLocation = me.real, padding = PaddingValues(bottom = 300.dp))
 
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0), horizontalArrangement = Arrangement.SpaceBetween) {
             RoundButton(RideIcons.Menu, stringResource(R.string.home_menu), onMenu)
@@ -144,8 +156,8 @@ fun HomeScreen(
 
             AnimatedVisibility(expanded, enter = expandVertically(), exit = shrinkVertically()) {
                 Column(Modifier.padding(top = 8.dp)) {
-                    Text("Search Mazo Maps for a destination", color = c.muted, fontSize = 13.sp,
-                        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onSearch).padding(vertical = 14.dp))
+                    RecentRow("Nova Terminal, Gate 4", "6.2 km") { onRecent("Nova Terminal, Gate 4") }
+                    RecentRow("Helix Garden Plaza", "3.8 km") { onRecent("Helix Garden Plaza") }
                 }
             }
             Spacer(Modifier.height(14.dp))

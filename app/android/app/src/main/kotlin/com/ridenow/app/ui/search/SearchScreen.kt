@@ -1,5 +1,9 @@
 package com.ridenow.app.ui.search
 
+import com.google.android.gms.maps.model.LatLng
+import com.ridenow.app.ui.map.GoogleApi
+import kotlinx.coroutines.delay
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,17 +67,28 @@ import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
 import com.ridenow.app.ui.theme.BrandYellow
 import com.ridenow.app.ui.theme.Ink
-import com.ridenow.app.ui.map.MazoMapsApi
-import com.ridenow.app.ui.map.MazoPlace
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 
+data class Place(val name: String, val area: String, val distance: String, val placeId: String? = null)
+
+private val Places = listOf(
+    Place("Helix Garden Plaza", "Sector 9, Garden Loop", "6.2 km"),
+    Place("Helix City Hall", "Sector 2, Civic Square", "3.1 km"),
+    Place("Helios Medical Centre", "Sector 5, Skyline Way", "4.8 km"),
+    Place("Hello Bakery & Café", "Sector 7, Meridian Walk", "0.4 km"),
+    Place("Nova Terminal, Gate 4", "Sector 12, Orbit Ring", "6.2 km"),
+    Place("Orbit Ring Station", "Sector 1, Ring Road", "5.5 km"),
+    Place("Aurora Medical Centre", "Sector 3, Skyline Way", "4.1 km"),
+    Place("Zenith Café", "Sector 7, Meridian Walk", "0.9 km"),
+)
+
 /** Destination search: trip type, route card with live search field, suggestions and shortcuts. */
 @Composable
 fun SearchScreen(
-    onBack: () -> Unit, onPlace: (MazoPlace, Boolean) -> Unit, onFriend: () -> Unit, onEditPickup: () -> Unit,
-    onSaved: () -> Unit, onMap: () -> Unit, onAdd: (String) -> Unit, modifier: Modifier = Modifier, scheduled: String? = null, pickup: String? = null, friend: String? = null,
+    onBack: () -> Unit, onPlace: (Place, Boolean) -> Unit, onFriend: () -> Unit, onEditPickup: () -> Unit,
+    onSaved: () -> Unit, onMap: () -> Unit, onAdd: (String) -> Unit, modifier: Modifier = Modifier, scheduled: String? = null, pickup: String? = null, friend: String? = null, near: LatLng? = null,
 ) {
     val c = RideTheme.colors
     var returnTrip by rememberSaveable { mutableStateOf(false) }
@@ -81,27 +96,17 @@ fun SearchScreen(
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     val q = query.trim()
-    var results by remember { mutableStateOf<List<MazoPlace>>(emptyList()) }
-    var searching by remember { mutableStateOf(false) }
-    var searchError by remember { mutableStateOf<String?>(null) }
-    var retryKey by remember { mutableStateOf(0) }
-    LaunchedEffect(q, retryKey) {
-        results = emptyList()
-        searchError = null
-        searching = false
-        if (q.length < 2) return@LaunchedEffect
-        kotlinx.coroutines.delay(300)
-        searching = true
-        try {
-            results = MazoMapsApi.searchPlaces(q)
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (failure: Exception) {
-            searchError = failure.message ?: "Mazo Maps search is unavailable."
-        } finally {
-            searching = false
+    var remote by remember { mutableStateOf<List<Place>?>(null) }
+    LaunchedEffect(q) {
+        remote = null
+        if (q.length >= 2) {
+            delay(250)
+            val r = GoogleApi.autocomplete(q, near)
+            remote = r?.map { Place(it.name, it.area, "", it.placeId) } ?: Places.filter { it.name.contains(q, true) || it.area.contains(q, true) }
         }
     }
+    val results = remote ?: emptyList()
+    val loading = q.length >= 2 && remote == null
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
@@ -147,20 +152,12 @@ fun SearchScreen(
                 item { OptionRow(RideIcons.Map, stringResource(R.string.search_map), null, chevron = true, onClick = onMap) }
                 item { OptionRow(RideIcons.Home, stringResource(R.string.search_add_home), null, plus = true) { onAdd("Home") } }
                 item { OptionRow(RideIcons.Work, stringResource(R.string.search_add_work), null, plus = true) { onAdd("Work") } }
+                item { OptionRow(RideIcons.Clock, "Nova Terminal, Gate 4", "Sector 12, Orbit Ring", chevron = true) { onPlace(Places[4], returnTrip) } }
             }
-            searching -> Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Text("Searching Mazo Maps…", color = c.muted)
-            }
-            searchError != null -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(searchError ?: "Map search unavailable", color = c.danger, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                Box(Modifier.padding(top = 12.dp).clickable { retryKey++ }.padding(14.dp)) {
-                    Text("Retry search", color = c.accent)
-                }
-            }
+            loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator(Modifier.size(28.dp), color = c.accent, strokeWidth = 3.dp) }
             results.isEmpty() -> EmptyResults(q, onMap, Modifier.weight(1f))
             else -> LazyColumn(Modifier.weight(1f).padding(top = 6.dp)) {
-                items(results, key = { it.name }) { p -> SuggestionRow(p, q) { onPlace(p, returnTrip) } }
+                items(results, key = { it.placeId ?: it.name }) { p -> SuggestionRow(p, q) { onPlace(p, returnTrip) } }
             }
         }
     }
@@ -268,7 +265,7 @@ private fun OptionRow(icon: List<String>, title: String, subtitle: String?, chev
 }
 
 @Composable
-private fun SuggestionRow(place: MazoPlace, query: String, onClick: () -> Unit) {
+private fun SuggestionRow(place: Place, query: String, onClick: () -> Unit) {
     val c = RideTheme.colors
     val title = buildAnnotatedString {
         val i = place.name.indexOf(query, ignoreCase = true)
@@ -284,9 +281,9 @@ private fun SuggestionRow(place: MazoPlace, query: String, onClick: () -> Unit) 
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, color = c.fg, fontSize = 15.sp)
-                Text(place.address ?: "Mazo Maps place", color = c.muted, fontSize = 12.sp)
+                Text(place.area, color = c.muted, fontSize = 12.sp)
             }
-            Text(place.point.label(), color = c.muted, fontSize = 12.sp)
+            Text(place.distance, color = c.muted, fontSize = 12.sp)
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.line))
     }

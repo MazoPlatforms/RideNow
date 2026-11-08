@@ -1,5 +1,21 @@
 package com.ridenow.app.ui.booking
 
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.ridenow.app.ui.map.MapPin
+import com.ridenow.app.ui.map.PinKind
+import com.ridenow.app.ui.map.RideMap
+import com.ridenow.app.ui.map.RouteInfo
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -74,39 +90,22 @@ fun VehicleArt(style: Int, width: Dp, modifier: Modifier = Modifier) {
     }
 }
 
-/** Placeholder map with streets and the route from pickup to destination, plus a distance chip. */
+/** Google map showing the route between [from] and [to], fitted to the visible area, with an optional distance chip. */
 @Composable
-fun RouteMap(modifier: Modifier = Modifier, pickupAt: Offset = Offset(0.2f, 0.33f), dropAt: Offset = Offset(0.78f, 0.15f), chip: String? = "$TripKm km · $TripMinutes min") {
+fun RouteMap(modifier: Modifier = Modifier, from: LatLng, to: LatLng?, route: RouteInfo?, chip: String?, bottomPadding: Dp = 0.dp, topPadding: Dp = 70.dp) {
     val c = RideTheme.colors
-    BoxWithConstraints(modifier) {
-        Canvas(Modifier.matchParentSize()) {
-            drawRect(c.bg)
-            val minor = c.street.copy(alpha = 0.9f)
-            var y = 60.dp.toPx(); while (y < size.height) { drawLine(minor, Offset(0f, y), Offset(size.width, y), 5.dp.toPx(), StrokeCap.Round); y += 80.dp.toPx() }
-            var x = 50.dp.toPx(); while (x < size.width) { drawLine(minor, Offset(x, 0f), Offset(x, size.height), 5.dp.toPx(), StrokeCap.Round); x += 70.dp.toPx() }
-            drawLine(c.street2, Offset(-10f, size.height * 0.7f), Offset(size.width + 10f, size.height * 0.05f), 9.dp.toPx(), StrokeCap.Round)
-            val a = Offset(size.width * pickupAt.x, size.height * pickupAt.y)
-            val b = Offset(size.width * dropAt.x, size.height * dropAt.y)
-            val route = Path().apply {
-                moveTo(a.x, a.y)
-                cubicTo(a.x + (b.x - a.x) * 0.2f, a.y - (a.y - b.y) * 0.7f, a.x + (b.x - a.x) * 0.55f, b.y + (a.y - b.y) * 0.45f, b.x, b.y)
-            }
-            drawPath(route, c.accent.copy(alpha = 0.2f), style = Stroke(10.dp.toPx(), cap = StrokeCap.Round))
-            drawPath(route, c.accent, style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
-            drawCircle(c.accent, 9.dp.toPx(), a); drawCircle(c.fg, 9.dp.toPx(), a, style = Stroke(3.dp.toPx()))
-            drawPin(b, c.accent)
+    val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(from, 14f) }
+    var loaded by remember { mutableStateOf(false) }
+    LaunchedEffect(loaded, to, route) {
+        if (loaded && to != null) {
+            val b = LatLngBounds.Builder().include(from).include(to); route?.points?.forEach { b.include(it) }
+            runCatching { cam.animate(CameraUpdateFactory.newLatLngBounds(b.build(), 90)) }
         }
-        if (chip != null) Box(
-            Modifier.offset(maxWidth * ((pickupAt.x + dropAt.x) / 2f) - 50.dp, maxHeight * ((pickupAt.y + dropAt.y) / 2f) + 8.dp)
-                .background(c.fg, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 7.dp),
-        ) { Text(chip, color = c.bg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
     }
-}
-
-private fun DrawScope.drawPin(tip: Offset, color: Color) {
-    val r = 14.dp.toPx(); val center = Offset(tip.x, tip.y - 36.dp.toPx())
-    val p = Path().apply { moveTo(tip.x, tip.y); lineTo(center.x - r * 0.8f, center.y + r * 0.7f); lineTo(center.x + r * 0.8f, center.y + r * 0.7f); close() }
-    drawPath(p, color); drawCircle(color, r, center); drawCircle(Ink, 5.dp.toPx(), center)
+    Box(modifier) {
+        RideMap(Modifier.fillMaxSize(), cam, pins = listOfNotNull(MapPin(from, PinKind.Pickup), to?.let { MapPin(it, PinKind.Drop) }), route = route?.points ?: emptyList(), padding = PaddingValues(top = topPadding, bottom = bottomPadding), onLoaded = { loaded = true })
+        if (chip != null) Text(chip, color = c.bg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.TopCenter).padding(top = topPadding + 8.dp).background(c.fg, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 7.dp))
+    }
 }
 
 val ChipShape = RoundedCornerShape(14.dp)

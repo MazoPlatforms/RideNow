@@ -1,5 +1,14 @@
 package com.ridenow.app.ui.booking
 
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.runtime.remember
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.ridenow.app.ui.map.MapPin
+import com.ridenow.app.ui.map.PinKind
+import com.ridenow.app.ui.map.RideMap
+
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
@@ -47,9 +56,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideButtonStyle
-import com.ridenow.app.ui.map.MazoMap
-import com.ridenow.app.ui.map.MapCoordinate
-import com.ridenow.app.ui.map.MazoRoute
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
@@ -58,8 +64,7 @@ import kotlinx.coroutines.delay
 
 /** Radar-style search for a driver. Demo: finds one after about 6 seconds and calls [onFound]. */
 @Composable
-fun FindingDriverScreen(destination: String, vehicleIndex: Int, returnTrip: Boolean, onFound: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier,
-    mapStart: MapCoordinate? = null, mapEnd: MapCoordinate? = null, mapRoute: MazoRoute? = null) {
+fun FindingDriverScreen(destination: String, vehicleIndex: Int, returnTrip: Boolean, onFound: () -> Unit, onCancel: () -> Unit, me: LatLng, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val v = Vehicles[vehicleIndex]
     val reduce = rememberReducedMotion()
@@ -71,8 +76,13 @@ fun FindingDriverScreen(destination: String, vehicleIndex: Int, returnTrip: Bool
     val bar = if (reduce) 0.5f else barRaw
 
     Box(modifier.fillMaxSize().background(c.bg)) {
-        MazoMap(Modifier.fillMaxSize(), initialCenter = mapEnd ?: mapStart,
-            start = mapStart, selected = mapEnd, route = mapRoute)
+        val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(me, 15f) }
+        val cars = remember(me) { listOf(0.003 to 0.004, -0.004 to 0.002, 0.002 to -0.005, -0.003 to -0.003).map { (a, b) -> MapPin(LatLng(me.latitude + a, me.longitude + b), PinKind.Vehicle) } }
+        RideMap(Modifier.fillMaxSize(), cam, pins = cars + MapPin(me, PinKind.Pickup), padding = PaddingValues(bottom = 330.dp))
+        Canvas(Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2, (size.height - 330.dp.toPx()) / 2)
+            for (k in 0..2) { val p = ((t + k / 3f) % 1f); drawCircle(c.accent.copy(alpha = (1f - p) * 0.4f), 20.dp.toPx() + p * 130.dp.toPx(), center, style = Stroke(2.dp.toPx())) }
+        }
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).height(48.dp).clip(RoundedCornerShape(24.dp)).background(c.bg)
                 .border(1.dp, c.line, RoundedCornerShape(24.dp)).padding(horizontal = 16.dp),
@@ -110,4 +120,4 @@ fun FindingDriverScreen(destination: String, vehicleIndex: Int, returnTrip: Bool
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun FindingPreview() = RideNowTheme(darkTheme = true) { FindingDriverScreen("Helix Garden Plaza", 1, false, {}, {}) }
+private fun FindingPreview() = RideNowTheme(darkTheme = true) { FindingDriverScreen("Helix Garden Plaza", 1, false, {}, {}, LatLng(0.0, 0.0)) }

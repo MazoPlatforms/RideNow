@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.booking
 
+import com.google.android.gms.maps.model.LatLng
+import com.ridenow.app.ui.map.RouteInfo
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,9 +45,6 @@ import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
 import com.ridenow.app.ui.theme.BrandYellow
-import com.ridenow.app.ui.map.MazoMap
-import com.ridenow.app.ui.map.MapCoordinate
-import com.ridenow.app.ui.map.MazoRoute
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
@@ -53,9 +53,7 @@ import com.ridenow.app.ui.util.entrance
 @Composable
 fun ConfirmScreen(
     destination: String, vehicleIndex: Int, returnTrip: Boolean, whenLabel: String?, onBack: () -> Unit, onBook: () -> Unit,
-    modifier: Modifier = Modifier,
-    mapStart: MapCoordinate? = null, mapEnd: MapCoordinate? = null, mapRoute: MazoRoute? = null,
-    mapError: String? = null,
+    route: RouteInfo?, from: LatLng, to: LatLng?, modifier: Modifier = Modifier,
 ) {
     val c = RideTheme.colors
     val v = Vehicles[vehicleIndex]
@@ -76,12 +74,8 @@ fun ConfirmScreen(
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(80), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(130.dp).clip(RoundedCornerShape(20.dp)).border(1.dp, c.line, RoundedCornerShape(20.dp))) {
-                MazoMap(Modifier.fillMaxSize(), initialCenter = mapEnd ?: mapStart,
-                    start = mapStart, selected = mapEnd, route = mapRoute, interactive = false)
+                RouteMap(Modifier.fillMaxSize(), from, to, route, "${route?.km ?: TripKm} km · ${route?.minutes ?: TripMinutes} min", topPadding = 0.dp)
             }
-            Text(mapError ?: if (mapRoute == null) "Calculating local route…" else
-                "Mazo Maps · ${"%.1f".format(mapRoute.distanceMeters / 1000)} km · ${(mapRoute.durationSeconds / 60).toInt()} min",
-                color = if (mapError == null) c.muted else c.danger, fontSize = 12.sp)
             Card {
                 Row2(stringResource(R.string.confirm_pickup), "Current location", dot = Dot.Pickup)
                 Divider(); Row2(stringResource(R.string.confirm_drop), destination, dot = Dot.Drop)
@@ -99,8 +93,8 @@ fun ConfirmScreen(
             Card {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                     FareLine(stringResource(R.string.confirm_base), base)
-                    FareLine(stringResource(R.string.confirm_distance, TripKm), dist)
-                    FareLine(stringResource(R.string.confirm_duration, TripMinutes), time)
+                    FareLine(stringResource(R.string.confirm_distance, route?.km ?: TripKm), dist)
+                    FareLine(stringResource(R.string.confirm_duration, route?.minutes ?: TripMinutes), time)
                     FareLine(stringResource(R.string.confirm_taxes), taxes)
                     HorizontalDivider(color = c.line)
                     FareLine(stringResource(R.string.confirm_total), total, bold = true)
@@ -157,8 +151,8 @@ private fun FareLine(label: String, amount: Double, bold: Boolean = false) {
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun ConfirmDarkPreview() = RideNowTheme(darkTheme = true) { ConfirmScreen("Helix Garden Plaza", 1, false, null, {}, {}) }
+private fun ConfirmDarkPreview() = RideNowTheme(darkTheme = true) { ConfirmScreen("Helix Garden Plaza", 1, false, null, {}, {}, null, LatLng(0.0, 0.0), null) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun ConfirmLightPreview() = RideNowTheme(darkTheme = false) { ConfirmScreen("Helix Garden Plaza", 1, false, "Wed, 4 Nov · 8:30 AM", {}, {}) }
+private fun ConfirmLightPreview() = RideNowTheme(darkTheme = false) { ConfirmScreen("Helix Garden Plaza", 1, false, "Wed, 4 Nov · 8:30 AM", {}, {}, null, LatLng(0.0, 0.0), null) }
