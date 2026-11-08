@@ -153,7 +153,7 @@ fun SearchScreen(
             }
             searchError != null -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(searchError ?: "Map search unavailable", color = c.danger, textAlign = TextAlign.Center)
+                Text(searchError ?: "Map search unavailable", color = c.danger, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 Box(Modifier.padding(top = 12.dp).clickable { retryKey++ }.padding(14.dp)) {
                     Text("Retry search", color = c.accent)
                 }
