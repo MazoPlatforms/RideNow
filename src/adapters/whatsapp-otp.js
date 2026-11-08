@@ -12,7 +12,7 @@ export async function deliverWhatsAppOtp({ pool, socket, config, job, demo = fal
   try {
     const sent = await Promise.race([
       socket.sendMessage(`${challenge.phone.slice(1)}@s.whatsapp.net`, {
-        text: `${demo ? 'RideNow சோதனை' : 'Mazo பயணச் சேவை'} OTP: ${code}. 5 நிமிடங்களில் காலாவதியாகும். இதைப் பகிர வேண்டாம்.`,
+        text: `${demo ? 'RideNow test' : 'Mazo Ride Service'} OTP: ${code}. Expires in 5 minutes. Do not share this code.`,
       }),
       new Promise((_, reject) => {
         timer = setTimeout(
