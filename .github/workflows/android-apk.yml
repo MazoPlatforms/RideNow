@@ -51,6 +51,16 @@ jobs:
           cp "$wrapper_dir/gradle/wrapper/gradle-wrapper.jar" app/android/gradle/wrapper/gradle-wrapper.jar
           chmod +x app/android/gradlew
       - uses: gradle/actions/wrapper-validation@v4
+      - name: Configure Google Maps API key
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+        run: |
+          if [ -z "$MAPS_API_KEY" ]; then
+            echo "::error::MAPS_API_KEY secret is missing"
+            exit 1
+          fi
+          printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > app/android/local.properties
+          echo "::add-mask::$MAPS_API_KEY"
       - name: Build the checked-in Android source
         run: |
           set -o pipefail
