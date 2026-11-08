@@ -1,41 +1,41 @@
-# தற்காலிக முதல் Admin அமைப்பு
+# Temporary initial admin setup
 
-இந்த வசதி முதல் admin account உருவாக்குவதற்கானது. ஏற்கெனவே வழங்கப்பட்ட public website கோப்புகளை மாற்றாது. புதிய account-access பக்கங்கள் backend-லிருந்து வழங்கப்படுகின்றன.
+This feature creates the first admin account. It does not modify previously published public website files. New account-access pages are served by the backend.
 
-## இயக்குதல்
+## Setup
 
-1. `003-admin-recovery` migration-ஐ நிறுவவும். Supabase-க்கு ஏற்கெனவே உள்ள `schema-install.yml` workflow பயன்படுத்தவும்; `ridenow-demo` திட்டம் மட்டும் அனுமதிக்கப்பட்டுள்ளது.
-2. Render Environment-ல் `ADMIN_SETUP_KEY` என்ற 32+ random-character secret மற்றும் `ADMIN_SETUP_EXPIRES_AT` என்ற UTC ISO expiry அமைக்கவும். இந்த deployment-க்கு key 24 மணி நேரத்திற்குள் காலாவதியாகும் வகையில் வழங்கப்படுகிறது. Code-ல் expiry இல்லாமல் setup இயங்காது.
-3. `/admin-setup/#key=<private-key>` என்ற தனிப்பட்ட இணைப்பைத் திறக்கவும். Fragment server request-க்கு அனுப்பப்படாது; JavaScript அதை வாசித்ததும் browser URL-லிருந்து நீக்கும். Key, password, recovery password ஆகியவற்றை chat, screenshot அல்லது Git commit-ல் பகிர வேண்டாம்.
+1. Install the `003-admin-recovery` migration. For Supabase, use the existing `schema-install.yml` workflow; only the `ridenow-demo` project is allowed.
+2. Set `ADMIN_SETUP_KEY` to a random 32+ character secret and `ADMIN_SETUP_EXPIRES_AT` to a UTC ISO expiration in the Render environment. The key should expire within 24 hours for this deployment. Setup cannot run without an expiration configured.
+3. Open the private link `/admin-setup/#key=<private-key>`. The fragment is not sent to the server; JavaScript reads it and removes it from the browser URL. Do not share keys, passwords, or recovery passwords in chats, screenshots, or Git commits.
 
-முதல் admin ஏற்கெனவே இருந்தாலோ, setup முடிந்ததற்கான permanent marker இருந்தாலோ, key காலாவதியானாலோ setup பக்கம்/API 404 வழங்கும். Admin role பின்னர் மாற்றப்பட்டாலும் பழைய setup key மீண்டும் திறக்காது. Setup முடிந்தபின் Render Environment-லிருந்து key மற்றும் expiry-ஐயும் நீக்கலாம்.
+The setup page/API responds with 404 if the first admin already exists, the permanent setup-completion marker is present, or the key has expired. Changing the admin role later does not reopen the old key. After setup, the key and expiration can be removed from the Render environment.
 
-## Account உருவாக்குதல்
+## Create the account
 
-- தனி admin phone number, பெயர் மற்றும் குறைந்தது 12 எழுத்துகள் கொண்ட password உள்ளிடவும். Password manager பயன்படுத்துவது பரிந்துரைக்கப்படுகிறது.
-- WhatsApp OTP கோரி, 5 நிமிடங்களுக்குள் கிடைத்த code உள்ளிடவும். OTP account phone-உடன் பொருந்த வேண்டும்; ஒருமுறை மட்டுமே பயன்படுத்தலாம்.
-- OTP அனுப்ப முடியாவிட்டால் அல்லது கிடைக்காவிட்டால் recovery checkbox தேர்வு செய்யலாம். **முதல் setup-ல் தனிப்பட்ட setup key தான் operator authorization**; அந்த வழியில் phone ownership சரிபார்க்கப்படாது. பொது பார்வையாளருக்கு key இல்லாமல் இந்த வழி கிடையாது.
-- TOTP விருப்பம். தேர்வு செய்தால் secret-ஐ authenticator-ல் சேர்த்து அதிலுள்ள code-ஐ உறுதிப்படுத்த வேண்டும். உறுதிப்படுத்தாத secret account-ல் சேமிக்கப்படாது.
-- ஏற்கெனவே சாதாரண rider ஆக உள்ள அதே எண்ணைப் பயன்படுத்தினால் account admin ஆக மாறும்; பழைய sessions revoke செய்யப்படும். Driver/staff, suspended அல்லது deleted account-களை இந்த setup மாற்றாது.
-- Account உருவானதும் **தனி recovery password ஒருமுறை காட்டப்படும்**. அதை login password-இலிருந்து தனியாகப் பாதுகாப்பாகச் சேமிக்கவும். Database-ல் இரு passwords-மும் bcrypt hashes ஆகவே சேமிக்கப்படும்.
+- Enter a dedicated admin phone number, name, and password of at least 12 characters. A password manager is recommended.
+- Request a WhatsApp OTP and enter the received code within five minutes. The OTP must match the account phone and can be used only once.
+- If OTP cannot be sent or received, select the recovery checkbox. **During initial setup, the private setup key provides operator authorization**; phone ownership is not checked on this path. The option is not available to a public visitor without the key.
+- TOTP is optional. If selected, add the secret to an authenticator and confirm its code. An unconfirmed secret is not stored on the account.
+- If the number already belongs to a regular rider, that account becomes an admin and old sessions are revoked. This setup does not modify driver/staff, suspended, or deleted accounts.
+- After account creation, **a separate recovery password is displayed once**. Store it securely and separately from the login password. Both passwords are stored in the database only as bcrypt hashes.
 
-## பின்னர் Login
+## Later login
 
-`/admin-access/` பக்கம்:
+On `/admin-access/`:
 
-- TOTP இல்லாவிட்டால்: login password + WhatsApp OTP.
-- TOTP அமைத்திருந்தால்: login password + புதிய TOTP code. Setup-ல் உறுதிப்படுத்திய அதே code-ஐ உடனே மீண்டும் பயன்படுத்த முடியாது; அடுத்த code வரும் வரை காத்திருக்கவும்.
-- OTP/TOTP கிடைக்காவிட்டால்: login password + தனி recovery password. Recovery பயன்படுத்தியதும் பழைய sessions revoke செய்யப்படும், பழைய recovery password செல்லாது, புதிய recovery password ஒருமுறை வழங்கப்படும். புதியதைச் சேமிக்க வேண்டும்.
-- தவறான recovery password 5 முறை உள்ளிடப்பட்டால் 15 நிமிட recovery lock. API rate limiting கூடுதலாக இயங்கும்.
+- Without TOTP: login password + WhatsApp OTP.
+- With TOTP: login password + a new TOTP code. The code already confirmed at setup cannot be used again immediately; wait for the next code.
+- If OTP/TOTP is unavailable: login password + separate recovery password. Recovery revokes old sessions, invalidates the old recovery password, and displays a new one once. Save the replacement.
+- Five incorrect recovery-password attempts cause a 15-minute recovery lock. API rate limiting also applies.
 
-`/admin-access/` தற்போது புதிய `/admin/login/` பல்பக்க sign-in-க்கு redirect செய்கிறது. Login முடிந்ததும் `/admin/` dashboard திறக்கும். Browser session ஒரு HttpOnly cookie மூலம் பாதுகாக்கப்படும்; API tokens server-side encrypted Redis state-ல் இருக்கும். Password/JWT browser storage அல்லது URL-ல் சேமிக்கப்படாது. [Dashboard விவரங்கள்](admin-dashboard.md).
+`/admin-access/` now redirects to the new multi-page sign-in at `/admin/login/`. After login, the `/admin/` dashboard opens. The browser session is secured with an HttpOnly cookie, while API tokens are stored in encrypted server-side Redis state. Passwords/JWTs are not saved in browser storage or the URL. See [dashboard details](admin-dashboard.md).
 
 ## API
 
 - `POST /v1/admin-setup/otp`: setup key header + phone.
 - `POST /v1/admin-setup/totp`: setup key header + phone; temporary encrypted enrollment envelope.
-- `POST /v1/admin-setup/complete`: setup key header + name/phone/password; `verification=whatsapp` என்றால் challenge/code, `verification=setup-key` என்றால் explicit operator fallback. விருப்ப enrollment மற்றும் TOTP confirmation.
-- `POST /v1/auth/staff/login`: phone/password + TOTP அல்லது phone-bound challenge/code.
-- `POST /v1/auth/admin/recover`: phone/password/recoveryPassword; புதிய session மற்றும் மாற்றிய recovery password.
+- `POST /v1/admin-setup/complete`: setup key header + name/phone/password; challenge/code for `verification=whatsapp` or explicit operator fallback for `verification=setup-key`. Optional enrollment and TOTP confirmation.
+- `POST /v1/auth/staff/login`: phone/password + TOTP or phone-bound challenge/code.
+- `POST /v1/auth/admin/recover`: phone/password/recoveryPassword; new session and rotated recovery password.
 
-Setup key header: `X-Admin-Setup-Key`. Account pages, setup responses மற்றும் auth responses `Cache-Control: no-store` பயன்படுத்துகின்றன. Request bodies மற்றும் credentials logs-ல் எழுதப்படாது. Recovery password HTTPS response-ல் உரிமையாளருக்கு ஒருமுறை வழங்கப்படுகிறது; அதைச் சேமிக்காமல் response இழந்தால் சாதாரண OTP/TOTP login-ஐப் பயன்படுத்த வேண்டும்.
+Setup key header: `X-Admin-Setup-Key`. Account pages, setup responses, and authentication responses use `Cache-Control: no-store`. Request bodies and credentials are not logged. The recovery password is returned to its owner once over HTTPS; if the response is lost without being saved, use normal OTP/TOTP login.
