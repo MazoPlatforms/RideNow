@@ -121,6 +121,12 @@ fun MazoMap(
             }
         }
         owner.lifecycle.addObserver(observer)
+        if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            view.onStart(); started = true
+        }
+        if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            view.onResume(); resumed = true
+        }
         onDispose {
             owner.lifecycle.removeObserver(observer)
             if (resumed) view.onPause()
@@ -146,8 +152,8 @@ fun MazoMap(
         if (current == null) onDispose {}
         else {
             val idle = MapLibreMap.OnCameraIdleListener {
-                val pos = current.cameraPosition.target
-                MapCoordinate(pos.longitude, pos.latitude).takeIf { it.valid }?.let(onCenter)
+                current.cameraPosition.target?.let { MapCoordinate(it.longitude, it.latitude) }
+                    ?.takeIf { it.valid }?.let(onCenter)
             }
             current.addOnCameraIdleListener(idle)
             onDispose { current.removeOnCameraIdleListener(idle) }
