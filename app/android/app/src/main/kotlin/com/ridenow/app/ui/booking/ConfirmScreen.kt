@@ -42,6 +42,9 @@ import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
 import com.ridenow.app.ui.theme.BrandYellow
+import com.ridenow.app.ui.map.MazoMap
+import com.ridenow.app.ui.map.MapCoordinate
+import com.ridenow.app.ui.map.MazoRoute
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
@@ -51,6 +54,8 @@ import com.ridenow.app.ui.util.entrance
 fun ConfirmScreen(
     destination: String, vehicleIndex: Int, returnTrip: Boolean, whenLabel: String?, onBack: () -> Unit, onBook: () -> Unit,
     modifier: Modifier = Modifier,
+    mapStart: MapCoordinate? = null, mapEnd: MapCoordinate? = null, mapRoute: MazoRoute? = null,
+    mapError: String? = null,
 ) {
     val c = RideTheme.colors
     val v = Vehicles[vehicleIndex]
@@ -71,8 +76,12 @@ fun ConfirmScreen(
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(80), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(130.dp).clip(RoundedCornerShape(20.dp)).border(1.dp, c.line, RoundedCornerShape(20.dp))) {
-                RouteMap(Modifier.fillMaxSize(), Offset0, Offset1, "$TripKm km · $TripMinutes min")
+                MazoMap(Modifier.fillMaxSize(), initialCenter = mapEnd ?: mapStart,
+                    start = mapStart, selected = mapEnd, route = mapRoute, interactive = false)
             }
+            Text(mapError ?: if (mapRoute == null) "Calculating local route…" else
+                "Mazo Maps · ${"%.1f".format(mapRoute.distanceMeters / 1000)} km · ${(mapRoute.durationSeconds / 60).toInt()} min",
+                color = if (mapError == null) c.muted else c.danger, fontSize = 12.sp)
             Card {
                 Row2(stringResource(R.string.confirm_pickup), "Current location", dot = Dot.Pickup)
                 Divider(); Row2(stringResource(R.string.confirm_drop), destination, dot = Dot.Drop)

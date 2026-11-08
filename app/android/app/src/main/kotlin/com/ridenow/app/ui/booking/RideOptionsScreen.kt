@@ -43,6 +43,9 @@ import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideButtonStyle
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
+import com.ridenow.app.ui.map.MazoMap
+import com.ridenow.app.ui.map.MapCoordinate
+import com.ridenow.app.ui.map.MazoRoute
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
@@ -52,12 +55,15 @@ import com.ridenow.app.ui.util.entrance
 fun RideOptionsScreen(
     destination: String, returnTrip: Boolean, initial: Int, onBack: () -> Unit,
     onContinue: (Int) -> Unit, onLater: (Int) -> Unit, modifier: Modifier = Modifier,
+    mapStart: MapCoordinate? = null, mapEnd: MapCoordinate? = null, mapRoute: MazoRoute? = null,
+    mapError: String? = null,
 ) {
     val c = RideTheme.colors
     var selected by rememberSaveable { mutableIntStateOf(initial) }
     val v = Vehicles[selected]
     Box(modifier.fillMaxSize().background(c.bg)) {
-        RouteMap(Modifier.fillMaxSize())
+        MazoMap(Modifier.fillMaxSize(), initialCenter = mapEnd ?: mapStart,
+            start = mapStart, selected = mapEnd, route = mapRoute)
 
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -80,13 +86,17 @@ fun RideOptionsScreen(
         ) {
             Box(Modifier.align(Alignment.CenterHorizontally).size(width = 40.dp, height = 4.dp).clip(CircleShape).background(c.border))
             Text(stringResource(R.string.ride_choose), color = c.fg, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 14.dp))
+            Text(mapError ?: if (mapRoute == null) "Calculating a local route…" else
+                "Mazo Maps route · local road estimate",
+                color = if (mapError == null) c.muted else c.danger,
+                fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
             if (returnTrip) Text(stringResource(R.string.ride_return_note), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
             Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Vehicles.forEachIndexed { i, veh -> VehicleRow(veh, returnTrip, i == selected) { selected = i } }
             }
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Stat(stringResource(R.string.ride_distance), "$TripKm km", Modifier.weight(1f))
-                Stat(stringResource(R.string.ride_time), "$TripMinutes min", Modifier.weight(1f))
+                Stat(stringResource(R.string.ride_distance), mapRoute?.let { "%.1f km".format(it.distanceMeters / 1000) } ?: "—", Modifier.weight(1f))
+                Stat(stringResource(R.string.ride_time), mapRoute?.let { "${(it.durationSeconds / 60).toInt()} min" } ?: "—", Modifier.weight(1f))
                 Stat(stringResource(R.string.ride_seats), "${v.seats}", Modifier.weight(1f))
                 Stat(stringResource(R.string.ride_luggage), "${v.luggage} bags", Modifier.weight(1f))
             }

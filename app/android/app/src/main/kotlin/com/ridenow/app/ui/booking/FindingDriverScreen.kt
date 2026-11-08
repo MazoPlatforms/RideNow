@@ -47,6 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideButtonStyle
+import com.ridenow.app.ui.map.MazoMap
+import com.ridenow.app.ui.map.MapCoordinate
+import com.ridenow.app.ui.map.MazoRoute
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
@@ -55,7 +58,8 @@ import kotlinx.coroutines.delay
 
 /** Radar-style search for a driver. Demo: finds one after about 6 seconds and calls [onFound]. */
 @Composable
-fun FindingDriverScreen(destination: String, vehicleIndex: Int, returnTrip: Boolean, onFound: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+fun FindingDriverScreen(destination: String, vehicleIndex: Int, returnTrip: Boolean, onFound: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier,
+    mapStart: MapCoordinate? = null, mapEnd: MapCoordinate? = null, mapRoute: MazoRoute? = null) {
     val c = RideTheme.colors
     val v = Vehicles[vehicleIndex]
     val reduce = rememberReducedMotion()
@@ -67,22 +71,8 @@ fun FindingDriverScreen(destination: String, vehicleIndex: Int, returnTrip: Bool
     val bar = if (reduce) 0.5f else barRaw
 
     Box(modifier.fillMaxSize().background(c.bg)) {
-        Canvas(Modifier.fillMaxSize()) {
-            val minor = c.street.copy(alpha = 0.9f)
-            var y = 60.dp.toPx(); while (y < size.height) { drawLine(minor, Offset(0f, y), Offset(size.width, y), 5.dp.toPx(), StrokeCap.Round); y += 80.dp.toPx() }
-            var x = 50.dp.toPx(); while (x < size.width) { drawLine(minor, Offset(x, 0f), Offset(x, size.height), 5.dp.toPx(), StrokeCap.Round); x += 70.dp.toPx() }
-            drawLine(c.street2, Offset(-10f, size.height * 0.7f), Offset(size.width + 10f, size.height * 0.05f), 9.dp.toPx(), StrokeCap.Round)
-            val me = Offset(size.width / 2, size.height * 0.28f)
-            for (k in 0..2) {
-                val p = ((t + k / 3f) % 1f)
-                drawCircle(c.accent.copy(alpha = (1f - p) * 0.4f), 20.dp.toPx() + p * 130.dp.toPx(), me, style = Stroke(2.dp.toPx()))
-            }
-            listOf(Offset(0.25f, 0.2f), Offset(0.78f, 0.24f), Offset(0.3f, 0.38f), Offset(0.74f, 0.4f)).forEach {
-                val o = Offset(size.width * it.x, size.height * it.y)
-                drawCircle(c.accent.copy(alpha = 0.2f), 12.dp.toPx(), o); drawCircle(c.accent, 4.dp.toPx(), o)
-            }
-            drawCircle(c.accent.copy(alpha = 0.2f), 22.dp.toPx(), me); drawCircle(c.accent, 7.dp.toPx(), me); drawCircle(c.bg, 7.dp.toPx(), me, style = Stroke(3.dp.toPx()))
-        }
+        MazoMap(Modifier.fillMaxSize(), initialCenter = mapEnd ?: mapStart,
+            start = mapStart, selected = mapEnd, route = mapRoute)
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).height(48.dp).clip(RoundedCornerShape(24.dp)).background(c.bg)
                 .border(1.dp, c.line, RoundedCornerShape(24.dp)).padding(horizontal = 16.dp),

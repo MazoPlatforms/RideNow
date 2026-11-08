@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.sp
 import com.ridenow.app.R
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
+import com.ridenow.app.ui.map.MazoMap
+import com.ridenow.app.ui.map.MapCoordinate
 import com.ridenow.app.ui.theme.BrandYellow
 import com.ridenow.app.ui.theme.RideColors
 import com.ridenow.app.ui.theme.RideNowTheme
@@ -69,18 +71,19 @@ import com.ridenow.app.ui.util.rememberReducedMotion
 
 /**
  * Home ("Where to?"): full-screen map, menu and notification buttons, and a bottom sheet.
- * The map is a drawn placeholder with moving vehicles; swap [CityMap] for a Google Maps view later.
+ * Mazo Maps is a live MapLibre surface; place vector coverage is not a complete road basemap.
  */
 @Composable
 fun HomeScreen(
     onMenu: () -> Unit, onNotifications: () -> Unit, onSearch: () -> Unit, onLater: () -> Unit,
     onEditPickup: () -> Unit, onSaved: (String) -> Unit, onRecent: (String) -> Unit,
-    modifier: Modifier = Modifier, hasUnread: Boolean = true, pickup: String = "128 Meridian Walk",
+    modifier: Modifier = Modifier, hasUnread: Boolean = true, pickup: String = "Current location",
+    onGpsLocation: (MapCoordinate) -> Unit = {},
 ) {
     val c = RideTheme.colors
     var expanded by rememberSaveable { mutableStateOf(true) }
     Box(modifier.fillMaxSize().background(c.bg)) {
-        CityMap(Modifier.fillMaxSize())
+        MazoMap(Modifier.fillMaxSize(), showLocate = true, onGpsLocation = onGpsLocation)
 
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0), horizontalArrangement = Arrangement.SpaceBetween) {
             RoundButton(RideIcons.Menu, stringResource(R.string.home_menu), onMenu)
@@ -141,8 +144,8 @@ fun HomeScreen(
 
             AnimatedVisibility(expanded, enter = expandVertically(), exit = shrinkVertically()) {
                 Column(Modifier.padding(top = 8.dp)) {
-                    RecentRow("Nova Terminal, Gate 4", "6.2 km") { onRecent("Nova Terminal, Gate 4") }
-                    RecentRow("Helix Garden Plaza", "3.8 km") { onRecent("Helix Garden Plaza") }
+                    Text("Search Mazo Maps for a destination", color = c.muted, fontSize = 13.sp,
+                        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onSearch).padding(vertical = 14.dp))
                 }
             }
             Spacer(Modifier.height(14.dp))

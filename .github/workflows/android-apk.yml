@@ -36,19 +36,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Record unchanged source checksums
+      - name: Record tracked Android source checksums
         run: |
           mkdir -p "$RUNNER_TEMP/android-release"
-          sha256sum app/android/RideNow-Android.zip > "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
-          project_dir="$RUNNER_TEMP/ridenow-supplied-project"
-          mkdir -p "$project_dir"
-          unzip -q app/android/RideNow-Android.zip -d "$project_dir"
-          test -f "$project_dir/RideNow/settings.gradle.kts"
-          test -f "$project_dir/RideNow/app/src/main/AndroidManifest.xml"
-          backdrop="$project_dir/RideNow/app/src/main/kotlin/com/ridenow/app/ui/components/Backdrop.kt"
-          if ! rg -q '^import androidx.compose.ui.unit.dp$' "$backdrop"; then
-            sed -i '/^import androidx.compose.ui.geometry.Offset$/a import androidx.compose.ui.unit.dp' "$backdrop"
-          fi
+          git ls-files -z -- app/android | xargs -0 sha256sum > "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
       - name: Generate wrapper outside the supplied project
         run: |
           wrapper_dir="$RUNNER_TEMP/ridenow-wrapper"
@@ -60,13 +51,13 @@ jobs:
           cp "$wrapper_dir/gradle/wrapper/gradle-wrapper.jar" app/android/gradle/wrapper/gradle-wrapper.jar
           chmod +x app/android/gradlew
       - uses: gradle/actions/wrapper-validation@v4
-      - name: Build the supplied Android project
+      - name: Build the checked-in Android source
         run: |
           set -o pipefail
-          app/android/gradlew --no-daemon --stacktrace --project-dir "$RUNNER_TEMP/ridenow-supplied-project/RideNow" :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
+          app/android/gradlew --no-daemon --stacktrace --project-dir app/android :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
       - name: Verify APK and preserve original sources
         run: |
-          apk="$RUNNER_TEMP/ridenow-supplied-project/RideNow/app/build/outputs/apk/debug/app-debug.apk"
+          apk="app/android/app/build/outputs/apk/debug/app-debug.apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/android-apk-metadata.txt"
           head -5 "$RUNNER_TEMP/android-apk-metadata.txt"
@@ -104,23 +95,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="android-splash-${GITHUB_RUN_ID}"
+          tag="android-maplibre-${GITHUB_RUN_ID}"
           cat > "$RUNNER_TEMP/android-release-notes.md" <<EOF
           RideNow Android UI preview built from commit ${GITHUB_SHA}.
 
-          - The APK is built from the supplied project ZIP in `app/android/RideNow-Android.zip`; the ZIP is included byte-for-byte, and its SHA-256 is verified before and after the build.
-          - The temporary build copy receives a missing Compose `dp` import in `Backdrop.kt` so it compiles; the supplied ZIP itself is not modified.
-          - The missing wrapper scripts and JAR are generated in GitHub Actions using Gradle 8.9 and Java 17; they are not added to the supplied ZIP.
+          - The APK is built from the checked-in Kotlin sources in `app/android/`, including live Mazo Maps MapLibre integration. The original ZIP is retained only as a legacy backup and is not the APK build input.
+          - All tracked Android source checksums are verified unchanged after the build.
+          - The missing wrapper scripts and JAR are generated in GitHub Actions using Gradle 8.9 and Java 17, without modifying tracked sources.
           - APK is debug-signed for installation and testing, not a production or Play Store release. Debug signing keys may differ between workflow runs; installing a later preview can require uninstalling the previous one.
           - Minimum Android version: Android 8.0 (API 26).
-          - The original uploaded ZIP and SHA-256 checksums are included.
+          - The legacy original ZIP is included unchanged for archival reference. It may not match the current checked-in source files.
           EOF
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" android-release/* --repo "$GITHUB_REPOSITORY" --clobber
           else
             gh release create "$tag" android-release/* --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --prerelease \
-              --title "RideNow Android preview #${GITHUB_RUN_NUMBER}" \
+              --title "RideNow Android MapLibre preview #${GITHUB_RUN_NUMBER}" \
               --notes-file "$RUNNER_TEMP/android-release-notes.md"
           fi
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +26,10 @@ import com.ridenow.app.ui.booking.RideOptionsScreen
 import com.ridenow.app.ui.booking.ScheduleScreen
 import com.ridenow.app.ui.booking.Vehicles
 import com.ridenow.app.ui.booking.fareFor
+import com.ridenow.app.ui.map.MapCoordinate
+import com.ridenow.app.ui.map.MazoMapException
+import com.ridenow.app.ui.map.MazoMapsApi
+import com.ridenow.app.ui.map.MazoRoute
 import com.ridenow.app.ui.home.HomeScreen
 import com.ridenow.app.ui.help.HelpScreen
 import com.ridenow.app.ui.legal.DocScreen
@@ -83,14 +88,38 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var returnTo by rememberSaveable { mutableStateOf(Screen.Home) }
     var doc by rememberSaveable { mutableStateOf("") }
     val contacts = remember { mutableStateListOf(Contact("Ana", "+15550101"), Contact("Ben", "+15550102")) }
-    var pickup by rememberSaveable { mutableStateOf("128 Meridian Walk") }
+    var pickup by rememberSaveable { mutableStateOf("Current location") }
+    var gpsPoint by remember { mutableStateOf<MapCoordinate?>(null) }
+    var pickupPoint by remember { mutableStateOf<MapCoordinate?>(null) }
+    var destinationPoint by remember { mutableStateOf<MapCoordinate?>(null) }
+    var mapRoute by remember { mutableStateOf<MazoRoute?>(null) }
+    var mapRouteError by remember { mutableStateOf<String?>(null) }
     var home by rememberSaveable { mutableStateOf<String?>("128 Meridian Walk, Sector 7") }
     var work by rememberSaveable { mutableStateOf<String?>(null) }
     var friend by rememberSaveable { mutableStateOf<String?>(null) }
     var mapFor by rememberSaveable { mutableStateOf("drop") }
     var addLabel by rememberSaveable { mutableStateOf("Home") }
-    val others = remember { mutableStateListOf("Nova Terminal, Gate 4" to "Sector 12, Orbit Ring", "Helix Garden Plaza" to "Sector 9, Garden Loop", "Aurora Medical Centre" to "Sector 3, Skyline Way") }
+    val others = remember { mutableStateListOf<Pair<String, String>>() }
     val nav = { to: Screen -> returnTo = screen; screen = to }
+    val routeStart = pickupPoint ?: if (pickup == "Current location") gpsPoint else null
+    // Only public Mazo Maps routing, never RideNow auth/booking/payment APIs.
+    // The effect is cancelled (including OkHttp) when a route endpoint/screen changes.
+    LaunchedEffect(screen, routeStart, destinationPoint) {
+        if (screen !in listOf(Screen.Options, Screen.Confirm, Screen.Finding, Screen.Trip)) return@LaunchedEffect
+        mapRoute = null
+        val from = routeStart
+        val to = destinationPoint
+        if (to == null) { mapRouteError = "Choose a real map destination."; return@LaunchedEffect }
+        if (from == null) { mapRouteError = "Enable GPS or choose the pickup on the map."; return@LaunchedEffect }
+        mapRouteError = null
+        try {
+            mapRoute = MazoMapsApi.route(from, to)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            mapRouteError = failure.message ?: "No supported route is available."
+        }
+    }
     val shownPhone = phone.ifBlank { "+1 555 012 3456" }
     val open = { label: String -> stubBack = screen; stub = label; screen = Screen.Stub }
     // Opens a destination by its menu or settings title; unknown titles show a placeholder.
@@ -141,7 +170,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 HomeScreen(
                     onMenu = { drawer = true }, onNotifications = { nav(Screen.Notifs) },
                     onSearch = { screen = Screen.Search }, onLater = { scheduleFrom = Screen.Home; screen = Screen.Schedule },
-                    onEditPickup = { nav(Screen.ChangePickup) }, onSaved = { nav(Screen.Saved) }, pickup = pickup,
+                    onEditPickup = { mapFor = "pickup"; nav(Screen.MapPick) }, onSaved = { nav(Screen.Saved) }, pickup = pickup,
+                    onGpsLocation = { gpsPoint = it },
                     onRecent = { dest = it; isReturn = false; screen = Screen.Options },
                 )
                 MenuDrawer(
@@ -154,8 +184,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 BackHandler { scheduled = null; screen = Screen.Home }
                 SearchScreen(
                     onBack = { scheduled = null; screen = Screen.Home }, scheduled = scheduled,
-                    onPlace = { place, ret -> dest = place.name; isReturn = ret; screen = Screen.Options },
-                    onFriend = { nav(Screen.Friend) }, onEditPickup = { nav(Screen.ChangePickup) }, pickup = pickup, friend = friend,
+                    onPlace = { place, ret -> dest = place.name; destinationPoint = place.point; isReturn = ret; screen = Screen.Options },
+                    onFriend = { nav(Screen.Friend) }, onEditPickup = { mapFor = "pickup"; nav(Screen.MapPick) }, pickup = pickup, friend = friend,
                     onSaved = { nav(Screen.Saved) }, onMap = { mapFor = "drop"; nav(Screen.MapPick) }, onAdd = { open("Add $it address") },
                 )
             }
@@ -165,6 +195,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     destination = dest, returnTrip = isReturn, initial = vehicle, onBack = { screen = Screen.Search },
                     onContinue = { vehicle = it; screen = Screen.Confirm },
                     onLater = { vehicle = it; scheduleFrom = Screen.Options; screen = Screen.Schedule },
+                    mapStart = routeStart, mapEnd = destinationPoint, mapRoute = mapRoute, mapError = mapRouteError,
                 )
             }
             Screen.Schedule -> {
@@ -179,14 +210,17 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 ConfirmScreen(
                     dest, vehicle, isReturn, whenLabel = scheduled, onBack = { screen = Screen.Options },
                     onBook = { if (scheduled != null) open("Scheduled ride details") else screen = Screen.Finding },
+                    mapStart = routeStart, mapEnd = destinationPoint, mapRoute = mapRoute, mapError = mapRouteError,
                 )
             }
-            Screen.Finding -> FindingDriverScreen(dest, vehicle, isReturn, onFound = { screen = Screen.Trip }, onCancel = { scheduled = null; screen = Screen.Home })
+            Screen.Finding -> FindingDriverScreen(dest, vehicle, isReturn, onFound = { screen = Screen.Trip }, onCancel = { scheduled = null; screen = Screen.Home },
+                mapStart = routeStart, mapEnd = destinationPoint, mapRoute = mapRoute)
             Screen.Trip -> {
                 BackHandler { }
                 TripScreen(
                     dest, vehicle, onCancelled = { scheduled = null; screen = Screen.Home }, onComplete = { rating = 0; screen = Screen.Complete },
                     onShare = { nav(Screen.ShareTrip) }, onSafety = { nav(Screen.Safety) },
+                    mapStart = routeStart, mapEnd = destinationPoint, mapRoute = mapRoute,
                 )
             }
             Screen.Complete -> {
@@ -269,8 +303,10 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.MapPick -> {
                 BackHandler { screen = returnTo }
-                if (mapFor == "pickup") MapPickerScreen("Set pickup", "Confirm pickup", onBack = { screen = returnTo }, onConfirm = { pickup = it; screen = returnTo })
-                else MapPickerScreen("Set drop location", "Set drop location", onBack = { screen = returnTo }, onConfirm = { dest = it; isReturn = false; screen = Screen.Options })
+                if (mapFor == "pickup") MapPickerScreen("Set pickup", "Confirm pickup", onBack = { screen = returnTo },
+                    onConfirm = { point -> pickupPoint = point; pickup = point.label(); screen = returnTo }, initialCenter = routeStart)
+                else MapPickerScreen("Set drop location", "Set drop location", onBack = { screen = returnTo },
+                    onConfirm = { point -> destinationPoint = point; dest = point.label(); isReturn = false; screen = Screen.Options }, initialCenter = routeStart)
             }
             Screen.ShareTrip -> {
                 BackHandler { screen = returnTo }
@@ -281,7 +317,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 val places = buildList {
                     add("Current location" to "128 Meridian Walk"); home?.let { add("Home" to it) }; work?.let { add("Work" to it) }; others.forEach { add(it.first to it.second) }
                 }
-                ChangePickupScreen(pickup, places, onBack = { screen = returnTo }, onConfirm = { pickup = it; screen = returnTo }, onMap = { mapFor = "pickup"; screen = Screen.MapPick })
+                ChangePickupScreen(pickup, places, onBack = { screen = returnTo }, onConfirm = { pickup = it; pickupPoint = null; screen = returnTo }, onMap = { mapFor = "pickup"; screen = Screen.MapPick })
             }
             Screen.Friend -> {
                 BackHandler { screen = returnTo }

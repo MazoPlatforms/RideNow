@@ -68,6 +68,9 @@ import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
 import com.ridenow.app.ui.theme.BrandYellow
 import com.ridenow.app.ui.theme.Ink
+import com.ridenow.app.ui.map.MazoMap
+import com.ridenow.app.ui.map.MapCoordinate
+import com.ridenow.app.ui.map.MazoRoute
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
@@ -82,7 +85,8 @@ private val Reasons = listOf("Driver is taking too long", "Booked by mistake", "
 
 /** Live ride: 0 driver assigned, 1 driver arriving, 2 on the way. Demo timers move through the phases. */
 @Composable
-fun TripScreen(destination: String, vehicleIndex: Int, onCancelled: () -> Unit, onComplete: () -> Unit, onShare: () -> Unit, onSafety: () -> Unit, modifier: Modifier = Modifier) {
+fun TripScreen(destination: String, vehicleIndex: Int, onCancelled: () -> Unit, onComplete: () -> Unit, onShare: () -> Unit, onSafety: () -> Unit, modifier: Modifier = Modifier,
+    mapStart: MapCoordinate? = null, mapEnd: MapCoordinate? = null, mapRoute: MazoRoute? = null) {
     val c = RideTheme.colors
     val v = Vehicles[vehicleIndex]
     var phase by rememberSaveable { mutableIntStateOf(0) }
@@ -98,23 +102,8 @@ fun TripScreen(destination: String, vehicleIndex: Int, onCancelled: () -> Unit, 
     val target = if (phase < 2) Pickup else Drop
 
     Box(modifier.fillMaxSize().background(c.bg)) {
-        Canvas(Modifier.fillMaxSize()) {
-            val minor = c.street.copy(alpha = 0.9f)
-            var y = 60.dp.toPx(); while (y < size.height) { drawLine(minor, Offset(0f, y), Offset(size.width, y), 5.dp.toPx(), StrokeCap.Round); y += 80.dp.toPx() }
-            var x = 50.dp.toPx(); while (x < size.width) { drawLine(minor, Offset(x, 0f), Offset(x, size.height), 5.dp.toPx(), StrokeCap.Round); x += 70.dp.toPx() }
-            drawLine(c.street2, Offset(-10f, size.height * 0.7f), Offset(size.width + 10f, size.height * 0.05f), 9.dp.toPx(), StrokeCap.Round)
-            fun px(o: Offset) = Offset(size.width * o.x, size.height * o.y)
-            val vp = px(vehiclePos); val tp = px(target)
-            drawLine(c.accent, vp, tp, 4.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(2f, 18f)))
-            if (phase == 2) { val pk = px(Pickup); drawLine(c.accent, pk, vp, 4.dp.toPx(), StrokeCap.Round) }
-            val pk = px(Pickup); drawCircle(c.accent, 8.dp.toPx(), pk); drawCircle(c.fg, 8.dp.toPx(), pk, style = Stroke(3.dp.toPx()))
-            val d = px(Drop); val r = 12.dp.toPx(); val cen = Offset(d.x, d.y - 32.dp.toPx())
-            drawPath(Path().apply { moveTo(d.x, d.y); lineTo(cen.x - r * 0.8f, cen.y + r * 0.7f); lineTo(cen.x + r * 0.8f, cen.y + r * 0.7f); close() }, c.accent)
-            drawCircle(c.accent, r, cen); drawCircle(Ink, 4.dp.toPx(), cen)
-            drawCircle(c.accent.copy(alpha = 0.2f), 24.dp.toPx(), vp)
-            drawRoundRect(c.fg, Offset(vp.x - 11.dp.toPx(), vp.y - 6.dp.toPx()), androidx.compose.ui.geometry.Size(22.dp.toPx(), 12.dp.toPx()), androidx.compose.ui.geometry.CornerRadius(5.dp.toPx()))
-            drawRoundRect(c.accent, Offset(vp.x - 11.dp.toPx(), vp.y - 1.dp.toPx()), androidx.compose.ui.geometry.Size(22.dp.toPx(), 2.dp.toPx()), androidx.compose.ui.geometry.CornerRadius(1.dp.toPx()))
-        }
+        MazoMap(Modifier.fillMaxSize(), initialCenter = mapEnd ?: mapStart,
+            start = mapStart, selected = mapEnd, route = mapRoute)
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).height(48.dp).clip(RoundedCornerShape(24.dp)).background(c.bg).border(1.dp, c.line, RoundedCornerShape(24.dp)).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
