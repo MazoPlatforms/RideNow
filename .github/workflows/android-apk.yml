@@ -45,7 +45,7 @@ jobs:
           wrapper_dir="$RUNNER_TEMP/ridenow-wrapper"
           mkdir -p "$wrapper_dir"
           printf 'rootProject.name = "wrapper-bootstrap"\n' > "$wrapper_dir/settings.gradle.kts"
-          gradle --no-daemon --project-dir "$wrapper_dir" wrapper --gradle-version 8.9 --distribution-type bin
+          gradle --no-daemon --project-dir "$wrapper_dir" wrapper --gradle-version 8.9 --distribution-type bin --no-validate-url
           cp "$wrapper_dir/gradlew" app/android/gradlew
           cp "$wrapper_dir/gradlew.bat" app/android/gradlew.bat
           cp "$wrapper_dir/gradle/wrapper/gradle-wrapper.jar" app/android/gradle/wrapper/gradle-wrapper.jar
