@@ -1,22 +1,22 @@
-# பாதுகாப்பு மற்றும் தரவு விதிகள்
+# Security and data policies
 
-- JWT 15 நிமிடம்; rotating refresh session 30 நாட்கள்; reuse குடும்பத்தை revoke செய்யும். ஒவ்வொரு HTTP request மற்றும் socket command-லும் database session சரிபார்ப்பு.
-- Socket events அனுப்புவதற்கு முன்பும் session மறுசரிபார்ப்பு; idle connection-கள் 15 விநாடிக்கு ஒருமுறை சோதிக்கப்படும்.
-- OTP 5 நிமிடம், challenge-க்கு 5 attempts, resend 60 விநாடி, phone-க்கு மணிக்கு 10 requests; encrypted delivery payload; API-ல் OTP இல்லை.
-- Admin/Staff bcrypt password + single-use TOTP; TOTP அமைக்காத account-க்கு password + phone-bound single-use WhatsApp OTP. TOTP அமைத்திருந்தால் சாதாரண OTP மூலம் அதைத் தவிர்க்க முடியாது. Secret AES-256-GCM; role elevation admin-க்கு மட்டும்; resource ownership backend-ல் கட்டாயம்.
-- முதல் admin web setup தனிப்பட்ட காலாவதியாகும் setup key மூலம் பாதுகாக்கப்படும்; admin உருவானதும் நிரந்தர completion marker மூலம் மூடப்படும். OTP கிடைக்காவிட்டால் உரிமையாளர் setup key வழியைத் தெளிவாகத் தேர்வு செய்யலாம்; அந்த வழியில் phone ownership உறுதிப்படுத்தப்படாது. பின்னர் recovery login-க்கு login password + தனி rotating recovery password இரண்டும் தேவை; 5 தவறான recovery முயற்சிகளுக்குப் பின் 15 நிமிட lock.
-- Rate limiter Redis தோல்வியில் fail closed. Edge IP limit 10,000/min, authenticated user 180/min, auth endpoint IP 10/min, socket user 120 commands/min.
-- SQL parameterized; state transitions, assignment, idempotency, ledger transactions lock செய்யப்பட்ட database transactions-ல்.
-- Ledger entries/transactions, fare versions immutable; திருத்தத்திற்கு reversal/புதிய version.
-- Document scan CLEAN இல்லாமல் review download/driver approval கிடையாது. S3-ல் exact scanned version pin; R2-ல் SHA-256 அடையாளத்துடன் புதிய server-only key-க்கு scanned bytes சேமிக்கப்படும். Verified key-க்கு user upload URL வழங்கப்படாது.
-- Rider history-ல் driver-ன் தற்போதைய இடம் வெளியிடப்படாது; realtime GPS தற்போதைய assignment-க்கு மட்டும்.
-- OTP, password, JWT, Baileys credentials, முழு documents ஆகியவை logs-ல் எழுதப்படக்கூடாது. QR/TOTP enrollment secrets operator-க்கு ஒருமுறை வழங்கப்படுகின்றன.
-- Admin browser sessions: Secure/HttpOnly/SameSite=Strict cookies, encrypted server-side Redis state, same-origin/custom-header CSRF checks. Password step-ல் password சேமிக்கப்படாது; ஐந்து நிமிட password-hash fingerprint proof மட்டும் encrypted ஆக வைக்கப்படும். JWT/refresh tokens browser storage-ல் வழங்கப்படாது.
+- JWT lifetime is 15 minutes; rotating refresh sessions last 30 days, and token reuse revokes the session family. Database session checks run for every HTTP request and socket command.
+- Sessions are revalidated before socket events are sent; idle connections are checked every 15 seconds.
+- OTP lifetime is 5 minutes, with 5 attempts per challenge, a 60-second resend interval, and 10 requests per phone per hour. Delivery payloads are encrypted; OTP values are not exposed through the API.
+- Admin/Staff authentication uses a bcrypt password and single-use TOTP, or a password plus phone-bound single-use WhatsApp OTP for accounts without TOTP. Configured TOTP cannot be bypassed using ordinary OTP. Secrets use AES-256-GCM; only admins can elevate roles; resource ownership is enforced on the backend.
+- Initial admin browser setup requires a private, expiring setup key and is permanently closed using a completion marker after the admin is created. If OTP is unavailable, the owner can explicitly select the setup-key path, which does not verify phone ownership. Later recovery login requires both the login password and a separate rotating recovery password, with a 15-minute lock after 5 failed recovery attempts.
+- The rate limiter fails closed if Redis fails. Limits: edge IP 10,000/min, authenticated user 180/min, auth endpoint IP 10/min, and socket user 120 commands/min.
+- SQL is parameterized. State transitions, assignment, idempotency, and ledger operations use locked database transactions.
+- Ledger entries/transactions and fare versions are immutable; corrections require reversals or new versions.
+- Review downloads and driver approval require a CLEAN document scan. S3 pins the exact scanned object version; R2 stores scanned bytes under a new server-only key identified by SHA-256. User upload URLs are never issued for verified keys.
+- Rider history does not expose the driver's current location; real-time GPS is limited to the current assignment.
+- Never log OTPs, passwords, JWTs, Baileys credentials, or entire documents. QR/TOTP enrollment secrets are provided to operators only once.
+- Admin browser sessions use Secure/HttpOnly/SameSite=Strict cookies, encrypted server-side Redis state, and same-origin/custom-header CSRF checks. Passwords are not stored during the password step; only an encrypted password-hash fingerprint proof is retained for five minutes. JWT/refresh tokens are not exposed to browser storage.
 
 ## Retention
 
-Raw ride GPS மற்றும் location outbox: 30 நாட்கள். Terminal ride events, route geometry, notifications: 90 நாட்கள். Canonical ride/fare snapshot, ledger, audit மற்றும் reconciliation பதிவுகள் அழிக்கப்படாது; நிதி/சட்ட retention கொள்கை உறுதியாகும் வரை பாதுகாக்கப்படும். Expired unused quote-கள் 90 நாட்களில் நீக்கப்படும்.
+Raw ride GPS and location outbox: 30 days. Terminal ride events, route geometry, and notifications: 90 days. Canonical ride/fare snapshots, ledger, audit, and reconciliation records are preserved until financial/legal retention policies are finalized. Expired unused quotes are removed after 90 days.
 
-Location history மாத partition-களுடன் இயங்கும்; worker வரவிருக்கும் partition-ஐ உருவாக்கும். Default partition எதிர்பாராத காலத் தரவை ஏற்கும் பாதுகாப்பு. Old records cleanup செய்யப்படுகிறது; காலியான பழைய partitions-ஐ DBA கண்காணித்து நீக்கலாம்.
+Location history uses monthly partitions; the worker creates the upcoming partition. The default partition provides a safeguard for unexpected timestamps. Old records are cleaned up; a DBA may monitor and drop empty old partitions.
 
-Production-க்கு முன் இலங்கையின் privacy, driver licensing, retention மற்றும் நிதி தேவைகளை உறுதிசெய்து configuration/செயல்முறைகளை மாற்றவும். பயனர் data deletion வேண்டுகோளில் account disable, session revocation, நிதிப்பதிவுகளுக்கான கட்டாய retention ஆகியவற்றை ஒருங்கிணைக்க வேண்டும்; destructive account deletion API இந்த வெளியீட்டில் இல்லை.
+Before production, verify Sri Lankan privacy, driver licensing, retention, and financial requirements, and update configuration and procedures accordingly. User data-deletion requests must coordinate account disabling, session revocation, and mandatory financial-record retention. This release has no destructive account-deletion API.
