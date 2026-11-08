@@ -1,4 +1,4 @@
-name: ridenow-demo தனி schema அமைத்தல்
+name: Set up isolated ridenow-demo schema
 on:
   workflow_dispatch:
 permissions:
@@ -19,7 +19,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: விருப்பமான Supabase பொது CA certificate
+      - name: Optional Supabase public CA certificate
         env:
           SUPABASE_CA_CERT: ${{ vars.SUPABASE_CA_CERT }}
         run: |
@@ -35,7 +35,7 @@ jobs:
             appendFileSync(process.env.GITHUB_ENV,`NODE_EXTRA_CA_CERTS=${file}\n`);
           }
           JS
-      - name: ridenow-demo migrations மற்றும் அனுமதிகள்
+      - name: ridenow-demo migrations and permissions
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: node scripts/install-private-schema.js
