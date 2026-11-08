@@ -1,17 +1,17 @@
-# Supabase மற்றும் Upstash இணைப்பு
+# Supabase and Upstash connectivity
 
-`production` GitHub Environment-ல் `DATABASE_URL`, `REDIS_URL` secrets தேவை. GitHub Actions-ன் **Supabase மற்றும் Upstash இணைப்புச் சோதனை** workflow-ஐ `main` கிளையில் கையால் இயக்கலாம்.
+The `production` GitHub environment requires `DATABASE_URL` and `REDIS_URL` secrets. The GitHub Actions **Supabase and Upstash connectivity test** workflow can be triggered manually on `main`.
 
-- Supabase: நீண்ட நேரம் இயங்கும் backend/gateway-க்கு நேரடி PostgreSQL அல்லது Session pooler இணைப்பு. IPv4 runner-க்கு Session pooler port 5432 வழக்கமான தேர்வு. Transaction pooler port 6543 session-level locks-க்கு பொருந்தாது; backend அதை மறுக்கும்.
-- Supabase host-களில் TLS certificate/hostname verification கட்டாயம். `TLS_CERTIFICATE_VERIFICATION_FAILED` என்றால் Dashboard → Database Settings → SSL Configuration-ல் கிடைக்கும் பொது CA certificate-ஐ `production` Environment Variable `SUPABASE_CA_CERT`-ல் PEM வடிவில் வைக்கலாம். Certificate verification அணைக்கப்படாது.
-- Upstash: நேரடி Redis/TCP URL தேவை. CLI எடுத்துக்காட்டில் `redis://` உடன் `--tls` இருக்கலாம்; backend Upstash host-களின் URL-ஐ தானாக `rediss://` ஆக மாற்றும். Secret மதிப்பை வெளியிடாது. REST URL/token இந்த client-க்கு பொருந்தாது.
+- Supabase: Use a direct PostgreSQL connection or Session pooler for long-running backend/gateway processes. Session pooler port 5432 is the usual choice for IPv4 runners. Transaction pooler port 6543 does not support session-level locks and is rejected by the backend.
+- TLS certificate and hostname verification are mandatory for Supabase hosts. If `TLS_CERTIFICATE_VERIFICATION_FAILED` occurs, the public CA certificate from Dashboard → Database Settings → SSL Configuration can be placed as PEM in the `production` environment variable `SUPABASE_CA_CERT`. Certificate verification remains enabled.
+- Upstash: A direct Redis/TCP URL is required. CLI examples may use `redis://` with `--tls`; the backend automatically converts Upstash host URLs to `rediss://` without exposing secret values. REST URLs/tokens are not supported by this client.
 
-சோதனை PostgreSQL/TLS, session advisory lock, PostGIS தூரக் கணக்கு, Redis read/write, Lua rate-limit commands, மற்றும் Pub/Sub ஆகியவற்றைச் சரிபார்க்கும். PostgreSQL-ல் schema/migrations அல்லது பயனர் தரவை மாற்றாது. Redis-ல் UUID பெயருள்ள சோதனை keys மட்டும் உருவாக்கி நீக்கும்; அவை 30 விநாடிகளில் தானாகவும் காலாவதியாகும். `FLUSHDB` பயன்படுத்தப்படாது.
+The test checks PostgreSQL/TLS, session advisory locks, PostGIS distance calculations, Redis read/write, Lua rate-limit commands, and Pub/Sub. It does not modify PostgreSQL schema, migrations, or user data. In Redis, it creates and deletes only test keys with UUID names, which also expire automatically within 30 seconds. It does not use `FLUSHDB`.
 
-பதிவுகள் மற்றும் `services-smoke-report` artifact-ல் connection URLs, passwords, tokens அல்லது பயனர் தரவு இருக்காது. இயங்கும் பயன்பாட்டிற்கு இணைத்துவிட்டதாகவோ, pilot வெளியீடு முடிந்ததாகவோ இந்தச் சோதனையைப் பொருள்படுத்தக்கூடாது.
+Logs and the `services-smoke-report` artifact do not contain connection URLs, passwords, tokens, or user data. A successful test does not mean the running application is connected or the pilot has been launched.
 
-## Schema ஒத்திசைவு
+## Schema alignment
 
-Supabase-ல் ஏற்கெனவே அட்டவணைகள் இருந்தால், repository migrations-உடன் அவற்றின் columns/version history பொருந்துகிறதா என்று முதலில் பரிசீலிக்க வேண்டும். இந்த workflow தானாக migrations இயக்காது. Application tables-ஐ Data API-ல் வெளிப்படாத schema/அனுமதிகளுடன் அமைத்து, PostgreSQL role மற்றும் RLS access model-ஐ உறுதிசெய்த பிறகே deployment migration செய்ய வேண்டும்.
+If Supabase already contains tables, first review whether their columns and migration version history match the repository migrations. This workflow does not run migrations automatically. Place application tables in a schema with permissions that are not exposed through the Data API, and verify the PostgreSQL role and RLS access model before running deployment migrations.
 
-Cloudflare R2-க்கு versioning தேவையில்லாத verified-copy முறை வழங்கப்பட்டுள்ளது; [R2 வழிமுறைகள்](r2-storage.md). Supabase Storage தனியாக இணைத்துச் சோதிக்கப்படவில்லை. PostgreSQL இணைப்பு வெற்றி என்பது Storage இணைப்பு வெற்றி அல்ல.
+Cloudflare R2 supports a verified-copy method that does not require versioning; see the [R2 guide](r2-storage.md). Supabase Storage has not been connected and tested separately. A successful PostgreSQL connection does not establish that Storage works.
