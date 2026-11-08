@@ -1,4 +1,4 @@
-name: Supabase மற்றும் Upstash இணைப்புச் சோதனை
+name: Supabase and Upstash connectivity test
 on:
   workflow_dispatch:
 permissions:
@@ -19,7 +19,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: விருப்பமான Supabase பொது CA certificate
+      - name: Optional Supabase public CA certificate
         env:
           SUPABASE_CA_CERT: ${{ vars.SUPABASE_CA_CERT }}
         run: |
@@ -35,7 +35,7 @@ jobs:
             appendFileSync(process.env.GITHUB_ENV,`NODE_EXTRA_CA_CERTS=${file}\n`);
           }
           JS
-      - name: PostgreSQL, PostGIS, Redis TLS மற்றும் Pub/Sub சோதனை
+      - name: Test PostgreSQL, PostGIS, Redis TLS and Pub/Sub
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
