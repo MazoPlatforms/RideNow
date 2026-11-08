@@ -75,7 +75,7 @@ import com.ridenow.app.ui.util.rememberReducedMotion
 fun HomeScreen(
     onMenu: () -> Unit, onNotifications: () -> Unit, onSearch: () -> Unit, onLater: () -> Unit,
     onEditPickup: () -> Unit, onSaved: (String) -> Unit, onRecent: (String) -> Unit,
-    modifier: Modifier = Modifier, hasUnread: Boolean = true,
+    modifier: Modifier = Modifier, hasUnread: Boolean = true, pickup: String = "128 Meridian Walk",
 ) {
     val c = RideTheme.colors
     var expanded by rememberSaveable { mutableStateOf(true) }
@@ -119,7 +119,7 @@ fun HomeScreen(
 
             Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent)); Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.home_pickup, "128 Meridian Walk"), color = c.muted, fontSize = 13.sp)
+                Text(stringResource(R.string.home_pickup, pickup), color = c.muted, fontSize = 13.sp)
                 Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup).semantics { contentDescription = "Edit pickup location" }, contentAlignment = Alignment.Center) {
                     RideIcon(RideIcons.Pencil, c.accent, size = 18.dp)
                 }

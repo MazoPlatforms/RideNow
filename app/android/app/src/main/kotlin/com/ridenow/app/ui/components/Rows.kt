@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.text.style.*
 import androidx.compose.ui.unit.*
+import androidx.compose.foundation.selection.toggleable
 import com.ridenow.app.ui.theme.RideTheme
 
 /** Back button, large title and optional subtitle used at the top of list-style screens. */
@@ -57,4 +58,15 @@ fun NavRow(
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(text, color = RideTheme.colors.muted, fontSize = 11.sp, letterSpacing = 1.1.sp, modifier = modifier.padding(top = 20.dp, bottom = 8.dp))
+}
+
+/** Small on/off switch used in settings-style rows. */
+@Composable
+fun RideSwitch(on: Boolean, label: String, onChange: (Boolean) -> Unit) {
+    val c = RideTheme.colors
+    Box(
+        Modifier.size(width = 48.dp, height = 28.dp).clip(RoundedCornerShape(14.dp)).background(if (on) c.accent else c.line)
+            .then(if (on) Modifier else Modifier.border(1.dp, c.border, RoundedCornerShape(14.dp)))
+            .toggleable(on, role = Role.Switch, onValueChange = onChange).semantics { contentDescription = label },
+    ) { Box(Modifier.padding(if (on) 4.dp else 3.dp).offset(x = if (on) 20.dp else 0.dp).size(20.dp).clip(CircleShape).background(if (on) c.onAccent else c.muted)) }
 }

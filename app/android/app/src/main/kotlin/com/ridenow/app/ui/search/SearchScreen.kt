@@ -84,7 +84,7 @@ private val Places = listOf(
 @Composable
 fun SearchScreen(
     onBack: () -> Unit, onPlace: (Place, Boolean) -> Unit, onFriend: () -> Unit, onEditPickup: () -> Unit,
-    onSaved: () -> Unit, onMap: () -> Unit, onAdd: (String) -> Unit, modifier: Modifier = Modifier, scheduled: String? = null,
+    onSaved: () -> Unit, onMap: () -> Unit, onAdd: (String) -> Unit, modifier: Modifier = Modifier, scheduled: String? = null, pickup: String? = null, friend: String? = null,
 ) {
     val c = RideTheme.colors
     var returnTrip by rememberSaveable { mutableStateOf(false) }
@@ -117,10 +117,17 @@ fun SearchScreen(
             RideIcon(RideIcons.Clock, c.accent, size = 18.dp); Spacer(Modifier.width(10.dp))
             Text("Scheduled · $scheduled", color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
+        if (friend != null) Row(
+            Modifier.padding(top = 10.dp).fillMaxWidth().height(44.dp).clip(RoundedCornerShape(14.dp)).background(c.accent.copy(alpha = 0.14f)).padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RideIcon(RideIcons.Person, c.accent, size = 18.dp); Spacer(Modifier.width(10.dp))
+            Text("Booking for $friend", color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
         TripTypeToggle(returnTrip, { returnTrip = it }, Modifier.padding(top = 14.dp).entrance(60))
 
         RouteCard(
-            returnTrip, query, { query = it }, focus, onEditPickup,
+            returnTrip, query, { query = it }, focus, onEditPickup, pickup,
             onSubmit = { results.firstOrNull()?.let { onPlace(it, returnTrip) } },
             modifier = Modifier.padding(top = 14.dp).entrance(120),
         )
@@ -165,7 +172,7 @@ private fun TripTypeToggle(returnTrip: Boolean, onChange: (Boolean) -> Unit, mod
 @Composable
 private fun RouteCard(
     returnTrip: Boolean, query: String, onQuery: (String) -> Unit, focus: FocusRequester,
-    onEditPickup: () -> Unit, onSubmit: () -> Unit, modifier: Modifier = Modifier,
+    onEditPickup: () -> Unit, pickup: String?, onSubmit: () -> Unit, modifier: Modifier = Modifier,
 ) {
     val c = RideTheme.colors
     val rows = if (returnTrip) 3 else 2
@@ -177,7 +184,7 @@ private fun RouteCard(
             },
     ) {
         RouteRow(stringResource(R.string.search_pickup), false, Marker.Pickup) {
-            Text(stringResource(R.string.search_current), color = c.fg, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Text(pickup ?: stringResource(R.string.search_current), color = c.fg, fontSize = 16.sp, modifier = Modifier.weight(1f))
             Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup).semantics { contentDescription = "Edit pickup location" }, contentAlignment = Alignment.Center) {
                 RideIcon(RideIcons.Pencil, c.accent, size = 18.dp)
             }

@@ -35,7 +35,11 @@ import com.ridenow.app.ui.booking.MapPickerScreen
 import com.ridenow.app.ui.safety.Contact
 import com.ridenow.app.ui.safety.SafetyCenterScreen
 import com.ridenow.app.ui.safety.TrustedContactsScreen
+import com.ridenow.app.ui.saved.AddAddressScreen
 import com.ridenow.app.ui.saved.SavedAddressesScreen
+import com.ridenow.app.ui.search.ChangePickupScreen
+import com.ridenow.app.ui.search.FriendScreen
+import com.ridenow.app.ui.share.ShareTripScreen
 import com.ridenow.app.ui.support.ContactSupportScreen
 import com.ridenow.app.ui.support.SupportChatScreen
 import androidx.compose.runtime.mutableStateListOf
@@ -58,7 +62,7 @@ import com.ridenow.app.ui.welcome.WelcomeScreen
 
 enum class Screen {
     Splash, Welcome, Phone, Otp, Details, Location, Notifications, Home, Search, Options, Schedule, Confirm, Finding, Trip,
-    Complete, Rate, Report, Profile, EditProfile, MyRides, Payments, Settings, Notifs, Saved, Help, Legal, Doc, Support, Chat, Safety, Contacts, MapPick, Stub,
+    Complete, Rate, Report, Profile, EditProfile, MyRides, Payments, Settings, Notifs, Saved, Help, Legal, Doc, Support, Chat, Safety, Contacts, MapPick, ShareTrip, ChangePickup, Friend, AddAddr, Stub,
 }
 
 @Composable
@@ -79,6 +83,13 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var returnTo by rememberSaveable { mutableStateOf(Screen.Home) }
     var doc by rememberSaveable { mutableStateOf("") }
     val contacts = remember { mutableStateListOf(Contact("Ana", "+15550101"), Contact("Ben", "+15550102")) }
+    var pickup by rememberSaveable { mutableStateOf("128 Meridian Walk") }
+    var home by rememberSaveable { mutableStateOf<String?>("128 Meridian Walk, Sector 7") }
+    var work by rememberSaveable { mutableStateOf<String?>(null) }
+    var friend by rememberSaveable { mutableStateOf<String?>(null) }
+    var mapFor by rememberSaveable { mutableStateOf("drop") }
+    var addLabel by rememberSaveable { mutableStateOf("Home") }
+    val others = remember { mutableStateListOf("Nova Terminal, Gate 4" to "Sector 12, Orbit Ring", "Helix Garden Plaza" to "Sector 9, Garden Loop", "Aurora Medical Centre" to "Sector 3, Skyline Way") }
     val nav = { to: Screen -> returnTo = screen; screen = to }
     val shownPhone = phone.ifBlank { "+1 555 012 3456" }
     val open = { label: String -> stubBack = screen; stub = label; screen = Screen.Stub }
@@ -130,7 +141,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 HomeScreen(
                     onMenu = { drawer = true }, onNotifications = { nav(Screen.Notifs) },
                     onSearch = { screen = Screen.Search }, onLater = { scheduleFrom = Screen.Home; screen = Screen.Schedule },
-                    onEditPickup = { open("Change pickup") }, onSaved = { nav(Screen.Saved) },
+                    onEditPickup = { nav(Screen.ChangePickup) }, onSaved = { nav(Screen.Saved) }, pickup = pickup,
                     onRecent = { dest = it; isReturn = false; screen = Screen.Options },
                 )
                 MenuDrawer(
@@ -144,8 +155,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 SearchScreen(
                     onBack = { scheduled = null; screen = Screen.Home }, scheduled = scheduled,
                     onPlace = { place, ret -> dest = place.name; isReturn = ret; screen = Screen.Options },
-                    onFriend = { open("Book for a friend") }, onEditPickup = { open("Change pickup") },
-                    onSaved = { nav(Screen.Saved) }, onMap = { nav(Screen.MapPick) }, onAdd = { open("Add $it address") },
+                    onFriend = { nav(Screen.Friend) }, onEditPickup = { nav(Screen.ChangePickup) }, pickup = pickup, friend = friend,
+                    onSaved = { nav(Screen.Saved) }, onMap = { mapFor = "drop"; nav(Screen.MapPick) }, onAdd = { open("Add $it address") },
                 )
             }
             Screen.Options -> {
@@ -175,7 +186,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 BackHandler { }
                 TripScreen(
                     dest, vehicle, onCancelled = { scheduled = null; screen = Screen.Home }, onComplete = { rating = 0; screen = Screen.Complete },
-                    onShare = { open("Share live trip") }, onSafety = { nav(Screen.Safety) },
+                    onShare = { nav(Screen.ShareTrip) }, onSafety = { nav(Screen.Safety) },
                 )
             }
             Screen.Complete -> {
@@ -223,7 +234,10 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.Saved -> {
                 BackHandler { screen = returnTo }
-                SavedAddressesScreen(onBack = { screen = returnTo }, onEdit = { open(it) })
+                SavedAddressesScreen(
+                    home, work, others, onBack = { screen = returnTo },
+                    onEdit = { l -> when (l) { "Home address" -> { addLabel = "Home"; nav(Screen.AddAddr) }; "Work address" -> { addLabel = "Work"; nav(Screen.AddAddr) }; "Add address" -> { addLabel = "Other"; nav(Screen.AddAddr) }; else -> open(l) }; Unit },
+                )
             }
             Screen.Help -> {
                 BackHandler { screen = returnTo }
@@ -247,7 +261,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.Safety -> {
                 BackHandler { screen = returnTo }
-                SafetyCenterScreen(contacts.size, onBack = { screen = returnTo }, onShare = { open("Share live trip") }, onContacts = { screen = Screen.Contacts }, onReport = { open("Report a safety issue") })
+                SafetyCenterScreen(contacts.size, onBack = { screen = returnTo }, onShare = { nav(Screen.ShareTrip) }, onContacts = { screen = Screen.Contacts }, onReport = { open("Report a safety issue") })
             }
             Screen.Contacts -> {
                 BackHandler { screen = if (returnTo == Screen.Safety) Screen.Safety else returnTo }
@@ -255,7 +269,30 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.MapPick -> {
                 BackHandler { screen = returnTo }
-                MapPickerScreen("Set drop location", "Set drop location", onBack = { screen = returnTo }, onConfirm = { dest = it; isReturn = false; screen = Screen.Options })
+                if (mapFor == "pickup") MapPickerScreen("Set pickup", "Confirm pickup", onBack = { screen = returnTo }, onConfirm = { pickup = it; screen = returnTo })
+                else MapPickerScreen("Set drop location", "Set drop location", onBack = { screen = returnTo }, onConfirm = { dest = it; isReturn = false; screen = Screen.Options })
+            }
+            Screen.ShareTrip -> {
+                BackHandler { screen = returnTo }
+                ShareTripScreen(contacts, onBack = { screen = returnTo }, onManage = { nav(Screen.Contacts) })
+            }
+            Screen.ChangePickup -> {
+                BackHandler { screen = returnTo }
+                val places = buildList {
+                    add("Current location" to "128 Meridian Walk"); home?.let { add("Home" to it) }; work?.let { add("Work" to it) }; others.forEach { add(it.first to it.second) }
+                }
+                ChangePickupScreen(pickup, places, onBack = { screen = returnTo }, onConfirm = { pickup = it; screen = returnTo }, onMap = { mapFor = "pickup"; screen = Screen.MapPick })
+            }
+            Screen.Friend -> {
+                BackHandler { screen = returnTo }
+                FriendScreen(onBack = { screen = returnTo }, onDone = { friend = it; screen = returnTo })
+            }
+            Screen.AddAddr -> {
+                BackHandler { screen = returnTo }
+                AddAddressScreen(addLabel, onBack = { screen = returnTo }, onSave = { l, a ->
+                    when (l) { "Home" -> home = a; "Work" -> work = a; else -> others.add(0, a.substringBefore(",") to a.substringAfter(", ", "Saved place")) }
+                    screen = returnTo
+                })
             }
             Screen.Stub -> {
                 BackHandler { screen = stubBack }

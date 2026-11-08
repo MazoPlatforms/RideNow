@@ -27,15 +27,14 @@ import com.ridenow.app.ui.util.entrance
 
 /** Home and Work are always shown; other places can be removed. Edits and adds open placeholders for now. */
 @Composable
-fun SavedAddressesScreen(onBack: () -> Unit, onEdit: (String) -> Unit, modifier: Modifier = Modifier) {
+fun SavedAddressesScreen(home: String?, work: String?, others: androidx.compose.runtime.snapshots.SnapshotStateList<Pair<String, String>>, onBack: () -> Unit, onEdit: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
-    val others = remember { mutableStateListOf("Nova Terminal, Gate 4" to "Sector 12, Orbit Ring", "Helix Garden Plaza" to "Sector 9, Garden Loop", "Aurora Medical Centre" to "Sector 3, Skyline Way") }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         ScreenTop("Saved addresses", onBack, subtitle = "Home and Work are always one tap away.")
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Slot(RideIcons.Home, "Home", "128 Meridian Walk, Sector 7", set = true) { onEdit("Home address") }
-                Slot(RideIcons.Work, "Work", "Not set yet", set = false) { onEdit("Work address") }
+                Slot(RideIcons.Home, "Home", home ?: "Not set yet", set = home != null) { onEdit("Home address") }
+                Slot(RideIcons.Work, "Work", work ?: "Not set yet", set = work != null) { onEdit("Work address") }
             }
             SectionLabel("OTHER PLACES")
             if (others.isEmpty()) Text("No favorites yet. Save places you visit often.", color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(vertical = 12.dp))
@@ -82,4 +81,4 @@ private fun Slot(icon: List<String>, title: String, sub: String, set: Boolean, o
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun SavedPreview() = RideNowTheme(darkTheme = true) { SavedAddressesScreen({}, {}) }
+private fun SavedPreview() = RideNowTheme(darkTheme = true) { SavedAddressesScreen("128 Meridian Walk", null, remember { mutableStateListOf("Zenith Café" to "Sector 7") }, {}, {}) }
