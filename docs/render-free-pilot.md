@@ -1,15 +1,15 @@
-# Render Free + UptimeRobot முன்னோட்டம்
+# Render Free + UptimeRobot preview
 
-இந்த அமைப்பு கட்டுப்படுத்தப்பட்ட demo / உள் சோதனைக்கானது. தொடர்ச்சியான பயணச் சேவைக்கு கிடைக்கும் நேர உத்தரவாதம் இல்லை. Render-ல் ஒரு Free Web Service மட்டும் உருவாக்கவும்; புதிய database, Redis, paid worker அல்லது disk தேவையில்லை. ஏற்கெனவே உள்ள Supabase **ridenow-demo** (`bhjuxggttifldkrcrshj`), Upstash, R2 பயன்படுத்தப்படுகின்றன. வேறு `ridenow` Supabase திட்டத்தைப் பயன்படுத்தக்கூடாது. `ridenow` என்ற database schema மட்டும் ridenow-demo உள்ளே உள்ளது.
+This setup is intended for a controlled demo or internal testing. It does not guarantee availability for continuous ride operations. Create only one Free Web Service on Render; no new database, Redis, paid worker, or disk is needed. Use the existing Supabase **ridenow-demo** (`bhjuxggttifldkrcrshj`), Upstash, and R2. Do not use another Supabase project named `ridenow`. Only a database schema named `ridenow` exists within ridenow-demo.
 
-## சேவை அமைப்பு
+## Service configuration
 
-Render workspace-ஐ உரிமையாளர் உறுதிப்படுத்திய பிறகே சேவை உருவாக்க வேண்டும்.
+Create the service only after the owner has confirmed the Render workspace.
 
-| அமைப்பு | மதிப்பு |
+| Setting | Value |
 | --- | --- |
-| வகை | Web Service |
-| பெயர் | ridenow-demo-api (பெயர் கிடைப்பதை உறுதிப்படுத்தவும்) |
+| Type | Web Service |
+| Name | ridenow-demo-api (confirm availability) |
 | Repository | https://github.com/MazoPlatforms/RideNow |
 | Branch | main |
 | Runtime | Node |
@@ -17,27 +17,27 @@ Render workspace-ஐ உரிமையாளர் உறுதிப்பட�
 | Build command | `npm ci --omit=dev` |
 | Start command | `npm run start:pilot` |
 | Health check path | `/health/ready` |
-| Auto-deploy | முதலில் முடக்கவும்; சரிபார்த்த commit-ஐ deploy செய்யவும் |
+| Auto-deploy | Disable initially; deploy a verified commit |
 
-`start:pilot` API, worker, WhatsApp gateway ஆகியவற்றை மூன்று child processes-ஆக ஒரே instance-ல் இயக்குகிறது. ஒன்று நின்றாலும் மற்றவற்றை நிறுத்தி service-ஐ தோல்வி exit code-உடன் முடிக்கும்; hosting platform மீண்டும் தொடங்கலாம். SIGTERM/SIGINT எல்லா child processes-க்கும் அனுப்பப்படும்; 20 விநாடிக்கு மேலாக நிற்காத process கட்டாயமாக நிறுத்தப்படும். ஒவ்வொரு process-க்கும் PostgreSQL pool இயல்பாக 4 connections; மொத்தம் அதிகபட்சம் 12. Instance memory/CPU போதுமா என்பதை உண்மையான deployment metrics-ல் அளக்க வேண்டும்; இன்னும் capacity நிரூபிக்கப்படவில்லை.
+`start:pilot` runs the API, worker, and WhatsApp gateway as three child processes in the same instance. If one exits, the others are stopped and the service exits with a failure code so the hosting platform can restart it. SIGTERM/SIGINT is forwarded to all child processes; any process still running after 20 seconds is forcibly stopped. Each process defaults to a PostgreSQL pool of four connections, at most 12 total. Measure instance memory/CPU using real deployment metrics; capacity has not yet been proven.
 
-Deploy overlap நேரத்தில் புதிய WhatsApp gateway பழைய gateway-ன் database lock விடுவிக்கப்படும் வரை காத்திருக்கும். பழைய instance ஓய்ந்ததும் அதே encrypted database session-ஐத் தொடரும். Build அல்லது startup-ல் migrations/seed/admin creation தானாக இயங்காது. Private schema installer workflow-ஐ தனியாக இயக்க வேண்டும்; அது ஏற்கெனவே வெற்றியடைந்துள்ளது.
+During overlapping deployments, the new WhatsApp gateway waits for the old gateway to release its database lock. Once the old instance stops, the new one resumes the same encrypted database session. Builds/startup do not automatically run migrations, seed data, or create admins. Run the private schema installer workflow separately; it has previously succeeded.
 
-## Render Environment
+## Render environment
 
-GitHub production Environment secrets தானாக Render-க்கு வராது. கீழ்க்கண்ட ஏற்கெனவே உள்ள மதிப்புகளை Render Environment-ல் தனியாகச் சேர்க்கவும்; chat, commit, build logs-ல் வெளியிட வேண்டாம்.
+GitHub production environment secrets do not transfer automatically to Render. Add the existing values below separately to the Render environment; do not expose them in chats, commits, or build logs.
 
-| ரகசியம் | பயன்பாடு |
+| Secret | Purpose |
 | --- | --- |
-| `DATABASE_URL` | ridenow-demo session pooler, port 5432; password URL encoded |
+| `DATABASE_URL` | ridenow-demo session pooler, port 5432; URL-encoded password |
 | `REDIS_URL` | Upstash TLS connection |
-| `JWT_SECRET` | ஏற்கெனவே பயன்படுத்தும் signing secret |
-| `OTP_PEPPER` | ஏற்கெனவே பயன்படுத்தும் தனி OTP secret |
-| `ENCRYPTION_KEY` | அதே 64 hex key; மாற்றினால் பழைய credentials படிக்க முடியாது |
-| `WA_AUTH_CREDS` | ஏற்கெனவே paired Baileys JSON; காலியான auth database-க்கு மட்டும் import |
+| `JWT_SECRET` | Existing signing secret |
+| `OTP_PEPPER` | Existing separate OTP secret |
+| `ENCRYPTION_KEY` | Same 64-character hex key; changing it prevents reading old credentials |
+| `WA_AUTH_CREDS` | Previously paired Baileys JSON; imported only into an empty auth database |
 | `S3_ACCESS_KEY`, `S3_SECRET_KEY` | R2 credentials |
 
-பொது configuration:
+Common configuration:
 
 ```dotenv
 NODE_VERSION=24
@@ -51,60 +51,60 @@ FCM_ENABLED=false
 NODE_EXTRA_CA_CERTS=/etc/secrets/supabase-ca.crt
 ```
 
-Production-ல் `OTP_PROVIDER` code மூலம் `baileys` ஆக நிர்ணயிக்கப்படுகிறது. Render-ல் இந்த variable இல்லாவிட்டாலும் அல்லது வேறு மதிப்பாக இருந்தாலும் Baileys மட்டுமே பயன்படுத்தப்படும். Development/test adapter தேர்வு தொடர்ந்து கிடைக்கும்.
+In production, the code forces `OTP_PROVIDER` to `baileys`. Even if the Render variable is missing or has a different value, only Baileys is used. Development/test adapter selection remains available.
 
-CA-க்கு மாற்று அமைப்பு: `SUPABASE_CA_CERT` environment variable-ல் public PEM வைத்திருந்தால் `start:pilot` தற்காலிக CA file உருவாக்கி, child processes தொடங்கும் முன்பே `NODE_EXTRA_CA_CERTS` அமைக்கும். இந்த முறையில் மேலுள்ள `/etc/secrets/supabase-ca.crt` அமைப்பு தேவையில்லை. இரண்டையும் அமைத்தால் ஏற்கெனவே உள்ள CA file-உடன் புதிய CA சேர்க்கப்படும்; குறிப்பிடும் file உண்மையாக இருக்க வேண்டும். TLS certificate verification தொடர்ந்து இயங்கும்.
+Alternative CA setup: If `SUPABASE_CA_CERT` contains public PEM in an environment variable, `start:pilot` writes a temporary CA file and configures `NODE_EXTRA_CA_CERTS` before starting child processes. In this mode, the `/etc/secrets/supabase-ca.crt` setting above is unnecessary. If both are set, the new CA is added to the existing CA file; the referenced file must exist. TLS certificate verification remains enabled.
 
-மேலும் `S3_ENDPOINT`, `S3_BUCKET` சேர்க்கவும். `CORS_ORIGINS`-ல் உண்மையான HTTPS frontend origin-களை comma-separated-ஆக சேர்க்கவும். அங்கீகரிக்கப்பட்ட vehicle categories-ஐ மட்டும் `MAP_CATEGORY_APPROVALS`-ல் குறிப்பிடவும்; சாலைச் சரிபார்ப்புக்கு முன் `TUK,CAR,VAN` என்று அனுமதி கொடுக்க வேண்டாம். `PORT` Render வழங்கும் மதிப்பிலேயே இருக்கட்டும்.
+Also add `S3_ENDPOINT` and `S3_BUCKET`. Include actual HTTPS frontend origins as comma-separated values in `CORS_ORIGINS`. Specify only approved vehicle categories in `MAP_CATEGORY_APPROVALS`; do not enable `TUK,CAR,VAN` before roads are verified. Keep `PORT` at the value provided by Render.
 
-`TRUST_PROXY_HOPS`-ஐ actual proxy chain சரிபார்த்த பிறகே அமைக்கவும். தவறான அமைப்பு rate limiting-ஐ பாதிக்கும். நேரடி onrender.com ingress-ல் ஓர் proxy hop இருப்பதை உறுதிப்படுத்தினால் `1`; பின்னர் Cloudflare proxy சேர்த்தால் மீண்டும் சோதிக்கவும்.
+Configure `TRUST_PROXY_HOPS` only after verifying the actual proxy chain. Incorrect settings affect rate limiting. Use `1` only after confirming one proxy hop for direct onrender.com ingress; recheck if a Cloudflare proxy is added later.
 
-Render Secret Files:
+Render secret files:
 
-- `supabase-ca.crt`: GitHub Variable `SUPABASE_CA_CERT`-ல் இருக்கும் public CA PEM. TLS verification-ஐ முடக்க வேண்டாம்.
-- Firebase credential இந்த self-hosted notification அமைப்புக்குத் தேவையில்லை. பின்னர் FCM சேர்த்தால் மட்டும் `FCM_ENABLED=true` மற்றும் `GOOGLE_APPLICATION_CREDENTIALS=/etc/secrets/firebase-service-account.json` அமைத்து உண்மையான push delivery-ஐச் சோதிக்கவும்.
+- `supabase-ca.crt`: public CA PEM from GitHub variable `SUPABASE_CA_CERT`. Do not disable TLS verification.
+- Firebase credentials are not required for this self-hosted notification setup. If FCM is added later, set `FCM_ENABLED=true` and `GOOGLE_APPLICATION_CREDENTIALS=/etc/secrets/firebase-service-account.json`, then test real push delivery.
 
-ஆவண malware scanning-க்கு Render-இலிருந்து அணுகக்கூடிய உண்மையான ClamAV endpoint தேவை: `CLAMAV_HOST`, `CLAMAV_PORT`. ClamAV TCP protocol-ல் authentication/TLS இல்லை; public internet-க்கு scanner port-ஐ நேரடியாகத் திறக்க வேண்டாம். பாதுகாக்கப்பட்ட network/tunnel அமைக்க வேண்டும். Scanner இல்லாமல் driver documents CLEAN ஆகாது. Free instance-க்குள் ClamAV-ஐயும் சேர்த்து இயக்குவது இந்த deployment அமைப்பின் பகுதி அல்ல. Rider profile avatars மட்டும் JPEG-ஆக decode/re-encode செய்யப்பட்டு metadata நீக்கப்படும்; அவற்றுக்கு ClamAV endpoint தேவையில்லை.
+Document malware scanning requires a real ClamAV endpoint reachable from Render: `CLAMAV_HOST`, `CLAMAV_PORT`. ClamAV's TCP protocol has no authentication/TLS; do not expose the scanner port directly to the public internet. Configure a protected network/tunnel. Without a scanner, driver documents do not become CLEAN. Running ClamAV within the Free instance is not part of this deployment configuration. Rider profile avatars are instead decoded/re-encoded as JPEG with metadata removed; they do not require ClamAV.
 
 ## UptimeRobot
 
-Service live ஆன பிறகு மட்டுமே அதன் Render dashboard காட்டும் உண்மையான URL-ஐப் பயன்படுத்தவும்; service பெயரிலிருந்து URL-ஐ ஊகிக்க வேண்டாம்.
+Only after the service is live, use its actual URL shown in the Render dashboard. Do not guess the URL from the service name.
 
 1. Add New Monitor → HTTP(s).
-2. பெயர்: `RideNow demo readiness`.
-3. URL: `https://<உண்மையான-render-host>/health/ready`.
-4. Interval: Free திட்டத்தில் 5 minutes.
-5. Alert contact-ஐத் தேர்ந்து down/recovery alerts இயங்குவதைச் சோதிக்கவும்.
+2. Name: `RideNow demo readiness`.
+3. URL: `https://<actual-render-host>/health/ready`.
+4. Interval: 5 minutes on the Free plan.
+5. Select an alert contact and test down/recovery alerts.
 
-இந்த endpoint PostgreSQL, Redis, production worker heartbeat ஆகியவற்றைச் சோதிக்கும். WhatsApp delivery, FCM delivery, R2 permissions, ClamAV ஆகியவற்றின் முழுச் செயல்பாட்டை இது நிரூபிக்காது. அவற்றைத் தனியாக end-to-end சோதிக்க வேண்டும். Monitor-க்கு JWT, OTP, API credentials சேர்க்க வேண்டாம். UptimeRobot account access/API credential இந்த repository-ல் இல்லை; monitor இன்னும் உருவாக்கப்படவில்லை.
+The endpoint checks PostgreSQL, Redis, and the production worker heartbeat. It does not demonstrate full WhatsApp delivery, FCM delivery, R2 permissions, or ClamAV functionality. Test each separately end to end. Do not include JWT, OTP, or API credentials in the monitor. This repository has no UptimeRobot account access/API credential; the monitor has not yet been created.
 
-## Deployment சரிபார்ப்பு
+## Deployment verification
 
-1. Render deploy `live` ஆக முடிந்திருக்க வேண்டும்; build success மட்டும் போதாது.
-2. `/health/live` → 200; `/health/ready` → 200 மற்றும் `status=ready`.
-3. Worker heartbeat, WhatsApp connection ஆகியவற்றைச் சரிபார்க்கவும். உரிமையாளர் ஒப்புக்கொண்ட எண்ணுக்கு ஒரு OTP அனுப்பி verify/replay rejection சோதிக்கவும்; ஒவ்வொரு deploy-க்கும் தானாக OTP அனுப்ப வேண்டாம்.
-4. Restart/redeploy செய்த பிறகும் WhatsApp session மீளவும், pending jobs தொடரவும் வேண்டும்.
-5. WebSocket notifications, reconnect பிறகு notification inbox, scanner வழியாக R2 upload/download, driver approval, booking → dispatch → accept → start → complete → cash ledger ஆகியவற்றைச் சோதிக்கவும்.
-6. Free memory/CPU, connection counts, job backlog, latency அளந்த பிறகே குறைந்த எண்ணிக்கையிலான pilot பயனர்களை அனுமதிக்கவும்.
+1. The Render deployment must reach `live`; a successful build alone is insufficient.
+2. `/health/live` → 200; `/health/ready` → 200 with `status=ready`.
+3. Check the worker heartbeat and WhatsApp connection. Send one OTP to an owner-approved number and test verification/replay rejection; never send OTPs automatically on every deployment.
+4. Confirm the WhatsApp session resumes and pending jobs continue after restart/redeployment.
+5. Test WebSocket notifications, the notification inbox after reconnect, R2 upload/download through the scanner, driver approval, and booking → dispatch → accept → start → complete → cash ledger.
+6. Measure Free-tier memory/CPU, connection counts, job backlog, and latency before admitting a small number of pilot users.
 
-## இலவசத் திட்ட வரம்புகள்
+## Free-tier limits
 
-2026-11-03 அன்று அதிகாரப்பூர்வ ஆவணங்கள் சரிபார்க்கப்பட்டன:
+Official documentation was checked on 2026-11-03:
 
-- [Render Free](https://render.com/docs/free): inbound HTTP/WebSocket traffic இல்லாமல் 15 நிமிடங்கள் கழிந்தால் sleep; மீண்டும் தொடங்க சுமார் ஒரு நிமிடம் ஆகலாம். எந்த நேரத்திலும் restart நிகழலாம்.
-- ஒவ்வொரு workspace-க்கும் மாதம் 750 free instance hours பகிரப்படும். அதே workspace-ல் வேறு Free services இருந்தால் அவையும் நேரத்தைப் பயன்படுத்தும்.
-- Free web instance: 0.1 CPU / 512 MB. External database/API/storage traffic அதிகமாக இருந்தாலும் Render suspend செய்யலாம்.
-- Bandwidth/build usage தனி வரம்புகள்; payment method இருந்தால் கூடுதல் usage billing ஏற்படலாம். Budget/spend settings-ஐ உரிமையாளர் சரிபார்க்க வேண்டும்.
-- [UptimeRobot Free](https://uptimerobot.com/pricing/): 5-minute monitoring. HTTP checks idle நேரத்தைக் குறைக்கலாம்; hosting suspension, restart, quota அல்லது downtime-ஐத் தடுக்க உத்தரவாதம் இல்லை.
+- [Render Free](https://render.com/docs/free): sleeps after 15 minutes without inbound HTTP/WebSocket traffic; restarting may take about one minute. Restarts can occur at any time.
+- Each workspace shares 750 free instance hours per month. Other Free services in the same workspace also consume these hours.
+- Free web instance: 0.1 CPU / 512 MB. Render may suspend services for excessive external database/API/storage traffic.
+- Bandwidth/build usage has separate limits; if a payment method exists, additional usage may be billed. The owner must review budget/spend settings.
+- [UptimeRobot Free](https://uptimerobot.com/pricing/): five-minute monitoring. HTTP checks may reduce idle periods but do not guarantee prevention of hosting suspensions, restarts, quota limits, or downtime.
 
-உண்மையான பயணங்களின் dispatch, scheduled rides, live tracking, WhatsApp OTP ஆகியவற்றிற்கு தொடர்ந்து இயங்கும் paid infrastructure-க்கு மாறுவது pilot readiness மதிப்பீட்டின் பகுதி.
+Moving to continuously available paid infrastructure for real-trip dispatch, scheduled rides, live tracking, and WhatsApp OTP must be part of the pilot readiness assessment.
 
-## அதே சேவையில் self-hosted notifications
+## Self-hosted notifications in the same service
 
-Notification worker ஏற்கெனவே `start:pilot`-க்குள் இயங்குகிறது; தனி Render service தேவையில்லை. PostgreSQL outbox → notifications inbox → Redis → authenticated Socket.IO இணைப்பு என்ற வழியில் அறிவிப்புகள் செல்கின்றன. FCM இல்லாவிட்டாலும் inbox மற்றும் WebSocket தொடர்ந்து இயங்கும். `driver.location` போன்ற அதிக அதிர்வெண் tracking நிகழ்வுகள் inbox-ல் சேமிக்கப்படாது.
+The notification worker already runs within `start:pilot`; no separate Render service is required. Notifications flow through PostgreSQL outbox → notification inbox → Redis → authenticated Socket.IO connection. The inbox and WebSocket continue to work without FCM. High-frequency tracking events such as `driver.location` are not stored in the inbox.
 
-Android/iOS client Socket.IO protocol பயன்படுத்த வேண்டும்; raw WebSocket client மட்டும் போதாது. Handshake-ல் `auth: { token: accessToken }` அனுப்பவும். பயன்பாட்டுக்குரிய `ride.updated` போன்ற event-களைக் கேட்டு `eventId` மூலம் duplicate-களைத் தவிர்க்கவும். ஒவ்வொரு reconnect-க்கும் JWT உடன் `GET /v1/me/notifications` அழைத்து தவறவிட்ட அறிவிப்புகளைப் பெறவும்; வாசித்தபின் `POST /v1/me/notifications/:id/read`. Socket event வராத நேரத்திலும் PostgreSQL inbox இருக்கும்; 90 நாள் retention தற்போதைய worker policy.
+Android/iOS clients must use the Socket.IO protocol; a raw WebSocket client alone is insufficient. Send `auth: { token: accessToken }` during the handshake. Listen for relevant events such as `ride.updated` and avoid duplicates using `eventId`. On each reconnect, call `GET /v1/me/notifications` with the JWT to retrieve missed notifications; after reading, call `POST /v1/me/notifications/:id/read`. The PostgreSQL inbox remains available even when socket events are missed; current worker policy retains notifications for 90 days.
 
-`FCM_ENABLED=false` நிலையில் புதிய external push jobs உருவாகாது. பழைய push jobs இருந்தால் அவற்றின் attempts அதிகரிக்காமல் pending-ல் இருக்கும்; பின்னர் FCM இயக்கினால் அவை தொடரலாம். Push provider-ஐ இயக்குவதற்கு முன் பழைய அறிவிப்புகளின் பொருத்தத்தை ஆய்வு செய்யவும். Inbox read status என்பது சாதன OS push delivery receipt அல்ல.
+With `FCM_ENABLED=false`, no new external push jobs are created. Existing push jobs, if any, remain pending without increasing attempts; they may continue when FCM is later enabled. Review the relevance of old notifications before enabling a push provider. An inbox read status is not a device OS push-delivery receipt.
 
-இந்த முறை செயலி இணைந்திருக்கும் நேரத்தில் உடனடி அறிவிப்புகளையும், மீண்டும் திறந்தபின் inbox-ஐயும் வழங்கும். செயலி background/suspended/மூடப்பட்ட நிலையில் உடனடி OS notification உத்தரவாதம் இல்லை; iOS-க்கு APNs, வழக்கமான Android சாதனங்களுக்கு FCM போன்ற push transport தனியாகத் தேவை. Self-hosted worker மட்டும் அவற்றை மாற்றாது. Render Free sleep/restart நேரத்தில் உடனடி அனுப்புதலும் நிற்கும்; மீண்டும் தொடங்கியதும் pending outbox தொடரும்.
+This method provides immediate notifications while the app is connected and an inbox when it is reopened. Immediate OS notifications are not guaranteed while the app is backgrounded, suspended, or closed; separate push transport such as APNs for iOS or FCM for common Android devices is required. A self-hosted worker alone cannot replace them. Sending also pauses during Render Free sleep/restart, and pending outbox work resumes when the service restarts.
