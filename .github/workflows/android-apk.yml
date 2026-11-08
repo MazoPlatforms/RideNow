@@ -64,9 +64,8 @@ jobs:
           sha256sum --check "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
           git diff --exit-code -- app/android
           cp "$apk" "$RUNNER_TEMP/android-release/RideNow-Android-debug.apk"
-          cp app/android/RideNow-Android.zip "$RUNNER_TEMP/android-release/RideNow-Android.zip"
           cd "$RUNNER_TEMP/android-release"
-          sha256sum RideNow-Android-debug.apk RideNow-Android.zip ANDROID_SOURCE_SHA256SUMS.txt > SHA256SUMS.txt
+          sha256sum RideNow-Android-debug.apk ANDROID_SOURCE_SHA256SUMS.txt > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: ridenow-android-${{ github.run_id }}
@@ -99,12 +98,11 @@ jobs:
           cat > "$RUNNER_TEMP/android-release-notes.md" <<EOF
           RideNow Android UI preview built from commit ${GITHUB_SHA}.
 
-          - The APK is built from the checked-in Kotlin sources in `app/android/`, including live Mazo Maps MapLibre integration. The original ZIP is retained only as a legacy backup and is not the APK build input.
+          - The APK is built from the checked-in Kotlin sources in `app/android/`, including live Mazo Maps MapLibre integration. The APK is built directly from the tracked, unzipped Android project; no source ZIP is used.
           - All tracked Android source checksums are verified unchanged after the build.
           - The missing wrapper scripts and JAR are generated in GitHub Actions using Gradle 8.9 and Java 17, without modifying tracked sources.
           - APK is debug-signed for installation and testing, not a production or Play Store release. Debug signing keys may differ between workflow runs; installing a later preview can require uninstalling the previous one.
           - Minimum Android version: Android 8.0 (API 26).
-          - The legacy original ZIP is included unchanged for archival reference. It may not match the current checked-in source files.
           EOF
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" android-release/* --repo "$GITHUB_REPOSITORY" --clobber
