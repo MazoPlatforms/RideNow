@@ -34,6 +34,11 @@ import com.ridenow.app.ui.booking.Vehicles
 import com.ridenow.app.ui.booking.fareFor
 import com.ridenow.app.ui.home.HomeScreen
 import com.ridenow.app.ui.help.HelpScreen
+import com.ridenow.app.ui.intro.IntroScreen
+import com.ridenow.app.ui.system.*
+import androidx.compose.foundation.layout.Box as LayoutBox
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.platform.LocalContext
 import com.ridenow.app.ui.legal.DocScreen
 import com.ridenow.app.ui.legal.LegalScreen
 import com.ridenow.app.ui.menu.MenuDrawer
@@ -69,7 +74,7 @@ import com.ridenow.app.ui.welcome.WelcomeScreen
 
 enum class Screen {
     Splash, Welcome, Phone, Otp, Details, Location, Notifications, Home, Search, Options, Schedule, Confirm, Finding, Trip,
-    Complete, Rate, Report, Profile, EditProfile, MyRides, Payments, Settings, Notifs, Saved, Help, Legal, Doc, Support, Chat, Safety, Contacts, MapPick, ShareTrip, ChangePickup, Friend, AddAddr, Stub,
+    Complete, Rate, Report, Profile, EditProfile, MyRides, Payments, Settings, Intro, Loading, Expired, ServerError, Notifs, Saved, Help, Legal, Doc, Support, Chat, Safety, Contacts, MapPick, ShareTrip, ChangePickup, Friend, AddAddr, Stub,
 }
 
 @Composable
@@ -105,6 +110,10 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         }
         Unit
     }
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("ridenow", 0) }
+    var netKey by remember { mutableIntStateOf(0) }
+    val online = rememberOnline(netKey)
     var pickup by rememberSaveable { mutableStateOf("128 Meridian Walk") }
     var home by rememberSaveable { mutableStateOf<String?>("128 Meridian Walk, Sector 7") }
     var work by rememberSaveable { mutableStateOf<String?>(null) }
@@ -135,9 +144,14 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         Unit
     }
 
+    Box(Modifier.fillMaxSize()) {
     Crossfade(targetState = screen, animationSpec = tween(400), label = "root") { current ->
         when (current) {
-            Screen.Splash -> SplashScreen(onFinished = { screen = Screen.Welcome })
+            Screen.Splash -> SplashScreen(onFinished = { screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro })
+            Screen.Intro -> IntroScreen(onDone = { prefs.edit().putBoolean("intro_seen", true).apply(); screen = Screen.Welcome })
+            Screen.Loading -> LoadingScreen(onDone = { screen = Screen.Home })
+            Screen.Expired -> SessionExpiredScreen(name, shownPhone, onSendCode = { screen = Screen.Phone }, onOther = { phone = ""; screen = Screen.Phone })
+            Screen.ServerError -> ServerErrorScreen("8F3K-2Q-500", onRetry = { screen = Screen.Home }, onContact = { nav(Screen.Support) })
             Screen.Welcome -> WelcomeScreen(onGetStarted = { screen = Screen.Phone }, onHaveAccount = { screen = Screen.Phone }, onHelp = { })
             Screen.Phone -> {
                 BackHandler { screen = Screen.Welcome }
@@ -157,7 +171,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.Notifications -> {
                 BackHandler { screen = Screen.Location }
-                NotificationPermissionScreen(onDone = { screen = Screen.Home })
+                NotificationPermissionScreen(onDone = { screen = Screen.Loading })
             }
             Screen.Home -> Box(Modifier.fillMaxSize()) {
                 HomeScreen(
@@ -327,5 +341,10 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 }
             }
         }
+    }
+    if (!online && screen != Screen.Splash && screen != Screen.Intro) {
+        BackHandler { }
+        NoInternetScreen(onRetry = { netKey++ }, onOpenRides = { })
+    }
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.ui.text.style.*
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.draw.drawBehind
 import com.ridenow.app.ui.components.RideButton
@@ -37,7 +38,15 @@ fun SavedAddressesScreen(home: String?, work: String?, others: androidx.compose.
                 Slot(RideIcons.Work, "Work", work ?: "Not set yet", set = work != null) { onEdit("Work address") }
             }
             SectionLabel("OTHER PLACES")
-            if (others.isEmpty()) Text("No favorites yet. Save places you visit often.", color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(vertical = 12.dp))
+            if (others.isEmpty()) Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp)).padding(vertical = 30.dp, horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                val pulse by androidx.compose.animation.core.rememberInfiniteTransition(label = "heart").animateFloat(0.7f, 1.15f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(2400, easing = androidx.compose.animation.core.LinearOutSlowInEasing)), label = "p")
+                Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(72.dp).graphicsLayer { scaleX = pulse; scaleY = pulse; alpha = (1.15f - pulse).coerceIn(0f, 0.6f) }.border(1.5.dp, c.accent, CircleShape))
+                    Box(Modifier.size(52.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) { RideIcon(RideIcons.Heart, c.accent, size = 26.dp) }
+                }
+                Text("No favorites yet", color = c.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
+                Text("Save places you visit often for faster pickups.", color = c.muted, fontSize = 13.sp, lineHeight = 19.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+            }
             others.forEachIndexed { i, (title, sub) ->
                 var menu by remember { mutableStateOf(false) }
                 Column(Modifier.fillMaxWidth()) {
