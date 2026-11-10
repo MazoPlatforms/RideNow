@@ -91,17 +91,14 @@ fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
     val loop = rememberInfiniteTransition(label = "splash")
     val orbitRaw by loop.animateFloat(0f, 360f, infiniteRepeatable(tween(9000, easing = LinearEasing)), label = "orbit")
     val pulseRaw by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearOutSlowInEasing)), label = "pulse")
-    val loaderRaw by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing)), label = "loader")
     val orbit = if (reduceMotion) 0f else orbitRaw
     val pulse = if (reduceMotion) 0f else pulseRaw
-    val loader = if (reduceMotion) 0.5f else loaderRaw
     val description = stringResource(R.string.splash_description)
 
     BoxWithConstraints(
         modifier.fillMaxSize().background(c.bg).semantics { contentDescription = description },
     ) {
         val textTop = maxHeight * 0.60f
-        val loaderTop = maxHeight * 0.82f
 
         Canvas(Modifier.fillMaxSize()) {
             drawStreets(c)
@@ -129,18 +126,6 @@ fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
             Text(
                 stringResource(R.string.splash_tagline), color = c.muted, fontSize = 14.sp,
                 modifier = Modifier.padding(top = 14.dp),
-            )
-        }
-
-        // Indeterminate loader
-        Box(
-            Modifier.align(Alignment.TopCenter).padding(top = loaderTop).width(120.dp).height(3.dp)
-                .clip(RoundedCornerShape(2.dp)).background(c.line),
-        ) {
-            Box(
-                Modifier.fillMaxHeight().fillMaxWidth(0.4f)
-                    .offset { IntOffset(((-48f + 168f * loader).dp.roundToPx()), 0) }
-                    .background(c.accent),
             )
         }
 
