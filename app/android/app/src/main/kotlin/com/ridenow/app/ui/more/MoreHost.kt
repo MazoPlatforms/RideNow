@@ -52,7 +52,7 @@ private fun MoreScreen(label: String, ctx: MoreCtx, nav: MoreNav) {
             "Reminder" -> ChoiceSheet("Reminder", ReminderOptions, 2, { nav.exit() }, nav.exit)
             "Pick another date" -> CalendarSheet(LocalDate.now(), { nav.back() }, nav.back)
             "Set stop location" -> StopLocationScreen("Current location", ctx.dest, nav.exit, { nav.open("Stop on map") }, { nav.exit() })
-            "Stop on map" -> MapPickerScreen("Set stop location", "Set stop location", nav.back) { _, _ -> nav.exit() }
+            "Stop on map" -> MapPickerScreen("Set stop location", "Set stop location", nav.back, onConfirm = { _, _ -> nav.exit() })
             // During the trip
             "No drivers available" -> NoDriversScreen(ctx, nav.finding, nav.schedule, nav.options, nav.home)
             "Driver cancelled" -> DriverCancelledScreen(ctx, nav.trip, nav.home)
