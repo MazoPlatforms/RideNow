@@ -40,6 +40,7 @@ android {
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("com.google.android.gms:play-services-auth-api-phone:18.1.0")
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.foundation:foundation")
