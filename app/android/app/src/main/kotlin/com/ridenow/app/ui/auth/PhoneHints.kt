@@ -43,11 +43,9 @@ fun requestPhoneHint(context: Context, onIntent: (IntentSender) -> Unit) {
 
 /** Reads the number the user picked in the system picker. */
 fun readPhoneFromHint(context: Context, data: Intent?, onNumber: (String) -> Unit) {
-    runCatching {
-        Identity.getSignInClient(context)
-            .getPhoneNumberFromIntent(data)
-            .addOnSuccessListener { number: String -> onNumber(number) }
-    }
+    val intent = data ?: return
+    runCatching { Identity.getSignInClient(context).getPhoneNumberFromIntent(intent) }
+        .onSuccess(onNumber)
 }
 
 /** Shows a stored number in the country's format, e.g. "+15550123456" -> "+1 (555) 012 3456". */
