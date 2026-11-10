@@ -1,5 +1,10 @@
 package com.ridenow.app.ui.auth
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -66,7 +71,9 @@ import kotlinx.coroutines.delay
 @Composable
 fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
-    var iso by rememberSaveable { mutableStateOf("US") }
+    val context = LocalContext.current
+    var iso by rememberSaveable { mutableStateOf(detectCountryIso(context)) }
+    var hintAsked by rememberSaveable { mutableStateOf(false) }
     var digits by rememberSaveable { mutableStateOf("") }
     var showPicker by rememberSaveable { mutableStateOf(false) }
     var sending by remember { mutableStateOf(false) }
@@ -76,6 +83,20 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modi
     val focusRequester = remember { FocusRequester() }
     val borderColor by animateColorAsState(if (focused) c.accent else c.border, label = "border")
 
+    // Android's own phone number prompt: picks the number and country for the user. No permission needed.
+    val hintLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            readPhoneFromHint(context, result.data) { full ->
+                splitFullNumber(full)?.let { (picked, rest) -> iso = picked.iso; digits = rest.take(picked.max) }
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        if (!hintAsked) {
+            hintAsked = true
+            requestPhoneHint(context) { sender -> hintLauncher.launch(IntentSenderRequest.Builder(sender).build()) }
+        }
+    }
     LaunchedEffect(Unit) { delay(400); focusRequester.requestFocus() }
     LaunchedEffect(sending) {
         if (sending) { delay(900); onCodeSent(country.dial + digits) }

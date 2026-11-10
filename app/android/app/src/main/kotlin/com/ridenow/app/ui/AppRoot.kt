@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
+import com.ridenow.app.ui.auth.formatPhoneForDisplay
 import com.ridenow.app.ui.auth.DetailsScreen
 import com.ridenow.app.ui.auth.OtpScreen
 import com.ridenow.app.ui.auth.PhoneScreen
@@ -134,7 +135,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var addLabel by rememberSaveable { mutableStateOf("Home") }
     val others = remember { mutableStateListOf("Nova Terminal, Gate 4" to "Sector 12, Orbit Ring", "Helix Garden Plaza" to "Sector 9, Garden Loop", "Aurora Medical Centre" to "Sector 3, Skyline Way") }
     val nav = { to: Screen -> backStack.add(screen); screen = to }
-    val shownPhone = phone.ifBlank { "+1 555 012 3456" }
+    val shownPhone = formatPhoneForDisplay(phone.ifBlank { "+1 555 012 3456" })
     val open = { label: String -> stubBack = screen; stub = label; screen = Screen.Stub }
     // Opens a destination by its menu or settings title; unknown titles show a placeholder.
     val go = { label: String ->

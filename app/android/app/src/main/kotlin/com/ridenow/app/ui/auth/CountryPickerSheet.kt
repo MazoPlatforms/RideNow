@@ -143,7 +143,7 @@ private fun CountryRow(country: Country, selected: Boolean, onClick: () -> Unit)
         Box(
             Modifier.size(36.dp).clip(CircleShape).border(1.dp, if (selected) c.accent else c.border, CircleShape),
             contentAlignment = Alignment.Center,
-        ) { Text(country.iso, color = if (selected) c.accent else c.muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+        ) { Text(country.flag, fontSize = 18.sp) }
         Spacer(Modifier.width(14.dp))
         Text(country.name, color = c.fg, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
         Text(country.dial, color = c.muted, fontSize = 14.sp)

@@ -68,7 +68,7 @@ fun MenuDrawer(open: Boolean, name: String, phone: String, onClose: () -> Unit, 
                 Row(Modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onSignOut), verticalAlignment = Alignment.CenterVertically) {
                     RideIcon(RideIcons.Logout, c.muted); Spacer(Modifier.width(12.dp)); Text("Sign out", color = c.fg, fontSize = 15.sp)
                 }
-                Spacer(Modifier.weight(1f)); Text("RideNow 2100.1", color = c.muted, fontSize = 12.sp)
+                Spacer(Modifier.weight(1f)); Text("RideNow ${com.ridenow.app.BuildConfig.VERSION_NAME}", color = c.muted, fontSize = 12.sp)
             }
         }
     }

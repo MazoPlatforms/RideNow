@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -76,10 +75,6 @@ fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val reduceMotion = remember {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    }
-    val versionName = remember {
-        @Suppress("DEPRECATION")
-        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: ""
     }
 
     val route = remember { Animatable(if (reduceMotion) 1f else 0f) }
@@ -157,10 +152,6 @@ fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 64.dp).width(96.dp).graphicsLayer { alpha = intro.value },
         )
 
-        Text(
-            "Version $versionName", color = c.muted, fontSize = 12.sp,
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 34.dp),
-        )
     }
 }
 

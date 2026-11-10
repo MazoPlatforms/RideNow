@@ -1,5 +1,11 @@
 package com.ridenow.app.ui.legal
 
+import com.ridenow.app.BuildConfig
+import com.ridenow.app.R
+import androidx.compose.foundation.Image
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -37,7 +43,7 @@ fun LegalScreen(onBack: () -> Unit, onOpen: (String) -> Unit, modifier: Modifier
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text("RideNow", color = c.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                    Text("Version 2100.1 (100)", color = c.muted, fontSize = 12.sp)
+                    Text("Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", color = c.muted, fontSize = 12.sp)
                     Text("Your everyday ride companion.", color = c.muted, fontSize = 12.sp)
                 }
                 RideIcon(listOf("M7 4l6 6-6 6"), c.muted, size = 18.dp)
@@ -56,6 +62,15 @@ fun LegalScreen(onBack: () -> Unit, onOpen: (String) -> Unit, modifier: Modifier
             }
             Spacer(Modifier.height(16.dp))
         }
+        // Low-opacity "from Sifric" watermark at the bottom of the screen.
+        Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp), contentAlignment = Alignment.Center) {
+            Image(
+                painter = painterResource(if (c.isDark) R.drawable.ridenow_from_sifric_dark else R.drawable.ridenow_from_sifric_light),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.width(110.dp).alpha(0.22f),
+            )
+        }
     }
 }
 
@@ -65,7 +80,7 @@ private val Docs = mapOf(
     "Cookie Policy" to listOf("What are cookies" to "Small files that help an app or website remember your preferences.", "How we use them" to "For sign-in, language and appearance settings."),
     "Data Protection" to listOf("Your rights" to "Access, correct, export or delete the data we hold about you.", "Security" to "Data is encrypted in transit and stored with restricted access."),
     "Open Source Licenses" to listOf("Jetpack Compose" to "Apache License 2.0.", "AndroidX libraries" to "Apache License 2.0.", "Kotlin" to "Apache License 2.0."),
-    "About RideNow" to listOf("Everyday rides" to "RideNow helps you book, schedule and share rides in a few taps.", "Version" to "Version 2100.1 (100)."),
+    "About RideNow" to listOf("Everyday rides" to "RideNow helps you book, schedule and share rides in a few taps.", "Version" to "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})."),
 )
 
 /** Simple reader for the legal documents. The text is placeholder copy. */
