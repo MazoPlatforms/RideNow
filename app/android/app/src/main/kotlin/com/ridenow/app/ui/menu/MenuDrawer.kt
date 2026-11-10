@@ -68,7 +68,7 @@ fun MenuDrawer(open: Boolean, name: String, phone: String, onClose: () -> Unit, 
                 Row(Modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onSignOut), verticalAlignment = Alignment.CenterVertically) {
                     RideIcon(RideIcons.Logout, c.muted); Spacer(Modifier.width(12.dp)); Text("Sign out", color = c.fg, fontSize = 15.sp)
                 }
-                Spacer(Modifier.weight(1f)); Text("RideNow 2100.1", color = c.muted, fontSize = 12.sp)
+                Spacer(Modifier.weight(1f)); Text("RideNow 1.0.0", color = c.muted, fontSize = 12.sp)
             }
         }
     }
@@ -87,6 +87,9 @@ private fun DrawerRow(item: Item, selected: Boolean, onClick: () -> Unit) {
             Text(item.title, color = c.fg, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
             Text(item.sub, color = c.muted, fontSize = 12.sp, maxLines = 1)
         }
-        if (item.badge != null) Text(item.badge, color = c.onAccent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clip(RoundedCornerShape(50)).background(c.accent).padding(horizontal = 8.dp, vertical = 2.dp))
+        if (item.badge != null) Box(
+            Modifier.size(20.dp).clip(CircleShape).background(c.accent),
+            contentAlignment = Alignment.Center,
+        ) { Text(item.badge, color = c.onAccent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
     }
 }

@@ -11,7 +11,7 @@ import com.ridenow.app.ui.map.RideMap
 import com.ridenow.app.ui.map.rememberUserLocation
 import androidx.compose.runtime.LaunchedEffect
 
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -19,11 +19,16 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,18 +37,25 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,7 +69,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -76,6 +88,10 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 import com.ridenow.app.ui.util.rememberReducedMotion
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Home ("Where to?"): full-screen map, menu and notification buttons, and a bottom sheet.
@@ -89,79 +105,163 @@ fun HomeScreen(
 ) {
     val c = RideTheme.colors
     var expanded by rememberSaveable { mutableStateOf(true) }
+    var sheetProgress by remember { mutableFloatStateOf(if (expanded) 1f else 0f) }
+    var isDragging by remember { mutableStateOf(false) }
+    var resumeAfterPress by remember { mutableStateOf(false) }
+    var mainHeightPx by remember { mutableFloatStateOf(0f) }
+    var recentHeightPx by remember { mutableFloatStateOf(0f) }
+    var sheetAnimation by remember { mutableStateOf<Job?>(null) }
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val handleInteraction = remember { MutableInteractionSource() }
+    val handlePressed by handleInteraction.collectIsPressedAsState()
+    val bottomInsetPx = with(density) {
+        (14.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()).toPx()
+    }
+    val contentHeightPx = mainHeightPx + recentHeightPx * sheetProgress
+    val contentHeight = with(density) { contentHeightPx.roundToInt().toDp() }
+    val sheetHeight = with(density) { (contentHeightPx + bottomInsetPx).roundToInt().toDp() }
+
+    fun animateSheet(targetExpanded: Boolean) {
+        sheetAnimation?.cancel()
+        val start = sheetProgress
+        sheetAnimation = scope.launch {
+            animate(
+                initialValue = start,
+                targetValue = if (targetExpanded) 1f else 0f,
+                animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+            ) { value, _ -> sheetProgress = value }
+            sheetProgress = if (targetExpanded) 1f else 0f
+        }
+    }
+
+    LaunchedEffect(handlePressed) {
+        if (handlePressed && !isDragging && sheetAnimation?.isActive == true) {
+            resumeAfterPress = true
+            sheetAnimation?.cancel()
+        }
+    }
+
     val me = rememberUserLocation()
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(me.position, 15f) }
     LaunchedEffect(me.position) { cam.animate(CameraUpdateFactory.newLatLngZoom(me.position, 15.5f)) }
-    val cars = remember(me.position) { listOf(0.003 to 0.004, -0.004 to 0.002, 0.002 to -0.005, -0.003 to -0.003).map { (a, b) -> MapPin(LatLng(me.position.latitude + a, me.position.longitude + b), PinKind.Vehicle) } }
+    val cars = remember(me.position) {
+        listOf(0.003 to 0.004, -0.004 to 0.002, 0.002 to -0.005, -0.003 to -0.003).map { (a, b) ->
+            MapPin(LatLng(me.position.latitude + a, me.position.longitude + b), PinKind.Vehicle)
+        }
+    }
+    val dragState = rememberDraggableState { delta ->
+        val distance = recentHeightPx.coerceAtLeast(1f)
+        sheetProgress = (sheetProgress - delta / distance).coerceIn(0f, 1f)
+    }
+
     Box(modifier.fillMaxSize().background(c.bg)) {
         RideMap(Modifier.fillMaxSize(), cam, pins = cars, myLocation = me.real, padding = PaddingValues(bottom = 300.dp))
 
-        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(
+            Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
             RoundButton(RideIcons.Menu, stringResource(R.string.home_menu), onMenu)
             Box {
                 RoundButton(RideIcons.Bell, stringResource(R.string.home_notifications), onNotifications)
-                if (hasUnread) Box(Modifier.align(Alignment.TopEnd).padding(top = 11.dp, end = 11.dp).size(12.dp).clip(CircleShape).background(BrandYellow).border(2.dp, c.bg, CircleShape))
+                if (hasUnread) Box(
+                    Modifier.align(Alignment.TopEnd).padding(top = 11.dp, end = 11.dp).size(12.dp)
+                        .clip(CircleShape).background(BrandYellow).border(2.dp, c.bg, CircleShape),
+                )
             }
         }
 
-        Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().shadow(16.dp, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), ambientColor = Color.Black, spotColor = Color.Black)
+        Box(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(sheetHeight)
+                .shadow(16.dp, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), ambientColor = Color.Black, spotColor = Color.Black)
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(c.bg)
-                .border(1.dp, c.line, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).navigationBarsPadding()
-                .padding(horizontal = 24.dp)
-                .animateContentSize(animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing))
-                .entrance(150, 40),
+                .border(1.dp, c.line, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                .clipToBounds().entrance(150, 40),
+            contentAlignment = Alignment.TopCenter,
         ) {
-            // Drag or tap the handle to expand and collapse the sheet.
-            Box(
-                Modifier.fillMaxWidth().height(28.dp).clickable { expanded = !expanded }.pointerInput(Unit) {
-                    var total = 0f
-                    detectVerticalDragGestures(onDragStart = { total = 0f }, onDragEnd = { if (total < -30f) expanded = true else if (total > 30f) expanded = false }) { _, dy -> total += dy }
-                }.semantics { contentDescription = if (expanded) "Collapse" else "Expand" },
-                contentAlignment = Alignment.Center,
-            ) { Box(Modifier.size(width = 40.dp, height = 4.dp).clip(CircleShape).background(c.border)) }
+            // The content viewport resizes under the fixed bottom inset, so the sheet follows the handle.
+            Box(Modifier.fillMaxWidth().height(contentHeight).clipToBounds(), contentAlignment = Alignment.TopCenter) {
+                Column(Modifier.fillMaxWidth().wrapContentHeight(unbounded = true).padding(horizontal = 24.dp)) {
+                    Column(Modifier.fillMaxWidth().onSizeChanged { mainHeightPx = it.height.toFloat() }) {
+                        Box(
+                            Modifier.fillMaxWidth().height(28.dp)
+                                .clickable(interactionSource = handleInteraction, indication = LocalIndication.current) {
+                                    if (resumeAfterPress) {
+                                        resumeAfterPress = false
+                                        animateSheet(expanded)
+                                    } else {
+                                        expanded = !expanded
+                                        animateSheet(expanded)
+                                    }
+                                }
+                                .draggable(
+                                    state = dragState,
+                                    orientation = Orientation.Vertical,
+                                    onDragStarted = {
+                                        resumeAfterPress = false
+                                        sheetAnimation?.cancel()
+                                        isDragging = true
+                                    },
+                                    onDragStopped = { velocity ->
+                                        val targetExpanded = if (abs(velocity) > 900f) velocity < 0f else sheetProgress >= 0.5f
+                                        expanded = targetExpanded
+                                        isDragging = false
+                                        animateSheet(targetExpanded)
+                                    },
+                                )
+                                .semantics { contentDescription = if (expanded) "Collapse" else "Expand" },
+                            contentAlignment = Alignment.Center,
+                        ) { Box(Modifier.size(width = 40.dp, height = 4.dp).clip(CircleShape).background(c.border)) }
 
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.home_title), color = c.fg, fontSize = 28.sp, fontWeight = FontWeight.Light, modifier = Modifier.weight(1f).semantics { heading() })
-                Row(
-                    Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp))
-                        .clickable(role = Role.Button, onClick = onLater).padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RideIcon(RideIcons.Clock, c.accent, size = 18.dp); Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.home_later), color = c.fg, fontSize = 14.sp)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(R.string.home_title), color = c.fg, fontSize = 28.sp,
+                                fontWeight = FontWeight.Light, modifier = Modifier.weight(1f).semantics { heading() },
+                            )
+                            Row(
+                                Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(c.field)
+                                    .border(1.dp, c.border, RoundedCornerShape(20.dp))
+                                    .clickable(role = Role.Button, onClick = onLater).padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                RideIcon(RideIcons.Clock, c.accent, size = 18.dp); Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.home_later), color = c.fg, fontSize = 14.sp)
+                            }
+                        }
+
+                        Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent)); Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.home_pickup, pickup), color = c.muted, fontSize = 13.sp)
+                            Box(
+                                Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup)
+                                    .semantics { contentDescription = "Edit pickup location" },
+                                contentAlignment = Alignment.Center,
+                            ) { RideIcon(RideIcons.Pencil, c.accent, size = 18.dp) }
+                        }
+
+                        Row(
+                            Modifier.padding(top = 4.dp).fillMaxWidth().height(60.dp).clip(RoundedCornerShape(16.dp))
+                                .background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp))
+                                .clickable(role = Role.Button, onClick = onSearch).padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RideIcon(RideIcons.Search, c.accent); Spacer(Modifier.width(12.dp))
+                            Text(stringResource(R.string.home_destination), color = c.muted, fontSize = 17.sp)
+                        }
+
+                        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SavedButton(RideIcons.Home, stringResource(R.string.home_saved_home), Modifier.weight(1f)) { onSaved("Home") }
+                            SavedButton(RideIcons.Work, stringResource(R.string.home_saved_work), Modifier.weight(1f)) { onSaved("Work") }
+                        }
+                    }
+
+                    Column(Modifier.fillMaxWidth().padding(top = 8.dp).onSizeChanged { recentHeightPx = it.height.toFloat() }) {
+                        RecentRow("Nova Terminal, Gate 4", "6.2 km") { onRecent("Nova Terminal, Gate 4") }
+                        RecentRow("Helix Garden Plaza", "3.8 km") { onRecent("Helix Garden Plaza") }
+                    }
                 }
             }
-
-            Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent)); Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.home_pickup, pickup), color = c.muted, fontSize = 13.sp)
-                Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup).semantics { contentDescription = "Edit pickup location" }, contentAlignment = Alignment.Center) {
-                    RideIcon(RideIcons.Pencil, c.accent, size = 18.dp)
-                }
-            }
-
-            Row(
-                Modifier.padding(top = 4.dp).fillMaxWidth().height(60.dp).clip(RoundedCornerShape(16.dp)).background(c.field)
-                    .border(1.dp, c.border, RoundedCornerShape(16.dp)).clickable(role = Role.Button, onClick = onSearch).padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RideIcon(RideIcons.Search, c.accent); Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.home_destination), color = c.muted, fontSize = 17.sp)
-            }
-
-            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SavedButton(RideIcons.Home, stringResource(R.string.home_saved_home), Modifier.weight(1f)) { onSaved("Home") }
-                SavedButton(RideIcons.Work, stringResource(R.string.home_saved_work), Modifier.weight(1f)) { onSaved("Work") }
-            }
-
-            if (expanded) {
-                Column(Modifier.padding(top = 8.dp)) {
-                    RecentRow("Nova Terminal, Gate 4", "6.2 km") { onRecent("Nova Terminal, Gate 4") }
-                    RecentRow("Helix Garden Plaza", "3.8 km") { onRecent("Helix Garden Plaza") }
-                }
-            }
-            Spacer(Modifier.height(14.dp))
         }
     }
 }

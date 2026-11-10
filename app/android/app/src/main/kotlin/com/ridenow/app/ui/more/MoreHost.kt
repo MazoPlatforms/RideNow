@@ -26,7 +26,7 @@ fun MoreHost(start: String, ctx: MoreCtx, root: MoreNav) {
     val label = stack.last()
     val push = { l: String -> stack = ArrayList(stack + l) }
     val pop = { if (stack.size > 1) stack = ArrayList(stack.dropLast(1)) else root.exit() }
-    BackHandler(enabled = stack.size > 1) { pop() }
+    BackHandler { pop() }
     val nav = MoreNav(
         back = pop, exit = root.exit, open = push, home = root.home, options = root.options, schedule = root.schedule, finding = root.finding, trip = root.trip,
         complete = root.complete, report = root.report, support = root.support, safety = root.safety, setPhone = root.setPhone, setVehicle = root.setVehicle,
