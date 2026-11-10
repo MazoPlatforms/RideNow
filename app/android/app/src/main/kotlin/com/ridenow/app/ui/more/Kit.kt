@@ -5,6 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -16,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -30,6 +34,7 @@ import com.ridenow.app.ui.components.*
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Everything the extra screens need from the app shell. */
 class MoreCtx(
@@ -77,15 +82,36 @@ fun MoreScaffold(
     }
 }
 
-/** A bottom sheet over a dimmed map. Tapping outside or going back calls [onDismiss]. */
+/** A bottom sheet over the live screen behind it. Tapping outside or going back dismisses it. */
+typealias SheetClose = (after: (() -> Unit)?) -> Unit
+
 @Composable
-fun SheetScreen(onDismiss: () -> Unit, title: String? = null, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
+fun SheetScreen(onDismiss: () -> Unit, title: String? = null, subtitle: String? = null, content: @Composable ColumnScope.(SheetClose) -> Unit) {
     val c = RideTheme.colors
-    BackHandler(onBack = onDismiss)
-    Box(Modifier.fillMaxSize().background(c.bg)) {
-        Canvas(Modifier.fillMaxSize()) { drawCityStreets(c, 0.5f) }
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss))
-        SheetCard(Modifier.align(Alignment.BottomCenter), title, subtitle, content)
+    val scope = rememberCoroutineScope()
+    val progress = remember { Animatable(1f) }
+    var closing by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { progress.animateTo(0f, tween(300, easing = FastOutSlowInEasing)) }
+    val close: SheetClose = { after ->
+        if (!closing) {
+            closing = true
+            scope.launch {
+                progress.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
+                if (after == null) onDismiss() else after()
+            }
+        }
+    }
+    val dismiss = { close(null) }
+    BackHandler(enabled = true, onBack = dismiss)
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier.fillMaxSize().graphicsLayer { alpha = (1f - progress.value) * 0.48f }
+                .background(Color.Black)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = dismiss),
+        )
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().graphicsLayer { translationY = size.height * progress.value }) {
+            SheetCard(Modifier, title, subtitle) { content(close) }
+        }
     }
 }
 

@@ -164,7 +164,7 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modi
     if (showPicker) {
         CountryPickerSheet(
             selected = country,
-            onSelect = { picked -> iso = picked.iso; digits = digits.take(picked.max) },
+            onSelect = { picked -> iso = picked.iso; digits = digits.take(picked.max); showPicker = false },
             onDismiss = { showPicker = false },
         )
     }

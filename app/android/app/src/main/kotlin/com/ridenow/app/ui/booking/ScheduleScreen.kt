@@ -72,7 +72,7 @@ private val Passengers = listOf("Me", "Someone else")
 
 /** Pick a pickup date and time. [onContinue] receives a label such as "Wed, 4 Nov, 8:30 AM". */
 @Composable
-fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: Modifier = Modifier) {
+fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: Modifier = Modifier, passengerName: String = "Alex Morgan") {
     val c = RideTheme.colors
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
@@ -151,7 +151,7 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
             if (sheet.isNotEmpty()) androidx.compose.ui.window.Dialog({ sheet = "" }, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
                 when (sheet) {
                     "date" -> com.ridenow.app.ui.more.CalendarSheet(date, { dateDay = it.toEpochDay(); sheet = "" }, { sheet = "" })
-                    "Passenger" -> com.ridenow.app.ui.more.ChoiceSheet("Passenger", Passengers, passenger, { passenger = it; sheet = "" }, { sheet = "" })
+                    "Passenger" -> com.ridenow.app.ui.more.ChoiceSheet("Passenger", Passengers, passenger, { passenger = it; sheet = "" }, { sheet = "" }, listOf(passengerName, "Choose a contact"))
                     "Repeat" -> com.ridenow.app.ui.more.ChoiceSheet("Repeat", Repeats, repeat, { repeat = it; sheet = "" }, { sheet = "" })
                     else -> com.ridenow.app.ui.more.ChoiceSheet("Reminder", Reminders, reminder, { reminder = it; sheet = "" }, { sheet = "" })
                 }

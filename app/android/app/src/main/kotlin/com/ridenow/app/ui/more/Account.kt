@@ -29,11 +29,22 @@ import androidx.compose.ui.text.style.*
 import androidx.compose.ui.unit.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.core.content.ContextCompat
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
+import com.ridenow.app.ui.auth.Countries
+import com.ridenow.app.ui.auth.CountryPickerSheet
+import com.ridenow.app.ui.auth.PhoneTransformation
 import com.ridenow.app.ui.components.*
 import com.ridenow.app.ui.theme.AccentChoices
 import com.ridenow.app.ui.theme.AccentPrefs
 import com.ridenow.app.ui.theme.RideTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -54,15 +65,77 @@ private fun MutableState<Boolean>.set(context: Context, key: String, value: Bool
 fun ChangePhoneScreen(onBack: () -> Unit, onSend: () -> Unit) {
     val c = RideTheme.colors
     val context = LocalContext.current
-    var number by rememberSaveable { mutableStateOf("") }
+    var iso by rememberSaveable { mutableStateOf(Countries.default.iso) }
+    var digits by rememberSaveable { mutableStateOf("") }
+    var showPicker by rememberSaveable { mutableStateOf(false) }
+    var sending by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
+    val country = Countries.byIso(iso)
+    val valid = digits.length >= country.min
+    val borderColor by animateColorAsState(if (focused) c.accent else c.border, label = "phone-border")
+
+    LaunchedEffect(sending) {
+        if (sending) {
+            delay(900)
+            context.prefs().edit().putString("pending_phone", country.dial + digits).apply()
+            sending = false
+            onSend()
+        }
+    }
+    fun send() { if (valid && !sending) sending = true }
+
     MoreScaffold("Change phone number", onBack, subtitle = "We will send a code to your new number.", bottom = {
-        RideButton("Send code", { context.prefs().edit().putString("pending_phone", number).apply(); onSend() }, enabled = number.length >= 7)
+        RideButton("Send code", { send() }, enabled = valid, loading = sending)
     }) {
-        Row(Modifier.padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.height(60.dp).clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(horizontal = 18.dp), contentAlignment = Alignment.Center) { Text("+1", color = c.fg, fontSize = 16.sp) }
-            RideTextField(number, { number = it.filter(Char::isDigit).take(14) }, "New phone number", RideIcons.Phone, Modifier.padding(start = 8.dp).weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
+        Row(Modifier.padding(top = 20.dp).height(60.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                Modifier.fillMaxHeight().width(96.dp).clip(RoundedCornerShape(16.dp)).background(c.field)
+                    .border(1.dp, c.border, RoundedCornerShape(16.dp))
+                    .clickable(role = Role.Button) { showPicker = true }.padding(horizontal = 14.dp)
+                    .semantics { contentDescription = "Country code, ${country.name} ${country.dial}" },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(country.dial, color = c.fg, fontSize = 17.sp)
+                Spacer(Modifier.width(6.dp))
+                RideIcon(RideIcons.ChevronDown, c.muted, size = 16.dp)
+            }
+            BasicTextField(
+                value = digits,
+                onValueChange = { value -> digits = value.filter(Char::isDigit).take(country.max) },
+                modifier = Modifier.weight(1f).fillMaxHeight().onFocusChanged { focused = it.isFocused },
+                singleLine = true,
+                textStyle = TextStyle(color = c.fg, fontSize = 20.sp, letterSpacing = 0.8.sp),
+                cursorBrush = SolidColor(c.accent),
+                visualTransformation = PhoneTransformation(country.pattern),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { send() }),
+                decorationBox = { inner ->
+                    Box(
+                        Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(c.field)
+                            .border(1.dp, borderColor, RoundedCornerShape(16.dp)).padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RideIcon(RideIcons.Phone, c.accent)
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("New phone number", color = c.muted, fontSize = 11.sp)
+                                Box(Modifier.fillMaxWidth().padding(top = 2.dp), contentAlignment = Alignment.CenterStart) { inner() }
+                            }
+                        }
+                    }
+                },
+            )
         }
         Text("Your current number stays active until you verify the new one.", color = c.muted, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 14.dp))
+    }
+
+    if (showPicker) {
+        CountryPickerSheet(
+            selected = country,
+            onSelect = { picked -> iso = picked.iso; digits = digits.take(picked.max); showPicker = false },
+            onDismiss = { showPicker = false },
+        )
     }
 }
 
@@ -71,16 +144,42 @@ fun VerifyNewNumberScreen(onBack: () -> Unit, onVerified: (String) -> Unit) {
     val c = RideTheme.colors
     val context = LocalContext.current
     val pending = remember { context.prefs().getString("pending_phone", "") ?: "" }
-    val shown = "+1 " + pending
     var code by rememberSaveable { mutableStateOf("") }
     var round by remember { mutableIntStateOf(0) }
+    var verifyRequest by remember { mutableIntStateOf(0) }
+    var verifying by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
     val left = key(round) { rememberCountdown(24) }
-    MoreScaffold("Verify new number", onBack, subtitle = "Enter the 6-digit code sent to $shown.", bottom = {
-        RideButton("Verify", { context.toast("Phone number updated"); onVerified(shown) }, enabled = code.length == 6)
+
+    LaunchedEffect(code, verifyRequest) {
+        if (code.length == 6 && !verifying) {
+            verifying = true
+            failed = false
+            delay(900)
+            if (code == "000000") {
+                failed = true
+                code = ""
+                verifying = false
+            } else {
+                context.toast("Phone number updated")
+                onVerified(pending)
+            }
+        }
+    }
+
+    MoreScaffold("Verify new number", onBack, subtitle = "Enter the 6-digit code sent to $pending.", bottom = {
+        RideButton("Verify", { verifyRequest++ }, enabled = code.length == 6 && !verifying, loading = verifying)
     }) {
-        Box(Modifier.padding(top = 24.dp)) { CodeField(code, { code = it }, 6) }
+        Box(Modifier.padding(top = 24.dp)) {
+            CodeField(code, { if (!verifying) { code = it; failed = false } }, 6)
+        }
+        if (failed) Text("The code could not be verified. Try again.", color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp))
         if (left > 0) Text("Resend code in ${mmss(left)}", color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 16.dp))
-        else Text("Resend code", color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp).heightIn(min = 48.dp).clickable(role = Role.Button) { round++; code = "" }.wrapContentHeight(Alignment.CenterVertically))
+        else Text(
+            "Resend code", color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(top = 8.dp).heightIn(min = 48.dp).clickable(role = Role.Button) { round++; code = ""; failed = false }
+                .wrapContentHeight(Alignment.CenterVertically),
+        )
     }
 }
 
