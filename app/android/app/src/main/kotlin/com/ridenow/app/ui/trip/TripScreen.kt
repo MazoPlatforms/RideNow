@@ -93,7 +93,7 @@ private val Reasons = listOf("Driver is taking too long", "Booked by mistake", "
 
 /** Live ride: 0 driver assigned, 1 driver arriving, 2 on the way. Demo timers move through the phases. */
 @Composable
-fun TripScreen(destination: String, vehicleIndex: Int, onCancelled: () -> Unit, onComplete: () -> Unit, onShare: () -> Unit, onSafety: () -> Unit, pickup: LatLng, drop: LatLng, route: RouteInfo?, modifier: Modifier = Modifier) {
+fun TripScreen(destination: String, vehicleIndex: Int, onCancelled: () -> Unit, onComplete: () -> Unit, onShare: () -> Unit, onSafety: () -> Unit, pickup: LatLng, drop: LatLng, route: RouteInfo?, modifier: Modifier = Modifier, onCall: () -> Unit = {}, onMessage: () -> Unit = {}) {
     val c = RideTheme.colors
     val v = Vehicles[vehicleIndex]
     var phase by rememberSaveable { mutableIntStateOf(0) }
@@ -162,7 +162,7 @@ fun TripScreen(destination: String, vehicleIndex: Int, onCancelled: () -> Unit, 
                         Text("Mira Tanaka", color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                         Row(verticalAlignment = Alignment.CenterVertically) { RideIcon(RideIcons.Star, c.accent, size = 14.dp); Text("  4.9 · 2,310 trips", color = c.muted, fontSize = 12.sp) }
                     }
-                    CircleAction(RideIcons.Call, "Call driver") {}; CircleAction(RideIcons.Message, "Message driver") {}
+                    CircleAction(RideIcons.Call, "Call driver") { onCall() }; CircleAction(RideIcons.Message, "Message driver") { onMessage() }
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(c.line))
                 Row(Modifier.fillMaxWidth().height(72.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {

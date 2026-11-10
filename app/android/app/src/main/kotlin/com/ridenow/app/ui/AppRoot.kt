@@ -1,6 +1,8 @@
 package com.ridenow.app.ui
 
 import androidx.activity.compose.BackHandler
+import com.ridenow.app.ui.more.*
+import com.ridenow.app.ui.theme.AccentPrefs
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import com.google.android.gms.maps.model.LatLng
@@ -144,6 +147,14 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         Unit
     }
 
+    LaunchedEffect(Unit) { AccentPrefs.name = prefs.getString("accent", "Default") ?: "Default" }
+    val moreNav = MoreNav(
+        back = { screen = stubBack }, exit = { screen = stubBack }, open = { open(it) }, home = { screen = Screen.Home }, options = { screen = Screen.Options },
+        schedule = { scheduleFrom = Screen.Options; screen = Screen.Schedule }, finding = { screen = Screen.Finding }, trip = { screen = Screen.Trip },
+        complete = { rating = 0; screen = Screen.Complete }, report = { screen = Screen.Report }, support = { nav(Screen.Support) }, safety = { nav(Screen.Safety) },
+        setPhone = { phone = it.removePrefix("+1 ") }, setVehicle = { vehicle = it }, setScheduled = { scheduled = it }, confirm = { screen = Screen.Confirm },
+        changeDrop = { pickDest(it, null, null) }, cancelScheduled = { scheduled = null; screen = Screen.Home }, signedOut = { screen = Screen.Welcome },
+    )
     Box(Modifier.fillMaxSize()) {
     Crossfade(targetState = screen, animationSpec = tween(400), label = "root") { current ->
         when (current) {
@@ -223,7 +234,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             Screen.Trip -> {
                 BackHandler { }
                 TripScreen(
-                    dest, vehicle, onCancelled = { scheduled = null; screen = Screen.Home }, onComplete = { rating = 0; screen = Screen.Complete },
+                    dest, vehicle, onCancelled = { scheduled = null; screen = Screen.Home }, onComplete = { rating = 0; open("Pay in cash") },
+                    onCall = { open("In-app call") }, onMessage = { open("Chat with driver") },
                     onShare = { nav(Screen.ShareTrip) }, onSafety = { nav(Screen.Safety) },
                     pickup = me.position, drop = destLL ?: LatLng(me.position.latitude + 0.012, me.position.longitude + 0.01), route = routeInfo,
                 )
@@ -333,7 +345,9 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     screen = returnTo
                 })
             }
-            Screen.Stub -> {
+            Screen.Stub -> if (MoreRoutes.handles(stub)) {
+                key(stub) { MoreHost(stub, MoreCtx(name, shownPhone, dest.ifBlank { "Helix Garden Plaza" }, pickup, vehicle, scheduled), moreNav) }
+            } else {
                 BackHandler { screen = stubBack }
                 val c = RideTheme.colors
                 Box(Modifier.fillMaxSize().background(c.bg), contentAlignment = Alignment.Center) {

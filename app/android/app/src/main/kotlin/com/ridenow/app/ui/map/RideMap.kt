@@ -58,10 +58,11 @@ fun RideMap(
     myLocation: Boolean = false, padding: PaddingValues = PaddingValues(), onLoaded: () -> Unit = {},
 ) {
     val c = RideTheme.colors
+    val mapKind = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("ridenow", 0).getString("map_style", "Default")
     val style = remember(c.isDark) { MapStyleOptions(if (c.isDark) DarkStyle else LightStyle) }
     GoogleMap(
         modifier, cameraPositionState = camera, contentPadding = padding, onMapLoaded = onLoaded,
-        properties = MapProperties(isMyLocationEnabled = myLocation, mapStyleOptions = style),
+        properties = MapProperties(isMyLocationEnabled = myLocation, mapStyleOptions = style.takeIf { mapKind != "Satellite" }, mapType = if (mapKind == "Satellite") com.google.maps.android.compose.MapType.SATELLITE else com.google.maps.android.compose.MapType.NORMAL),
         uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = false, compassEnabled = false, mapToolbarEnabled = false),
     ) {
         val d = LocalDensity.current.density

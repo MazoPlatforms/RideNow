@@ -7,6 +7,9 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -43,9 +46,20 @@ object RideTheme {
     val colors: RideColors @Composable @ReadOnlyComposable get() = LocalRideColors.current
 }
 
+/** One entry in Settings > App color. Light mode uses a deeper shade so text keeps its contrast. */
+class AccentChoice(val name: String, val dark: Color, val light: Color)
+val AccentChoices = listOf(
+    AccentChoice("Mint", Color(0xFF3DDC97), Color(0xFF0B6B45)), AccentChoice("Default", BrandYellow, Color(0xFF8A5A00)),
+    AccentChoice("Aqua", Color(0xFF3CC8E6), Color(0xFF0A6C80)), AccentChoice("Violet", Color(0xFFA98BFF), Color(0xFF5B3BC4)),
+    AccentChoice("Amber", Color(0xFFFFA726), Color(0xFF8A4B00)), AccentChoice("Coral", Color(0xFFFF7A66), Color(0xFFB03A28)),
+)
+object AccentPrefs { var name by mutableStateOf("Default") }
+
 @Composable
 fun RideNowTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val c = if (darkTheme) DarkRideColors else LightRideColors
+    val base = if (darkTheme) DarkRideColors else LightRideColors
+    val pick = AccentChoices.firstOrNull { it.name == AccentPrefs.name && it.name != "Default" }
+    val c = if (pick == null) base else base.copy(accent = if (darkTheme) pick.dark else pick.light, onAccent = if (darkTheme) Ink else Color.White)
     val scheme = if (darkTheme) darkColorScheme(primary = c.accent, background = c.bg, surface = c.bg, onBackground = c.fg, onSurface = c.fg)
     else lightColorScheme(primary = c.accent, background = c.bg, surface = c.bg, onBackground = c.fg, onSurface = c.fg)
     CompositionLocalProvider(LocalRideColors provides c) { MaterialTheme(colorScheme = scheme, content = content) }

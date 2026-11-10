@@ -83,6 +83,7 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
     var repeat by rememberSaveable { mutableIntStateOf(0) }
     var reminder by rememberSaveable { mutableIntStateOf(2) }
     var passenger by rememberSaveable { mutableIntStateOf(0) }
+    var sheet by remember { mutableStateOf("") }
 
     val date = LocalDate.ofEpochDay(dateDay)
     val base = (0..4).map { today.plusDays(it.toLong()) }
@@ -118,8 +119,7 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
             }
             Row(
                 Modifier.height(48.dp).clickable(role = Role.Button) {
-                    DatePickerDialog(context, { _, y, m, d -> dateDay = LocalDate.of(y, m + 1, d).toEpochDay() }, date.year, date.monthValue - 1, date.dayOfMonth)
-                        .apply { datePicker.minDate = System.currentTimeMillis() - 1000 }.show()
+                    sheet = "date"
                 },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -141,11 +141,19 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
 
             Label("OPTIONS")
             Column(Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp))) {
-                OptionRow(RideIcons.Person, "Passenger", Passengers[passenger]) { passenger = (passenger + 1) % Passengers.size }
+                OptionRow(RideIcons.Person, "Passenger", Passengers[passenger]) { sheet = "Passenger" }
                 HorizontalDivider(color = c.line)
-                OptionRow(listOf("M4 9V8a3 3 0 0 1 3-3h8l-2-2M16 11v1a3 3 0 0 1-3 3H5l2 2"), "Repeat", Repeats[repeat]) { repeat = (repeat + 1) % Repeats.size }
+                OptionRow(listOf("M4 9V8a3 3 0 0 1 3-3h8l-2-2M16 11v1a3 3 0 0 1-3 3H5l2 2"), "Repeat", Repeats[repeat]) { sheet = "Repeat" }
                 HorizontalDivider(color = c.line)
-                OptionRow(RideIcons.Bell, "Reminder", Reminders[reminder]) { reminder = (reminder + 1) % Reminders.size }
+                OptionRow(RideIcons.Bell, "Reminder", Reminders[reminder]) { sheet = "Reminder" }
+            }
+            if (sheet.isNotEmpty()) androidx.compose.ui.window.Dialog({ sheet = "" }, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+                when (sheet) {
+                    "date" -> com.ridenow.app.ui.more.CalendarSheet(date, { dateDay = it.toEpochDay(); sheet = "" }, { sheet = "" })
+                    "Passenger" -> com.ridenow.app.ui.more.ChoiceSheet("Passenger", Passengers, passenger, { passenger = it; sheet = "" }, { sheet = "" })
+                    "Repeat" -> com.ridenow.app.ui.more.ChoiceSheet("Repeat", Repeats, repeat, { repeat = it; sheet = "" }, { sheet = "" })
+                    else -> com.ridenow.app.ui.more.ChoiceSheet("Reminder", Reminders, reminder, { reminder = it; sheet = "" }, { sheet = "" })
+                }
             }
             Spacer(Modifier.height(16.dp))
         }
