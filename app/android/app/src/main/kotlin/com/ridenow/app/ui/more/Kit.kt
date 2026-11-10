@@ -5,9 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -19,7 +16,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -33,8 +29,15 @@ import androidx.compose.ui.unit.*
 import com.ridenow.app.ui.components.*
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
-import kotlinx.coroutines.delay
+import com.ridenow.app.ui.util.rememberReducedMotion
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.staticCompositionLocalOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 /** Everything the extra screens need from the app shell. */
 class MoreCtx(
@@ -82,35 +85,43 @@ fun MoreScaffold(
     }
 }
 
-/** A bottom sheet over the live screen behind it. Tapping outside or going back dismisses it. */
-typealias SheetClose = (after: (() -> Unit)?) -> Unit
+/** Closes the nearest [SheetScreen] with an animated exit, then runs the given action. */
+val LocalSheetClose = staticCompositionLocalOf<((() -> Unit) -> Unit)?> { null }
 
+/** A bottom sheet over a dimmed screen. Slides up and fades in; tapping outside or Back slides it down first. */
 @Composable
-fun SheetScreen(onDismiss: () -> Unit, title: String? = null, subtitle: String? = null, content: @Composable ColumnScope.(SheetClose) -> Unit) {
-    val c = RideTheme.colors
+fun SheetScreen(onDismiss: () -> Unit, title: String? = null, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    val reduce = rememberReducedMotion()
+    val progress = remember { Animatable(if (reduce) 1f else 0f) }
     val scope = rememberCoroutineScope()
-    val progress = remember { Animatable(1f) }
     var closing by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { progress.animateTo(0f, tween(300, easing = FastOutSlowInEasing)) }
-    val close: SheetClose = { after ->
+
+    LaunchedEffect(Unit) {
+        if (!reduce) progress.animateTo(1f, tween(280, easing = LinearOutSlowInEasing))
+    }
+
+    val requestClose: (() -> Unit) -> Unit = { then ->
         if (!closing) {
             closing = true
             scope.launch {
-                progress.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
-                if (after == null) onDismiss() else after()
+                if (!reduce) progress.animateTo(0f, tween(220, easing = FastOutLinearInEasing))
+                then()
             }
         }
     }
-    val dismiss = { close(null) }
-    BackHandler(enabled = true, onBack = dismiss)
+
+    BackHandler { requestClose(onDismiss) }
     Box(Modifier.fillMaxSize()) {
         Box(
-            Modifier.fillMaxSize().graphicsLayer { alpha = (1f - progress.value) * 0.48f }
-                .background(Color.Black)
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = dismiss),
+            Modifier.fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f * progress.value))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { requestClose(onDismiss) }
         )
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().graphicsLayer { translationY = size.height * progress.value }) {
-            SheetCard(Modifier, title, subtitle) { content(close) }
+        CompositionLocalProvider(LocalSheetClose provides requestClose) {
+            SheetCard(
+                Modifier.align(Alignment.BottomCenter).graphicsLayer { translationY = (1f - progress.value) * 600.dp.toPx() },
+                title, subtitle, content,
+            )
         }
     }
 }

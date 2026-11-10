@@ -230,7 +230,7 @@ private enum class Marker { Pickup, Stop, Drop }
 @Composable
 private fun RouteRow(label: String, active: Boolean, marker: Marker, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     val c = RideTheme.colors
-    Row(Modifier.fillMaxWidth().height(64.dp).padding(start = 16.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().height(63.dp).padding(start = 16.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.width(10.dp), contentAlignment = Alignment.Center) {
             when (marker) {
                 Marker.Pickup -> Box(Modifier.size(10.dp).clip(CircleShape).background(BrandYellow))
@@ -241,7 +241,7 @@ private fun RouteRow(label: String, active: Boolean, marker: Marker, content: @C
         Spacer(Modifier.width(20.dp))
         Column(Modifier.weight(1f)) {
             Text(label, color = if (active) c.accent else c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp)
-            Row(verticalAlignment = Alignment.CenterVertically, content = content)
+            Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically, content = content)
         }
     }
 }

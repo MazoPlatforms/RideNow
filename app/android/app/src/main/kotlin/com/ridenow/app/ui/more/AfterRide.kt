@@ -233,13 +233,13 @@ fun EditScheduledScreen(ctx: MoreCtx, onBack: () -> Unit, onSave: (String) -> Un
         }
         when (sheet) {
             "date" -> CalendarSheet(d, { date = it.toEpochDay(); sheet = "" }, { sheet = "" })
-            "time" -> SheetScreen({ sheet = "" }, "Time") { close ->
+            "time" -> SheetScreen({ sheet = "" }, "Time") {
                 Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { (1..12).forEach { h -> Chip("$h", h == hour, { hour = h }, Modifier.widthIn(min = 48.dp)) } }
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(0, 15, 30, 45).forEach { m -> Chip("%02d".format(m), m == minute, { minute = m }) }; Spacer(Modifier.width(8.dp))
                     Chip("AM", !pm, { pm = false }); Chip("PM", pm, { pm = true })
                 }
-                RideButton("Save", { close { sheet = "" } }, Modifier.padding(top = 16.dp))
+                RideButton("Save", { sheet = "" }, Modifier.padding(top = 16.dp))
             }
             "vehicle" -> ChoiceSheet("Vehicle", Vehicles.map { it.name }, veh, { veh = it; sheet = "" }, { sheet = "" }, Vehicles.map { money(it.fare) })
             "reminder" -> ChoiceSheet("Reminder", ReminderOptions, rem, { rem = it; sheet = "" }, { sheet = "" })

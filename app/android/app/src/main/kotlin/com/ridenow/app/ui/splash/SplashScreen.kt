@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.splash
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -145,6 +148,14 @@ fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
                     .background(c.accent),
             )
         }
+
+        // "from Sifric" credit, like "from Meta" on Meta apps. Dark and light artwork follow the active theme.
+        Image(
+            painter = painterResource(if (c.isDark) R.drawable.ridenow_from_sifric_dark else R.drawable.ridenow_from_sifric_light),
+            contentDescription = "from Sifric",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 64.dp).width(96.dp).graphicsLayer { alpha = intro.value },
+        )
 
         Text(
             "Version $versionName", color = c.muted, fontSize = 12.sp,

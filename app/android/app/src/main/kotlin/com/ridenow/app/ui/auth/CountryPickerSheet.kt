@@ -111,14 +111,14 @@ fun CountryPickerSheet(selected: Country, onSelect: (Country) -> Unit, onDismiss
                 if (q.isEmpty()) {
                     item { SectionLabel(stringResource(R.string.country_suggested)) }
                     items(Countries.suggested, key = { "s" + it.iso }) { country ->
-                        CountryRow(country, country.iso == selected.iso) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); close { onSelect(country) } }
+                        CountryRow(country, country.iso == selected.iso) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); close { onSelect(country); onDismiss() } }
                     }
                     item { SectionLabel(stringResource(R.string.country_all)) }
                 } else if (results.isEmpty()) {
                     item { Text(stringResource(R.string.country_none), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(vertical = 24.dp)) }
                 }
                 items(results, key = { it.iso }) { country ->
-                    CountryRow(country, country.iso == selected.iso) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); close { onSelect(country) } }
+                    CountryRow(country, country.iso == selected.iso) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); close { onSelect(country); onDismiss() } }
                 }
             }
         }

@@ -1,6 +1,5 @@
 package com.ridenow.app.ui.saved
 
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*

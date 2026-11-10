@@ -3,7 +3,6 @@ package com.ridenow.app.ui.more
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -118,7 +117,7 @@ fun VehicleInfoSheet(index: Int, onSelect: (Int) -> Unit, onDismiss: () -> Unit)
     val i = index.coerceIn(0, Vehicles.lastIndex)
     val v = Vehicles[i]
     val blurb = when (v.name) { "Pulse" -> "Compact electric ride for up to ${v.seats}."; "Orbit" -> "Comfortable electric ride for up to ${v.seats}."; else -> "Spacious electric ride for up to ${v.seats}." }
-    SheetScreen(onDismiss, v.name, blurb) { close ->
+    SheetScreen(onDismiss, v.name, blurb) {
         Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
             listOf("Seats" to "${v.seats}", "Luggage" to "${v.luggage} bags", "Pickup" to "${v.etaMin} min", "Fare" to money(v.fare)).forEach { (k, value) ->
                 Column(Modifier.weight(1f)) { Text(k, color = c.muted, fontSize = 12.sp); Text(value, color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
@@ -129,7 +128,7 @@ fun VehicleInfoSheet(index: Int, onSelect: (Int) -> Unit, onDismiss: () -> Unit)
             Row(Modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) { RideIcon(RideIcons.Check, c.accent, size = 18.dp); Text("  $it", color = c.fg, fontSize = 14.sp) }
         }
         Text("Estimated fare. Pay your driver in cash.", color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 12.dp))
-        RideButton("Select ${v.name}", { close { onSelect(i) } })
+        RideButton("Select ${v.name}", { onSelect(i) })
     }
 }
 
@@ -140,7 +139,7 @@ fun HighDemandSheet(vehicle: Int, onContinue: () -> Unit, onSchedule: () -> Unit
     val c = RideTheme.colors
     val v = Vehicles[vehicle.coerceIn(0, Vehicles.lastIndex)]
     var notify by rememberSaveable { mutableStateOf(false) }
-    SheetScreen(onDismiss) { close ->
+    SheetScreen(onDismiss) {
         Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             IconBadge(RideIcons.Alert, c.accent, 44.dp)
             Text("HIGH DEMAND", color = c.accent, fontSize = 12.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 12.dp))
@@ -151,9 +150,9 @@ fun HighDemandSheet(vehicle: Int, onContinue: () -> Unit, onSchedule: () -> Unit
             InfoRow("Usual fare", money(v.fare / 1.4))
             InfoRow("1.4× right now", money(v.fare), strong = true, valueColor = c.accent)
         }
-        RideButton("Continue at ${money(v.fare)}", { close(onContinue) }, Modifier.padding(top = 16.dp))
+        RideButton("Continue at ${money(v.fare)}", onContinue, Modifier.padding(top = 16.dp))
         RideButton(if (notify) "We will notify you" else "Notify me when fares drop", { notify = !notify }, style = RideButtonStyle.Text)
-        RideButton("Schedule for later", { close(onSchedule) }, style = RideButtonStyle.Text)
+        RideButton("Schedule for later", onSchedule, style = RideButtonStyle.Text)
     }
 }
 
@@ -199,10 +198,10 @@ fun PickUpLaterSheet(onConfirm: (String) -> Unit, onCancel: () -> Unit, onMoreDa
     var minute by rememberSaveable { mutableIntStateOf(((now.minute + 14) / 15 * 15) % 60) }
     var pm by rememberSaveable { mutableStateOf(now.hour >= 12) }
     val date = LocalDate.ofEpochDay(dateDay)
-    SheetScreen(onCancel, "Pick up later", "Choose when you want to be picked up.") { close ->
+    SheetScreen(onCancel, "Pick up later", "Choose when you want to be picked up.") {
         DateTimePicker(date, { dateDay = it.toEpochDay() }, hour, { hour = it }, minute, { minute = it }, pm, { pm = it }, onMoreDates)
-        RideButton("Confirm · ${pickLabel(date, hour, minute, pm)}", { close { onConfirm(pickLabel(date, hour, minute, pm)) } }, Modifier.padding(top = 16.dp))
-        RideButton("Cancel", { close(null) }, style = RideButtonStyle.Text)
+        RideButton("Confirm · ${pickLabel(date, hour, minute, pm)}", { onConfirm(pickLabel(date, hour, minute, pm)) }, Modifier.padding(top = 16.dp))
+        RideButton("Cancel", onCancel, style = RideButtonStyle.Text)
     }
 }
 
@@ -214,7 +213,7 @@ fun CalendarSheet(initial: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: ()
     val today = remember { LocalDate.now() }
     var month by remember { mutableStateOf(YearMonth.from(initial)) }
     var chosen by remember { mutableStateOf(initial) }
-    SheetScreen(onDismiss, "Pick another date") { close ->
+    SheetScreen(onDismiss, "Pick another date") {
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())), color = c.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
             SmallAction(RideIcons.Back, "Previous month", 0f, month.isAfter(YearMonth.from(today))) { month = month.minusMonths(1) }
@@ -247,7 +246,7 @@ fun CalendarSheet(initial: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: ()
                 }
             }
         }
-        RideButton("Confirm date", { close { onPick(chosen) } }, Modifier.padding(top = 12.dp))
+        RideButton("Confirm date", { onPick(chosen) }, Modifier.padding(top = 12.dp))
     }
 }
 
@@ -256,51 +255,15 @@ fun CalendarSheet(initial: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: ()
 @Composable
 fun ChoiceSheet(title: String, options: List<String>, initial: Int, onSave: (Int) -> Unit, onDismiss: () -> Unit, subs: List<String?> = emptyList()) {
     var pick by rememberSaveable { mutableIntStateOf(initial) }
-    val c = RideTheme.colors
-    val isPassenger = title == "Passenger"
-    val mint = if (c.isDark) androidx.compose.ui.graphics.Color(0xFF72EBD0) else androidx.compose.ui.graphics.Color(0xFF087F68)
-    SheetScreen(onDismiss, if (isPassenger) null else title) { close ->
-        if (isPassenger) {
-            Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Passenger", color = c.fg, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
-                Box(Modifier.size(40.dp).clip(CircleShape).clickable(role = Role.Button) { close(null) }, contentAlignment = Alignment.Center) {
-                    RideIcon(RideIcons.Close, c.fg, size = 22.dp)
-                }
+    SheetScreen(onDismiss, title) {
+        Column(Modifier.padding(top = 8.dp)) {
+            options.forEachIndexed { i, o ->
+                if (i > 0) RowDivider()
+                RadioRow(o, pick == i, { pick = i }, subs.getOrNull(i))
             }
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.bg).border(1.dp, c.border, RoundedCornerShape(22.dp))) {
-                options.forEachIndexed { i, option ->
-                    if (i > 0) RowDivider()
-                    Row(
-                        Modifier.fillMaxWidth().heightIn(min = 80.dp).selectable(pick == i, role = Role.RadioButton) { pick = i }
-                            .padding(horizontal = 18.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RideIcon(if (i == 0) RideIcons.Person else listOf("M7,7m-2.5,0a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0", "M2.5 17c.5-2.8 2-4.2 4.5-4.2", "M13,8m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0", "M11.5 13c2.8-.4 5 1 6 4"), mint, size = 23.dp)
-                        Column(Modifier.weight(1f).padding(start = 18.dp)) {
-                            Text(option, color = c.fg, fontSize = 17.sp)
-                            Text(subs.getOrNull(i) ?: if (i == 0) "Your profile" else "Choose a contact", color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 2.dp))
-                        }
-                        Box(Modifier.size(24.dp).clip(CircleShape).border(2.dp, if (pick == i) mint else c.muted, CircleShape), contentAlignment = Alignment.Center) {
-                            if (pick == i) Box(Modifier.fillMaxSize().background(mint, CircleShape).padding(7.dp).background(c.bg, CircleShape))
-                        }
-                    }
-                    if (i < options.lastIndex) HorizontalDivider(color = c.line)
-                }
-            }
-            Box(
-                Modifier.padding(top = 28.dp).fillMaxWidth().height(56.dp).clip(RoundedCornerShape(28.dp))
-                    .background(mint).clickable(role = Role.Button) { close { onSave(pick) } },
-                contentAlignment = Alignment.Center,
-            ) { Text("Save", color = androidx.compose.ui.graphics.Color(0xFF07110F), fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
-        } else {
-            Column(Modifier.padding(top = 8.dp)) {
-                options.forEachIndexed { i, o ->
-                    if (i > 0) RowDivider()
-                    RadioRow(o, pick == i, { pick = i }, subs.getOrNull(i))
-                }
-            }
-            RideButton("Save", { close { onSave(pick) } }, Modifier.padding(top = 14.dp))
         }
+        val close = LocalSheetClose.current
+        RideButton("Save", { if (close != null) close { onSave(pick) } else onSave(pick) }, Modifier.padding(top = 14.dp))
     }
 }
 

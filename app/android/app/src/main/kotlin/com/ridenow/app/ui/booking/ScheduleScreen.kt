@@ -35,7 +35,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -72,7 +71,7 @@ private val Passengers = listOf("Me", "Someone else")
 
 /** Pick a pickup date and time. [onContinue] receives a label such as "Wed, 4 Nov, 8:30 AM". */
 @Composable
-fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: Modifier = Modifier, passengerName: String = "Alex Morgan") {
+fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
@@ -151,7 +150,7 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
             if (sheet.isNotEmpty()) androidx.compose.ui.window.Dialog({ sheet = "" }, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
                 when (sheet) {
                     "date" -> com.ridenow.app.ui.more.CalendarSheet(date, { dateDay = it.toEpochDay(); sheet = "" }, { sheet = "" })
-                    "Passenger" -> com.ridenow.app.ui.more.ChoiceSheet("Passenger", Passengers, passenger, { passenger = it; sheet = "" }, { sheet = "" }, listOf(passengerName, "Choose a contact"))
+                    "Passenger" -> com.ridenow.app.ui.more.ChoiceSheet("Passenger", Passengers, passenger, { passenger = it; sheet = "" }, { sheet = "" })
                     "Repeat" -> com.ridenow.app.ui.more.ChoiceSheet("Repeat", Repeats, repeat, { repeat = it; sheet = "" }, { sheet = "" })
                     else -> com.ridenow.app.ui.more.ChoiceSheet("Reminder", Reminders, reminder, { reminder = it; sheet = "" }, { sheet = "" })
                 }
