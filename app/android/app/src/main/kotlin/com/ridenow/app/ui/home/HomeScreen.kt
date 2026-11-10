@@ -11,15 +11,14 @@ import com.ridenow.app.ui.map.RideMap
 import com.ridenow.app.ui.map.rememberUserLocation
 import androidx.compose.runtime.LaunchedEffect
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -109,7 +108,9 @@ fun HomeScreen(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().shadow(16.dp, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), ambientColor = Color.Black, spotColor = Color.Black)
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(c.bg)
                 .border(1.dp, c.line, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).navigationBarsPadding()
-                .padding(horizontal = 24.dp).entrance(150, 40),
+                .padding(horizontal = 24.dp)
+                .animateContentSize(animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing))
+                .entrance(150, 40),
         ) {
             // Drag or tap the handle to expand and collapse the sheet.
             Box(
@@ -154,7 +155,7 @@ fun HomeScreen(
                 SavedButton(RideIcons.Work, stringResource(R.string.home_saved_work), Modifier.weight(1f)) { onSaved("Work") }
             }
 
-            AnimatedVisibility(expanded, enter = expandVertically(), exit = shrinkVertically()) {
+            if (expanded) {
                 Column(Modifier.padding(top = 8.dp)) {
                     RecentRow("Nova Terminal, Gate 4", "6.2 km") { onRecent("Nova Terminal, Gate 4") }
                     RecentRow("Helix Garden Plaza", "3.8 km") { onRecent("Helix Garden Plaza") }
