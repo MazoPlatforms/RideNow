@@ -35,7 +35,7 @@ fun splitFullNumber(full: String): Pair<Country, String>? {
 
 /** Asks Android for the phone number on this device (system picker, no permission). */
 fun requestPhoneHint(context: Context, onIntent: (IntentSender) -> Unit) {
-    Identity.getPhoneNumberHintIntentClient(context)
+    Identity.getSignInClient(context)
         .getPhoneNumberHintIntent(GetPhoneNumberHintIntentRequest.builder().build())
         .addOnSuccessListener { pending: PendingIntent -> onIntent(pending.intentSender) }
         .addOnFailureListener { }
@@ -44,7 +44,7 @@ fun requestPhoneHint(context: Context, onIntent: (IntentSender) -> Unit) {
 /** Reads the number the user picked in the system picker. */
 fun readPhoneFromHint(context: Context, data: Intent?, onNumber: (String) -> Unit) {
     runCatching {
-        Identity.getPhoneNumberHintIntentClient(context)
+        Identity.getSignInClient(context)
             .getPhoneNumberFromIntent(data)
             .addOnSuccessListener { number: String -> onNumber(number) }
     }
