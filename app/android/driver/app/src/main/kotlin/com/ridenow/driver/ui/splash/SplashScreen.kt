@@ -9,10 +9,12 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -32,6 +34,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -39,8 +43,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ridenow.driver.R
-import com.ridenow.driver.ui.components.OrbMark
-import com.ridenow.driver.ui.components.Wordmark
 import com.ridenow.driver.ui.theme.RideColors
 import com.ridenow.driver.ui.theme.RideNowTheme
 import com.ridenow.driver.ui.theme.RideTheme
@@ -90,28 +92,25 @@ fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
             drawHalo(c, intro.value, orbit, pulse, route.value)
         }
 
-        OrbMark(
-            size = 88.dp,
-            modifier = Modifier.align(Alignment.TopCenter).offset(y = maxHeight * 0.426f - 44.dp).graphicsLayer {
+        // Stacked RideNow Driver lockup (symbol, wordmark, DRIVER) sits inside the halo.
+        Image(
+            painter = painterResource(if (c.isDark) R.drawable.driver_splash_wordmark_dark else R.drawable.driver_splash_wordmark_light),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.align(Alignment.TopCenter).offset(y = maxHeight * 0.426f - 89.dp).width(190.dp).aspectRatio(771f / 720f).graphicsLayer {
                 alpha = intro.value
                 scaleX = 0.8f + 0.2f * intro.value
                 scaleY = 0.8f + 0.2f * intro.value
             },
         )
 
-        Column(
-            Modifier.fillMaxWidth().padding(top = textTop).graphicsLayer {
+        Text(
+            stringResource(R.string.splash_tagline), color = c.muted, fontSize = 14.sp,
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = textTop).graphicsLayer {
                 alpha = intro.value
                 translationY = (1f - intro.value) * 16.dp.toPx()
             },
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Wordmark(height = 34.dp)
-            Text(
-                stringResource(R.string.splash_tagline), color = c.muted, fontSize = 14.sp,
-                modifier = Modifier.padding(top = 14.dp),
-            )
-        }
+        )
 
         Text(
             stringResource(R.string.splash_version), color = c.muted, fontSize = 12.sp,
@@ -160,8 +159,8 @@ private fun DrawScope.drawRoute(c: RideColors, progress: Float) {
 
 private fun DrawScope.drawHalo(c: RideColors, intro: Float, orbit: Float, pulse: Float, route: Float) {
     val center = orbCenter(size)
-    val ringOuter = 110.dp.toPx()
-    val ringInner = 82.dp.toPx()
+    val ringOuter = 128.dp.toPx()
+    val ringInner = 96.dp.toPx()
     drawCircle(Brush.radialGradient(listOf(c.accent.copy(alpha = 0.18f * intro), androidx.compose.ui.graphics.Color.Transparent), center, 150.dp.toPx()), 150.dp.toPx(), center)
     drawCircle(c.ring1.copy(alpha = intro), ringOuter, center, style = Stroke(1.dp.toPx()))
     drawCircle(c.ring2.copy(alpha = intro), ringInner, center, style = Stroke(1.dp.toPx()))

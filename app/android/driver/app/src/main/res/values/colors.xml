@@ -1,5 +1,4 @@
 <resources>
     <color name="splash_bg">#F6F8FA</color>
-    <color name="driver_launcher_background">#07090D</color>
-    <color name="driver_mint">#7CF5D0</color>
+    <color name="driver_icon_background">#141517</color>
 </resources>

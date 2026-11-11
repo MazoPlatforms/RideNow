@@ -67,15 +67,32 @@ jobs:
           fi
           printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > app/android/rider/local.properties
           echo "::add-mask::$MAPS_API_KEY"
+      - name: Prepare Driver build copy for Kotlin compilation
+        run: |
+          mkdir -p "$RUNNER_TEMP/driver-build"
+          cp -a app/android/driver/. "$RUNNER_TEMP/driver-build/"
+          export DRIVER_BUILD="$RUNNER_TEMP/driver-build"
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import os
+
+          icon = Path(os.environ["DRIVER_BUILD"]) / "app/src/main/kotlin/com/ridenow/driver/ui/components/RideIcon.kt"
+          source = icon.read_text()
+          declaration = '    val Lock = listOf("M5,9h10v8h-10z", "M7 9V7a3 3 0 0 1 6 0v2")\n'
+          if source.count("val Lock =") != 2 or source.count(declaration) != 1:
+              raise SystemExit("Expected the supplied Driver source's unused duplicate Lock declaration exactly once")
+          icon.write_text(source.replace(declaration, "", 1))
+          print("Removed one unused duplicate Lock declaration from the temporary CI build copy only.")
+          PYCODE
       - name: Build Rider and Driver debug APKs
         run: |
           set -o pipefail
           app/android/rider/gradlew --no-daemon --stacktrace --project-dir app/android/rider :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
-          app/android/driver/gradlew --no-daemon --stacktrace --project-dir app/android/driver :app:assembleDebug 2>&1 | tee -a "$RUNNER_TEMP/android-build.log"
+          "$RUNNER_TEMP/driver-build/gradlew" --no-daemon --stacktrace --project-dir "$RUNNER_TEMP/driver-build" :app:assembleDebug 2>&1 | tee -a "$RUNNER_TEMP/android-build.log"
       - name: Verify APKs and source archives
         run: |
           rider_apk=app/android/rider/app/build/outputs/apk/debug/app-debug.apk
-          driver_apk=app/android/driver/app/build/outputs/apk/debug/app-debug.apk
+          driver_apk="$RUNNER_TEMP/driver-build/app/build/outputs/apk/debug/app-debug.apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$rider_apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$driver_apk"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$rider_apk" > "$RUNNER_TEMP/rider-apk-metadata.txt"
@@ -124,7 +141,7 @@ jobs:
           RideNow Rider and Driver Android APKs built from commit ${GITHUB_SHA}.
 
           - Both APKs are debug-signed previews for installation and testing, not production or Play Store releases.
-          - Rider and Driver source files are unchanged; the source archives and checksums are included.
+          - Rider and Driver source files and source ZIPs are included unchanged with checksums. For compilation only, Actions removes an unused duplicate Lock declaration from a temporary Driver build copy; repository source is untouched.
           - Gradle 8.9 wrappers are generated only in GitHub Actions and are not committed.
           - Debug signing keys may differ between runs; uninstall an older preview if Android rejects an update.
           - Minimum Android version: Android 8.0 (API 26).

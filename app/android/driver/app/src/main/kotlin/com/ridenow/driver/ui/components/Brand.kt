@@ -1,28 +1,44 @@
 package com.ridenow.driver.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.em
-import androidx.compose.ui.unit.sp
 import com.ridenow.driver.R
 import com.ridenow.driver.ui.theme.RideTheme
 
-/** The RideNow orbit mark (ring with a centre dot) in the theme accent. */
+/** The RideNow Driver symbol (R, pin and driver). White and yellow on dark, black and yellow on light. */
 @Composable
-fun LogoMark(width: Dp, modifier: Modifier = Modifier) = RideMark(RideTheme.colors.accent, modifier, width)
+fun LogoMark(width: Dp, modifier: Modifier = Modifier) =
+    Image(
+        painter = painterResource(if (RideTheme.colors.isDark) R.drawable.driver_mark_dark else R.drawable.driver_mark_light),
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = modifier.size(width),
+    )
+
+/** Horizontal RideNow Driver lockup (symbol, wordmark and DRIVER label). [height] is the lockup height. */
+@Composable
+fun Wordmark(height: Dp, modifier: Modifier = Modifier) =
+    Image(
+        painter = painterResource(if (RideTheme.colors.isDark) R.drawable.driver_wordmark_dark else R.drawable.driver_wordmark_light),
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = modifier.height(height).aspectRatio(952f / 245f),
+    )
 
 /** Mint gradient orb that hosts [content]. */
 @Composable
@@ -35,16 +51,3 @@ fun Orb(size: Dp, modifier: Modifier = Modifier, content: @Composable BoxScope.(
         content = content,
     )
 }
-
-/** The orb with the orbit mark in ink, used on the splash. */
-@Composable
-fun OrbMark(size: Dp, modifier: Modifier = Modifier) =
-    Orb(size, modifier) { RideMark(RideTheme.colors.onFill, size = size * 0.5f) }
-
-/** "RideNow Driver" in light weight with open tracking. [height] is the font size in dp. */
-@Composable
-fun Wordmark(height: Dp, modifier: Modifier = Modifier) =
-    Text(
-        stringResource(R.string.app_name), color = RideTheme.colors.fg, modifier = modifier,
-        fontSize = height.value.sp, fontWeight = FontWeight.Light, letterSpacing = 0.03.em,
-    )
