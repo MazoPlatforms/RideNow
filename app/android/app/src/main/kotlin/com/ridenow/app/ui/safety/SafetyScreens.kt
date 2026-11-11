@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.safety
 
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -52,36 +55,54 @@ private fun Switch(on: Boolean, label: String, onChange: (Boolean) -> Unit) {
 /** Emergency call, ride details and safety tools. */
 @Composable
 fun SafetyCenterScreen(contacts: Int, onBack: () -> Unit, onShare: () -> Unit, onContacts: () -> Unit, onReport: () -> Unit, modifier: Modifier = Modifier) {
+    val textMenuSafety = stringResource(R.string.menu_safety)
+    val textEmergency = stringResource(R.string.text_emergency)
+    val textCallLocalEmergencyServicesNow = stringResource(R.string.text_call_local_emergency_services_now)
+    val textCallEmergency = stringResource(R.string.text_call_emergency)
+    val textOrbitSilver = stringResource(R.string.text_orbit_silver)
+    val textDriverMiraTanaka = stringResource(R.string.text_driver_mira_tanaka)
+    val textSafetyTools = stringResource(R.string.text_safety_tools)
+    val textTripShareLive = stringResource(R.string.trip_share_live)
+    val textTrustedContacts = stringResource(R.string.text_trusted_contacts)
+    val textNoneYet = stringResource(R.string.text_none_yet)
+    val textValueContactValueOne = stringResource(R.string.extra_1_s_contact)
+    val textValueContactValueMany = stringResource(R.string.extra_1_s_contacts)
+    val textReportASafetyIssue = stringResource(R.string.text_report_a_safety_issue)
+    val textAudioRecording = stringResource(R.string.text_audio_recording)
+    val textOn = stringResource(R.string.text_on)
+    val textOff = stringResource(R.string.text_off)
+    val textCheckInAlerts = stringResource(R.string.text_check_in_alerts)
+
     val c = RideTheme.colors
     val context = LocalContext.current
     var audio by rememberSaveable { mutableStateOf(false) }
     var checkIns by rememberSaveable { mutableStateOf(true) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
-        ScreenTop("Safety center", onBack)
+        ScreenTop(textMenuSafety, onBack)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             Column(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.danger.copy(alpha = 0.10f)).border(1.dp, c.danger, RoundedCornerShape(20.dp)).padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RideIcon(RideIcons.Shield, c.danger, size = 24.dp); Spacer(Modifier.width(12.dp))
-                    Column { Text("Emergency", color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold); Text("Call local emergency services now.", color = c.muted, fontSize = 13.sp) }
+                    Column { Text(textEmergency, color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold); Text(textCallLocalEmergencyServicesNow, color = c.muted, fontSize = 13.sp) }
                 }
                 Row(
                     Modifier.padding(top = 14.dp).fillMaxWidth().height(52.dp).clip(RoundedCornerShape(26.dp)).background(c.danger)
                         .clickable(role = Role.Button) { runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$EmergencyNumber")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
                     horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-                ) { RideIcon(RideIcons.Call, if (c.isDark) androidx.compose.ui.graphics.Color(0xFF2B0A0A) else androidx.compose.ui.graphics.Color.White, size = 18.dp); Spacer(Modifier.width(8.dp)); Text("Call emergency", color = if (c.isDark) androidx.compose.ui.graphics.Color(0xFF2B0A0A) else androidx.compose.ui.graphics.Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+                ) { RideIcon(RideIcons.Call, if (c.isDark) androidx.compose.ui.graphics.Color(0xFF2B0A0A) else androidx.compose.ui.graphics.Color.White, size = 18.dp); Spacer(Modifier.width(8.dp)); Text(textCallEmergency, color = if (c.isDark) androidx.compose.ui.graphics.Color(0xFF2B0A0A) else androidx.compose.ui.graphics.Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
             }
             Row(Modifier.padding(top = 12.dp).fillMaxWidth().height(72.dp).clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp)).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 VehicleArt(1, 64.dp); Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) { Text("Orbit · Silver", color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold); Text("Driver Mira Tanaka", color = c.muted, fontSize = 12.sp) }
-                Text("RN 2100", color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp, modifier = Modifier.border(1.dp, c.border, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp))
+                Column(Modifier.weight(1f)) { Text(textOrbitSilver, color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold); Text(textDriverMiraTanaka, color = c.muted, fontSize = 12.sp) }
+                Text(stringResource(R.string.sample_vehicle_plate), color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp, modifier = Modifier.border(1.dp, c.border, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp))
             }
-            SectionLabel("SAFETY TOOLS")
+            SectionLabel(textSafetyTools)
             GroupCard {
-                NavRow(RideIcons.Share, "Share live trip", onShare); RowDivider()
-                NavRow(RideIcons.Person, "Trusted contacts", onContacts, subtitle = if (contacts == 0) "None yet" else "$contacts contact${if (contacts == 1) "" else "s"}"); RowDivider()
-                NavRow(RideIcons.Flag, "Report a safety issue", onReport); RowDivider()
-                NavRow(RideIcons.Phone, "Audio recording", { audio = !audio }, subtitle = if (audio) "On" else "Off", trailing = { Switch(audio, "Audio recording") { audio = it } }); RowDivider()
-                NavRow(RideIcons.Bell, "Check-in alerts", { checkIns = !checkIns }, subtitle = if (checkIns) "On" else "Off", trailing = { Switch(checkIns, "Check-in alerts") { checkIns = it } })
+                NavRow(RideIcons.Share, textTripShareLive, onShare); RowDivider()
+                NavRow(RideIcons.Person, textTrustedContacts, onContacts, subtitle = if (contacts == 0) textNoneYet else (if (contacts != 1) textValueContactValueMany else textValueContactValueOne).format(contacts)); RowDivider()
+                NavRow(RideIcons.Flag, textReportASafetyIssue, onReport); RowDivider()
+                NavRow(RideIcons.Phone, textAudioRecording, { audio = !audio }, subtitle = if (audio) textOn else textOff, trailing = { Switch(audio, textAudioRecording) { audio = it } }); RowDivider()
+                NavRow(RideIcons.Bell, textCheckInAlerts, { checkIns = !checkIns }, subtitle = if (checkIns) textOn else textOff, trailing = { Switch(checkIns, textCheckInAlerts) { checkIns = it } })
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -92,12 +113,21 @@ fun SafetyCenterScreen(contacts: Int, onBack: () -> Unit, onShare: () -> Unit, o
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrustedContactsScreen(contacts: List<Contact>, onAdd: (Contact) -> Unit, onRemove: (Contact) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    val textTrustedContacts = stringResource(R.string.text_trusted_contacts)
+    val textPeopleWhoCanFollowYourLiveTrip = stringResource(R.string.text_people_who_can_follow_your_live_trip)
+    val textNoTrustedContactsYetAddSomeoneYouTrustToFollowYourTrips = stringResource(R.string.text_no_trusted_contacts_yet_add_someone_you_trust_to_follow_your_trips)
+    val textRemoveValue = stringResource(R.string.text_remove_value)
+    val textAddAContact = stringResource(R.string.text_add_a_contact)
+    val textName = stringResource(R.string.text_name)
+    val textFriendPhone = stringResource(R.string.friend_phone)
+    val textSaveContact = stringResource(R.string.text_save_contact)
+
     val c = RideTheme.colors
     var sheet by rememberSaveable { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
-        ScreenTop("Trusted contacts", onBack, subtitle = "People who can follow your live trip.")
+        ScreenTop(textTrustedContacts, onBack, subtitle = textPeopleWhoCanFollowYourLiveTrip)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
-            if (contacts.isEmpty()) Text("No trusted contacts yet. Add someone you trust to follow your trips.", color = c.muted, fontSize = 14.sp, lineHeight = 21.sp, modifier = Modifier.padding(top = 24.dp))
+            if (contacts.isEmpty()) Text(textNoTrustedContactsYetAddSomeoneYouTrustToFollowYourTrips, color = c.muted, fontSize = 14.sp, lineHeight = 21.sp, modifier = Modifier.padding(top = 24.dp))
             else GroupCard(Modifier.padding(top = 16.dp)) {
                 contacts.forEachIndexed { i, k ->
                     if (i > 0) RowDivider()
@@ -105,24 +135,24 @@ fun TrustedContactsScreen(contacts: List<Contact>, onAdd: (Contact) -> Unit, onR
                         Box(Modifier.size(40.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)).border(1.dp, c.accent, CircleShape), contentAlignment = Alignment.Center) { Text(k.name.take(2).uppercase(), color = c.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) { Text(k.name, color = c.fg, fontSize = 15.sp); Text(k.phone, color = c.muted, fontSize = 12.sp) }
-                        Box(Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button) { onRemove(k) }.semantics { contentDescription = "Remove ${k.name}" }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Trash, c.muted) }
+                        Box(Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button) { onRemove(k) }.semantics { contentDescription = textRemoveValue.format(k.name) }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Trash, c.muted) }
                     }
                 }
             }
         }
-        RideButton("Add a contact", { sheet = true }, modifier = Modifier.padding(vertical = 12.dp))
+        RideButton(textAddAContact, { sheet = true }, modifier = Modifier.padding(vertical = 12.dp))
     }
     if (sheet) {
         val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         var name by remember { mutableStateOf("") }; var phone by remember { mutableStateOf("") }
         ModalBottomSheet(onDismissRequest = { sheet = false }, sheetState = state, containerColor = c.bg, contentColor = c.fg, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
             Column(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
-                Text("Add a contact", color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 14.dp))
+                Text(textAddAContact, color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 14.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RideTextField(name, { name = it.take(40) }, "Name", RideIcons.Person, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next))
-                    RideTextField(phone, { phone = it.filter { ch -> ch.isDigit() || ch == '+' }.take(15) }, "Phone number", RideIcons.Phone, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done))
+                    RideTextField(name, { name = it.take(40) }, textName, RideIcons.Person, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next))
+                    RideTextField(phone, { phone = it.filter { ch -> ch.isDigit() || ch == '+' }.take(15) }, textFriendPhone, RideIcons.Phone, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done))
                 }
-                RideButton("Save contact", { onAdd(Contact(name.trim(), phone)); sheet = false }, enabled = name.isNotBlank() && phone.length >= 6, modifier = Modifier.padding(top = 16.dp))
+                RideButton(textSaveContact, { onAdd(Contact(name.trim(), phone)); sheet = false }, enabled = name.isNotBlank() && phone.length >= 6, modifier = Modifier.padding(top = 16.dp))
             }
         }
     }

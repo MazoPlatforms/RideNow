@@ -55,7 +55,11 @@ fun ConfirmScreen(
     destination: String, vehicleIndex: Int, returnTrip: Boolean, whenLabel: String?, onBack: () -> Unit, onBook: () -> Unit,
     route: RouteInfo?, from: LatLng, to: LatLng?, modifier: Modifier = Modifier,
 ) {
+    val textValueKmValueMin = stringResource(R.string.text_value_km_value_min)
+    val textValueValueSeats = stringResource(R.string.text_value_value_seats)
+
     val c = RideTheme.colors
+    val backLabel = stringResource(R.string.search_back)
     val v = Vehicles[vehicleIndex]
     val total = v.fareFor(returnTrip)
     val taxes = Math.round(total * 0.065 * 100) / 100.0
@@ -65,7 +69,7 @@ fun ConfirmScreen(
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = "Back" }, contentAlignment = Alignment.Center) {
+            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = backLabel }, contentAlignment = Alignment.Center) {
                 RideIcon(RideIcons.Back, c.fg, size = 22.dp)
             }
             Spacer(Modifier.weight(1f))
@@ -74,17 +78,17 @@ fun ConfirmScreen(
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(80), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(130.dp).clip(RoundedCornerShape(20.dp)).border(1.dp, c.line, RoundedCornerShape(20.dp))) {
-                RouteMap(Modifier.fillMaxSize(), from, to, route, "${route?.km ?: TripKm} km · ${route?.minutes ?: TripMinutes} min", topPadding = 0.dp)
+                RouteMap(Modifier.fillMaxSize(), from, to, route, textValueKmValueMin.format(route?.km ?: TripKm, route?.minutes ?: TripMinutes), topPadding = 0.dp)
             }
             Card {
-                Row2(stringResource(R.string.confirm_pickup), "Current location", dot = Dot.Pickup)
+                Row2(stringResource(R.string.confirm_pickup), stringResource(R.string.search_current), dot = Dot.Pickup)
                 Divider(); Row2(stringResource(R.string.confirm_drop), destination, dot = Dot.Drop)
-                Divider(); Row2(stringResource(R.string.confirm_when), whenLabel ?: "Now · about ${v.etaMin} min away", dot = Dot.Clock)
+                Divider(); Row2(stringResource(R.string.confirm_when), whenLabel ?: stringResource(R.string.confirm_now, v.etaMin), dot = Dot.Clock)
                 Divider()
                 Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(stringResource(R.string.confirm_vehicle), color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp)
-                        Text("${v.name} · ${v.seats} seats", color = c.fg, fontSize = 15.sp)
+                        Text(textValueValueSeats.format(v.name, v.seats), color = c.fg, fontSize = 15.sp)
                     }
                     VehicleArt(v.style, 64.dp)
                 }
@@ -102,7 +106,7 @@ fun ConfirmScreen(
             }
         }
         RideButton(
-            (if (whenLabel != null) "Schedule " else "Book ") + "${v.name} · ${money(total)}", onBook,
+            (if (whenLabel != null) stringResource(R.string.confirm_book_schedule) else stringResource(R.string.confirm_book_now)) + "${v.name} · ${money(total)}", onBook,
             modifier = Modifier.padding(vertical = 12.dp).entrance(200),
         )
     }
@@ -151,8 +155,8 @@ private fun FareLine(label: String, amount: Double, bold: Boolean = false) {
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun ConfirmDarkPreview() = RideNowTheme(darkTheme = true) { ConfirmScreen("Helix Garden Plaza", 1, false, null, {}, {}, null, LatLng(0.0, 0.0), null) }
+private fun ConfirmDarkPreview() = RideNowTheme(darkTheme = true) { ConfirmScreen(stringResource(R.string.text_helix_garden_plaza), 1, false, null, {}, {}, null, LatLng(0.0, 0.0), null) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun ConfirmLightPreview() = RideNowTheme(darkTheme = false) { ConfirmScreen("Helix Garden Plaza", 1, false, "Wed, 4 Nov · 8:30 AM", {}, {}, null, LatLng(0.0, 0.0), null) }
+private fun ConfirmLightPreview() = RideNowTheme(darkTheme = false) { ConfirmScreen(stringResource(R.string.text_helix_garden_plaza), 1, false, stringResource(R.string.text_wed_4_nov_8_30_am), {}, {}, null, LatLng(0.0, 0.0), null) }

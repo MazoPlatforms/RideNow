@@ -6,9 +6,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.verticalDrag
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
@@ -97,9 +97,17 @@ import com.ridenow.app.ui.util.rememberReducedMotion
 fun HomeScreen(
     onMenu: () -> Unit, onNotifications: () -> Unit, onSearch: () -> Unit, onLater: () -> Unit,
     onEditPickup: () -> Unit, onSaved: (String) -> Unit, onRecent: (String) -> Unit,
-    modifier: Modifier = Modifier, hasUnread: Boolean = true, pickup: String = "128 Meridian Walk",
+    modifier: Modifier = Modifier, hasUnread: Boolean = true, pickup: String = stringResource(R.string.text_text_128_meridian_walk),
 ) {
+    val textNovaTerminalGate4 = stringResource(R.string.text_nova_terminal_gate_4)
+    val text62Km = stringResource(R.string.text_text_6_2_km)
+    val textHelixGardenPlaza = stringResource(R.string.text_helix_garden_plaza)
+    val text38Km = stringResource(R.string.text_text_3_8_km)
+
     val c = RideTheme.colors
+    val sheetExpandLabel = stringResource(R.string.sheet_expand)
+    val sheetCollapseLabel = stringResource(R.string.sheet_collapse)
+    val editPickupLabel = stringResource(R.string.home_pickup_edit)
     // 0f = compact, 1f = expanded. Drives the sheet live while the finger moves.
     val progress = remember { Animatable(1f) }
     val expanded = progress.value > 0.5f
@@ -156,7 +164,7 @@ fun HomeScreen(
         ) {
             // The whole sheet is draggable. Tapping this handle toggles it.
             Box(
-                Modifier.fillMaxWidth().height(28.dp).semantics { contentDescription = if (expanded) "Collapse" else "Expand" },
+                Modifier.fillMaxWidth().height(28.dp).semantics { contentDescription = if (expanded) sheetCollapseLabel else sheetExpandLabel },
                 contentAlignment = Alignment.Center,
             ) { Box(Modifier.size(width = 40.dp, height = 4.dp).clip(CircleShape).background(c.border)) }
 
@@ -175,7 +183,7 @@ fun HomeScreen(
             Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent)); Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.home_pickup, pickup), color = c.muted, fontSize = 13.sp)
-                Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup).semantics { contentDescription = "Edit pickup location" }, contentAlignment = Alignment.Center) {
+                Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup).semantics { contentDescription = editPickupLabel }, contentAlignment = Alignment.Center) {
                     RideIcon(RideIcons.Pencil, c.accent, size = 18.dp)
                 }
             }
@@ -200,8 +208,8 @@ fun HomeScreen(
                     .graphicsLayer { alpha = progress.value },
             ) {
                 Column(Modifier.padding(top = 8.dp)) {
-                    RecentRow("Nova Terminal, Gate 4", "6.2 km") { onRecent("Nova Terminal, Gate 4") }
-                    RecentRow("Helix Garden Plaza", "3.8 km") { onRecent("Helix Garden Plaza") }
+                    RecentRow(textNovaTerminalGate4, text62Km) { onRecent(textNovaTerminalGate4) }
+                    RecentRow(textHelixGardenPlaza, text38Km) { onRecent(textHelixGardenPlaza) }
                 }
             }
             Spacer(Modifier.height(14.dp))

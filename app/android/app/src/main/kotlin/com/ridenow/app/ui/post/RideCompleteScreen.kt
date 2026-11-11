@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.post
 
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -54,6 +57,19 @@ fun RideCompleteScreen(
     destination: String, vehicle: Vehicle, total: Double, rating: Int,
     onReceipt: () -> Unit, onRate: () -> Unit, onReport: () -> Unit, onDone: () -> Unit, modifier: Modifier = Modifier,
 ) {
+    val textYouHaveArrived = stringResource(R.string.text_you_have_arrived)
+    val textTripTotal = stringResource(R.string.text_trip_total)
+    val textPaid = stringResource(R.string.text_paid)
+    val text84Km19MinValueRn2100 = stringResource(R.string.text_text_8_4_km_19_min_value_rn_2100)
+    val textDownloadReceipt = stringResource(R.string.text_download_receipt)
+    val textPdfTrip8f3k2q = stringResource(R.string.text_pdf_trip_8f3k2q)
+    val textRateYourDriver = stringResource(R.string.text_rate_your_driver)
+    val textYouRatedValue = stringResource(R.string.text_you_rated_value)
+    val textMiraTanaka = stringResource(R.string.text_mira_tanaka)
+    val textReportATripProblem = stringResource(R.string.text_report_a_trip_problem)
+    val textBehaviorRoutePaymentAndMore = stringResource(R.string.text_behavior_route_payment_and_more)
+    val textDone = stringResource(R.string.text_done)
+
     val c = RideTheme.colors
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -63,26 +79,26 @@ fun RideCompleteScreen(
                 }
                 Box(Modifier.size(80.dp).clip(CircleShape).background(BrandYellow), contentAlignment = Alignment.Center) { RideIcon(RideIcons.Check, Ink, size = 38.dp) }
             }
-            Text("You have arrived.", color = c.fg, fontSize = 28.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 20.dp).semantics { heading() }.entrance(80))
+            Text(textYouHaveArrived, color = c.fg, fontSize = 28.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 20.dp).semantics { heading() }.entrance(80))
             Text(destination, color = c.muted, fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
 
             Column(Modifier.padding(top = 22.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp)).padding(16.dp).entrance(160)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("TRIP TOTAL", color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp, modifier = Modifier.weight(1f))
-                    Text("Paid", color = c.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clip(RoundedCornerShape(50)).background(c.accent.copy(alpha = 0.14f)).padding(horizontal = 12.dp, vertical = 5.dp))
+                    Text(textTripTotal, color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp, modifier = Modifier.weight(1f))
+                    Text(textPaid, color = c.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clip(RoundedCornerShape(50)).background(c.accent.copy(alpha = 0.14f)).padding(horizontal = 12.dp, vertical = 5.dp))
                 }
                 Text(money(total), color = c.fg, fontSize = 32.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
-                Text("8.4 km · 19 min · ${vehicle.name} · RN 2100", color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                Text(text84Km19MinValueRn2100.format(vehicle.name), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
             }
 
             Column(Modifier.padding(top = 14.dp).fillMaxWidth().entrance(240)) {
                 HorizontalDivider(color = c.line)
-                ActionRow(RideIcons.Download, "Download receipt", "PDF · Trip #8F3K2Q", onReceipt)
-                ActionRow(RideIcons.Star, "Rate your driver", if (rating > 0) "You rated $rating ★" else "Mira Tanaka", onRate)
-                ActionRow(RideIcons.Flag, "Report a trip problem", "Behavior, route, payment and more", onReport)
+                ActionRow(RideIcons.Download, textDownloadReceipt, textPdfTrip8f3k2q, onReceipt)
+                ActionRow(RideIcons.Star, textRateYourDriver, if (rating > 0) textYouRatedValue.format(rating) else textMiraTanaka, onRate)
+                ActionRow(RideIcons.Flag, textReportATripProblem, textBehaviorRoutePaymentAndMore, onReport)
             }
         }
-        RideButton("Done", onDone, modifier = Modifier.padding(vertical = 12.dp))
+        RideButton(textDone, onDone, modifier = Modifier.padding(vertical = 12.dp))
     }
 }
 

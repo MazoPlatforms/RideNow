@@ -1,5 +1,9 @@
 package com.ridenow.app.ui.profile
 
+import com.ridenow.app.ui.components.localizedLabel
+
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -60,10 +64,30 @@ fun ProfileScreen(
     name: String, phone: String, mode: ThemeMode, onMode: (ThemeMode) -> Unit, onBack: () -> Unit, onEdit: () -> Unit,
     onOpen: (String) -> Unit, onLogout: () -> Unit, modifier: Modifier = Modifier,
 ) {
+    val textSettingsProfile = stringResource(R.string.settings_profile)
+    val textMenuSaved = stringResource(R.string.menu_saved)
+    val text4Places = stringResource(R.string.text_text_4_places)
+    val textMenuPayments = stringResource(R.string.menu_payments)
+    val text1Method = stringResource(R.string.text_text_1_method)
+    val textRideHistory2 = stringResource(R.string.text_ride_history_2)
+    val textViewRides = stringResource(R.string.text_view_rides)
+    val textPersonalInformation = stringResource(R.string.text_personal_information)
+    val textNamePhoneEmail = stringResource(R.string.text_name_phone_email)
+    val textMenuNotifications = stringResource(R.string.menu_notifications)
+    val textManageYourPreferences = stringResource(R.string.text_manage_your_preferences)
+    val textSettingsLanguage = stringResource(R.string.settings_language)
+    val textSettingsPrivacy = stringResource(R.string.settings_privacy)
+    val textSettingsPrivacySub = stringResource(R.string.settings_privacy_sub)
+    val textMenuHelp = stringResource(R.string.menu_help)
+    val textSettingsHelpSub = stringResource(R.string.settings_help_sub)
+    val textSettingsAbout = stringResource(R.string.settings_about)
+    val textSettingsAboutSub = stringResource(R.string.settings_about_sub)
+    val textLogOut = stringResource(R.string.text_log_out)
+
     val c = RideTheme.colors
     var sheet by rememberSaveable { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
-        ScreenTop("Profile", onBack)
+        ScreenTop(textSettingsProfile, onBack)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             Row(
                 Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp)).clickable(role = Role.Button, onClick = onEdit).padding(14.dp),
@@ -74,25 +98,25 @@ fun ProfileScreen(
                 RideIcon(listOf("M7 4l6 6-6 6"), c.muted, size = 18.dp)
             }
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Tile(RideIcons.Pin, "Saved Places", "4 places", Modifier.weight(1f)) { onOpen("Saved addresses") }
-                Tile(RideIcons.Card, "Payments", "1 method", Modifier.weight(1f)) { onOpen("Payments") }
-                Tile(RideIcons.Clock, "Ride History", "View rides", Modifier.weight(1f)) { onOpen("Your Rides") }
+                Tile(RideIcons.Pin, textMenuSaved, text4Places, Modifier.weight(1f)) { onOpen("Saved addresses") }
+                Tile(RideIcons.Card, textMenuPayments, text1Method, Modifier.weight(1f)) { onOpen("Payments") }
+                Tile(RideIcons.Clock, textRideHistory2, textViewRides, Modifier.weight(1f)) { onOpen("Your Rides") }
             }
             GroupCard(Modifier.padding(top = 12.dp)) {
-                NavRow(RideIcons.Person, "Personal Information", onEdit, subtitle = "Name, phone, email"); RowDivider()
-                NavRow(RideIcons.Bell, "Notifications", { onOpen("Notification settings") }, subtitle = "Manage your preferences"); RowDivider()
-                NavRow(RideIcons.Globe, "Language", { onOpen("Language") }, subtitle = "English"); RowDivider()
-                NavRow(RideIcons.Moon, "Appearance", { sheet = true }, subtitle = mode.label)
+                NavRow(RideIcons.Person, textPersonalInformation, onEdit, subtitle = textNamePhoneEmail); RowDivider()
+                NavRow(RideIcons.Bell, textMenuNotifications, { onOpen("Notification settings") }, subtitle = textManageYourPreferences); RowDivider()
+                NavRow(RideIcons.Globe, textSettingsLanguage, { onOpen("Language") }, subtitle = localizedLabel("English")); RowDivider()
+                NavRow(RideIcons.Moon, stringResource(R.string.settings_appearance), { sheet = true }, subtitle = stringResource(mode.labelRes))
             }
             GroupCard(Modifier.padding(top = 10.dp)) {
-                NavRow(RideIcons.Shield, "Privacy & Security", { onOpen("Privacy & Security") }, subtitle = "Account and data controls"); RowDivider()
-                NavRow(RideIcons.Help, "Help & Support", { onOpen("Help & Support") }, subtitle = "Get help or contact us"); RowDivider()
-                NavRow(RideIcons.Info, "About", { onOpen("Legal & About") }, subtitle = "App version, terms and policies")
+                NavRow(RideIcons.Shield, textSettingsPrivacy, { onOpen("Privacy & Security") }, subtitle = textSettingsPrivacySub); RowDivider()
+                NavRow(RideIcons.Help, textMenuHelp, { onOpen("Help & Support") }, subtitle = textSettingsHelpSub); RowDivider()
+                NavRow(RideIcons.Info, textSettingsAbout, { onOpen("Legal & About") }, subtitle = textSettingsAboutSub)
             }
             Row(
                 Modifier.padding(top = 12.dp, bottom = 16.dp).fillMaxWidth().height(52.dp).clip(RoundedCornerShape(16.dp)).background(c.danger.copy(alpha = 0.12f)).clickable(role = Role.Button, onClick = onLogout),
                 horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-            ) { RideIcon(RideIcons.Logout, c.danger); Spacer(Modifier.width(10.dp)); Text("Log out", color = c.danger, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+            ) { RideIcon(RideIcons.Logout, c.danger); Spacer(Modifier.width(10.dp)); Text(textLogOut, color = c.danger, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
         }
     }
     if (sheet) AppearanceSheet(mode, onMode) { sheet = false }
@@ -113,6 +137,20 @@ private val Genders = listOf("Female", "Male", "Non-binary", "Prefer not to say"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> Unit, onSave: (String, String) -> Unit, onChangePhone: () -> Unit, modifier: Modifier = Modifier) {
+    val textEditProfile = stringResource(R.string.text_edit_profile)
+    val textKeepYourInformationUpToDate = stringResource(R.string.text_keep_your_information_up_to_date)
+    val textDetailsName = stringResource(R.string.details_name)
+    val textFriendPhone = stringResource(R.string.friend_phone)
+    val textDetailsEmail = stringResource(R.string.details_email)
+    val textAdditionalInformation = stringResource(R.string.text_additional_information)
+    val textGenderOptional = stringResource(R.string.text_gender_optional)
+    val textDateOfBirthOptional = stringResource(R.string.text_date_of_birth_optional)
+    val textSelectADate = stringResource(R.string.text_select_a_date)
+    val textCurrentCity = stringResource(R.string.text_current_city)
+    val textSaveChanges = stringResource(R.string.text_save_changes)
+    val textGender = stringResource(R.string.text_gender)
+    val textOptionalYouCanChangeThisAnyTime = stringResource(R.string.text_optional_you_can_change_this_any_time)
+
     val c = RideTheme.colors
     val context = LocalContext.current
     var n by rememberSaveable { mutableStateOf(name) }
@@ -124,40 +162,40 @@ fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> 
     val emailOk = e.isBlank() || Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$").matches(e.trim())
     val canSave = n.trim().length >= 2 && emailOk
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
-        ScreenTop("Edit profile", onBack, subtitle = "Keep your information up to date.")
+        ScreenTop(textEditProfile, onBack, subtitle = textKeepYourInformationUpToDate)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             Box(Modifier.fillMaxWidth().padding(vertical = 18.dp), contentAlignment = Alignment.Center) { Avatar(n, 88.dp, badge = true) }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                RideTextField(n, { n = it.take(60) }, "Full name", RideIcons.Person, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next))
-                PickRow(RideIcons.Phone, "Phone number", phone, onChangePhone)
-                RideTextField(e, { e = it.take(80) }, "Email (optional)", RideIcons.Mail, isError = !emailOk, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next))
+                RideTextField(n, { n = it.take(60) }, textDetailsName, RideIcons.Person, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next))
+                PickRow(RideIcons.Phone, textFriendPhone, phone, onChangePhone)
+                RideTextField(e, { e = it.take(80) }, textDetailsEmail, RideIcons.Mail, isError = !emailOk, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next))
             }
-            Text("ADDITIONAL INFORMATION", color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
+            Text(textAdditionalInformation, color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                PickRow(RideIcons.Person, "Gender (optional)", gender) { genderSheet = true }
-                PickRow(RideIcons.Calendar, "Date of birth (optional)", dob.ifEmpty { "Select a date" }) {
+                PickRow(RideIcons.Person, textGenderOptional, localizedLabel(gender)) { genderSheet = true }
+                PickRow(RideIcons.Calendar, textDateOfBirthOptional, dob.ifEmpty { textSelectADate }) {
                     val d = LocalDate.now().minusYears(25)
                     DatePickerDialog(context, { _, y, m, day -> dob = LocalDate.of(y, m + 1, day).toString() }, d.year, d.monthValue - 1, d.dayOfMonth)
                         .apply { datePicker.maxDate = System.currentTimeMillis() }.show()
                 }
-                RideTextField(city, { city = it.take(60) }, "Current city", RideIcons.Pin, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done))
+                RideTextField(city, { city = it.take(60) }, textCurrentCity, RideIcons.Pin, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done))
             }
             Spacer(Modifier.height(16.dp))
         }
-        RideButton("Save changes", { onSave(n.trim(), e.trim()) }, enabled = canSave, modifier = Modifier.padding(vertical = 12.dp))
+        RideButton(textSaveChanges, { onSave(n.trim(), e.trim()) }, enabled = canSave, modifier = Modifier.padding(vertical = 12.dp))
     }
     if (genderSheet) {
         val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val scope = rememberCoroutineScope()
         ModalBottomSheet(onDismissRequest = { genderSheet = false }, sheetState = state, containerColor = c.bg, contentColor = c.fg, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
             Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
-                Text("Gender", color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                Text("Optional. You can change this any time.", color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+                Text(textGender, color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                Text(textOptionalYouCanChangeThisAnyTime, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
                 GroupCard {
                     Genders.forEachIndexed { i, g ->
                         if (i > 0) RowDivider()
                         Row(Modifier.fillMaxWidth().height(56.dp).clickable(role = Role.RadioButton) { gender = g; scope.launch { state.hide() }.invokeOnCompletion { genderSheet = false } }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(g, color = c.fg, fontSize = 15.sp, fontWeight = if (g == gender) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
+                            Text(localizedLabel(g), color = c.fg, fontSize = 15.sp, fontWeight = if (g == gender) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
                             if (g == gender) RideIcon(RideIcons.Check, c.accent)
                         }
                     }
@@ -179,4 +217,4 @@ private fun PickRow(icon: List<String>, label: String, value: String, onClick: (
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun ProfilePreview() = RideNowTheme(darkTheme = true) { ProfileScreen("Alex Morgan", "+1 555 012 3456", ThemeMode.System, {}, {}, {}, {}, {}) }
+private fun ProfilePreview() = RideNowTheme(darkTheme = true) { ProfileScreen(stringResource(R.string.text_alex_morgan), "+1 555 012 3456", ThemeMode.System, {}, {}, {}, {}, {}) }

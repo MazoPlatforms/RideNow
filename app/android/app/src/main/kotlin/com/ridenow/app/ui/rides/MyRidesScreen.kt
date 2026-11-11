@@ -1,5 +1,10 @@
 package com.ridenow.app.ui.rides
 
+import com.ridenow.app.ui.components.localizedLabel
+
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -28,36 +33,57 @@ import com.ridenow.app.ui.util.entrance
 enum class RideStatus(val label: String) { Completed("Completed"), Scheduled("Scheduled"), Cancelled("Cancelled") }
 data class RideItem(val date: String, val destination: String, val meta: String, val fare: String, val status: RideStatus)
 
-private val Rides = listOf(
-    RideItem("Wed, 4 Nov · 8:30 AM", "Nova Terminal, Gate 4", "Orbit · Booked", "$16.80", RideStatus.Scheduled),
-    RideItem("Today", "Helix Garden Plaza", "Orbit · 8.4 km · 19 min", "$16.80", RideStatus.Completed),
-    RideItem("Mon, 2 Nov", "Aurora Medical Centre", "Pulse · 5.2 km · 14 min", "$12.40", RideStatus.Completed),
-    RideItem("Sat, 31 Oct", "Helix Garden Plaza", "Nova XL · Cancelled", "—", RideStatus.Cancelled),
-)
+
 
 /** Ride history with filters. Sample data for now. [onOpen] receives the destination. */
 @Composable
 fun MyRidesScreen(onBack: () -> Unit, onBook: () -> Unit, onOpen: (RideItem) -> Unit, modifier: Modifier = Modifier) {
+    val textWed4Nov830Am = stringResource(R.string.text_wed_4_nov_8_30_am)
+    val textNovaTerminalGate4 = stringResource(R.string.text_nova_terminal_gate_4)
+    val textOrbitBooked = stringResource(R.string.text_orbit_booked)
+    val textScheduleToday = stringResource(R.string.schedule_today)
+    val textHelixGardenPlaza = stringResource(R.string.text_helix_garden_plaza)
+    val textOrbit84Km19Min = stringResource(R.string.text_orbit_8_4_km_19_min)
+    val textMon2Nov = stringResource(R.string.text_mon_2_nov)
+    val textAuroraMedicalCentre = stringResource(R.string.text_aurora_medical_centre)
+    val textPulse52Km14Min = stringResource(R.string.text_pulse_5_2_km_14_min)
+    val textSat31Oct = stringResource(R.string.text_sat_31_oct)
+    val textNovaXlCancelled = stringResource(R.string.text_nova_xl_cancelled)
+    val textMenuRides = stringResource(R.string.menu_rides)
+    val textAll = stringResource(R.string.text_all)
+    val textNoRidesYet = stringResource(R.string.text_no_rides_yet)
+    val textYourTripsAndReceiptsWillAppearHere = stringResource(R.string.text_your_trips_and_receipts_will_appear_here)
+    val textBookARide = stringResource(R.string.text_book_a_ride)
+    val textUpcoming = stringResource(R.string.text_upcoming)
+    val textPast = stringResource(R.string.text_past)
+
+    val Rides = listOf(
+        RideItem(textWed4Nov830Am, textNovaTerminalGate4, textOrbitBooked, "$16.80", RideStatus.Scheduled),
+        RideItem(textScheduleToday, textHelixGardenPlaza, textOrbit84Km19Min, "$16.80", RideStatus.Completed),
+        RideItem(textMon2Nov, textAuroraMedicalCentre, textPulse52Km14Min, "$12.40", RideStatus.Completed),
+        RideItem(textSat31Oct, textHelixGardenPlaza, textNovaXlCancelled, "—", RideStatus.Cancelled),
+    )
+
     val c = RideTheme.colors
     var filter by rememberSaveable { mutableStateOf<String?>(null) }
     val shown = Rides.filter { filter == null || it.status.label == filter }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
-        ScreenTop("Your Rides", onBack)
+        ScreenTop(textMenuRides, onBack)
         Row(Modifier.padding(top = 14.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Pill("All", filter == null) { filter = null }
-            RideStatus.values().forEach { s -> Pill(s.label, filter == s.label) { filter = s.label } }
+            Pill(textAll, filter == null) { filter = null }
+            RideStatus.values().forEach { s -> Pill(localizedLabel(s.label), filter == s.label) { filter = s.label } }
         }
         if (shown.isEmpty()) {
             Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Text("No rides yet", color = c.fg, fontSize = 24.sp, fontWeight = FontWeight.Light)
-                Text("Your trips and receipts will appear here.", color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp, bottom = 20.dp))
-                Box(Modifier.width(220.dp)) { RideButton("Book a ride", onBook) }
+                Text(textNoRidesYet, color = c.fg, fontSize = 24.sp, fontWeight = FontWeight.Light)
+                Text(textYourTripsAndReceiptsWillAppearHere, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp, bottom = 20.dp))
+                Box(Modifier.width(220.dp)) { RideButton(textBookARide, onBook) }
             }
         } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             val upcoming = shown.filter { it.status == RideStatus.Scheduled }
             val past = shown - upcoming.toSet()
-            if (upcoming.isNotEmpty()) { SectionLabel("UPCOMING"); upcoming.forEach { RideCard(it) { onOpen(it) }; Spacer(Modifier.height(8.dp)) } }
-            if (past.isNotEmpty()) { SectionLabel("PAST"); past.forEach { RideCard(it) { onOpen(it) }; Spacer(Modifier.height(8.dp)) } }
+            if (upcoming.isNotEmpty()) { SectionLabel(textUpcoming); upcoming.forEach { RideCard(it) { onOpen(it) }; Spacer(Modifier.height(8.dp)) } }
+            if (past.isNotEmpty()) { SectionLabel(textPast); past.forEach { RideCard(it) { onOpen(it) }; Spacer(Modifier.height(8.dp)) } }
             Spacer(Modifier.height(12.dp))
         }
     }
@@ -97,7 +123,7 @@ private fun RideCard(r: RideItem, onClick: () -> Unit) {
             Text(r.fare, color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             val on = r.status != RideStatus.Cancelled
             Text(
-                r.status.label, color = if (on) c.accent else c.muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                localizedLabel(r.status.label), color = if (on) c.accent else c.muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 6.dp).clip(RoundedCornerShape(50)).then(if (r.status == RideStatus.Completed) Modifier.background(c.accent.copy(alpha = 0.14f)) else Modifier.border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))).padding(horizontal = 10.dp, vertical = 3.dp),
             )
         }

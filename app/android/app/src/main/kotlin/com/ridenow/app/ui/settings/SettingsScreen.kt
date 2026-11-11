@@ -1,5 +1,10 @@
 package com.ridenow.app.ui.settings
 
+import java.util.Locale
+import com.ridenow.app.ui.more.prefs
+import androidx.compose.ui.platform.LocalContext
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -31,22 +36,25 @@ fun SettingsScreen(
 ) {
     val c = RideTheme.colors
     var sheet by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val langCode = context.prefs().getString("lang", "en") ?: "en"
+    val nativeLanguageName = Locale.forLanguageTag(langCode).let { loc -> loc.getDisplayLanguage(loc).replaceFirstChar { it.titlecaseChar() } }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
-        ScreenTop("Settings", onBack, subtitle = "Manage your account and app preferences.")
+        ScreenTop(stringResource(R.string.settings_title), onBack, subtitle = stringResource(R.string.settings_subtitle))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             GroupCard(Modifier.padding(top = 16.dp)) {
-                NavRow(RideIcons.Person, "Profile", { onOpen("Profile") }, subtitle = "View and edit your profile"); RowDivider()
-                NavRow(RideIcons.Card, "Payment Methods", { onOpen("Payments") }, subtitle = "Manage your payment options"); RowDivider()
-                NavRow(RideIcons.Receipt, "Transaction History", { onOpen("Transaction History") }, subtitle = "Your payments and ride transactions"); RowDivider()
-                NavRow(RideIcons.Pin, "Saved Places", { onOpen("Saved addresses") }, subtitle = "Manage your saved locations")
+                NavRow(RideIcons.Person, stringResource(R.string.settings_profile), { onOpen("Profile") }, subtitle = stringResource(R.string.settings_profile_sub)); RowDivider()
+                NavRow(RideIcons.Card, stringResource(R.string.settings_payments), { onOpen("Payments") }, subtitle = stringResource(R.string.settings_payments_sub)); RowDivider()
+                NavRow(RideIcons.Receipt, stringResource(R.string.settings_transactions), { onOpen("Transaction History") }, subtitle = stringResource(R.string.settings_transactions_sub)); RowDivider()
+                NavRow(RideIcons.Pin, stringResource(R.string.menu_saved), { onOpen("Saved addresses") }, subtitle = stringResource(R.string.settings_saved_sub))
             }
             GroupCard(Modifier.padding(top = 12.dp, bottom = 16.dp)) {
-                NavRow(RideIcons.Moon, "Appearance", { sheet = true }, subtitle = mode.label); RowDivider()
-                NavRow(RideIcons.Globe, "Language", { onOpen("Language") }, subtitle = "English"); RowDivider()
-                NavRow(RideIcons.Bell, "Notifications", { onOpen("Notification settings") }, subtitle = "Manage your notifications"); RowDivider()
-                NavRow(RideIcons.Shield, "Privacy & Security", { onOpen("Privacy & Security") }, subtitle = "Account and data controls"); RowDivider()
-                NavRow(RideIcons.Help, "Help & Support", { onOpen("Help & Support") }, subtitle = "Get help or contact us"); RowDivider()
-                NavRow(RideIcons.Info, "About", { onOpen("Legal & About") }, subtitle = "App version, terms and policies")
+                NavRow(RideIcons.Moon, stringResource(R.string.settings_appearance), { sheet = true }, subtitle = stringResource(mode.labelRes)); RowDivider()
+                NavRow(RideIcons.Globe, stringResource(R.string.settings_language), { onOpen("Language") }, subtitle = nativeLanguageName); RowDivider()
+                NavRow(RideIcons.Bell, stringResource(R.string.menu_notifications), { onOpen("Notification settings") }, subtitle = stringResource(R.string.settings_notifications_sub)); RowDivider()
+                NavRow(RideIcons.Shield, stringResource(R.string.settings_privacy), { onOpen("Privacy & Security") }, subtitle = stringResource(R.string.settings_privacy_sub)); RowDivider()
+                NavRow(RideIcons.Help, stringResource(R.string.menu_help), { onOpen("Help & Support") }, subtitle = stringResource(R.string.settings_help_sub)); RowDivider()
+                NavRow(RideIcons.Info, stringResource(R.string.settings_about), { onOpen("Legal & About") }, subtitle = stringResource(R.string.settings_about_sub))
             }
         }
     }
@@ -62,13 +70,13 @@ fun AppearanceSheet(mode: ThemeMode, onMode: (ThemeMode) -> Unit, onDismiss: () 
     val scope = rememberCoroutineScope()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = c.bg, contentColor = c.fg, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
-            Text("Appearance", color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            Text("Choose how the app looks on your device.", color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+            Text(stringResource(R.string.settings_appearance), color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.settings_appearance_sub), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
             GroupCard {
                 ThemeMode.values().forEachIndexed { i, m ->
                     if (i > 0) RowDivider()
                     Row(Modifier.fillMaxWidth().height(56.dp).clickable(role = Role.RadioButton) { onMode(m); scope.launch { state.hide() }.invokeOnCompletion { onDismiss() } }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(m.label, color = c.fg, fontSize = 15.sp, fontWeight = if (m == mode) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
+                        Text(stringResource(m.labelRes), color = c.fg, fontSize = 15.sp, fontWeight = if (m == mode) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
                         Box(Modifier.size(20.dp).clip(CircleShape).then(if (m == mode) Modifier.background(c.accent) else Modifier.border(1.5.dp, c.muted, CircleShape)), contentAlignment = Alignment.Center) {
                             if (m == mode) Box(Modifier.size(8.dp).clip(CircleShape).background(c.onAccent))
                         }

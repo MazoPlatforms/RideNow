@@ -1,5 +1,10 @@
 package com.ridenow.app.ui.saved
 
+import com.ridenow.app.ui.components.localizedLabel
+
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -37,6 +42,13 @@ private val Suggestions = listOf(
 /** Save a Home, Work or other place. [onSave] receives the label and address. */
 @Composable
 fun AddAddressScreen(initialLabel: String, onBack: () -> Unit, onSave: (String, String) -> Unit, modifier: Modifier = Modifier) {
+    val textAddValueAddress = stringResource(R.string.text_add_value_address)
+    val textSaveItOnceForOneTapRides = stringResource(R.string.text_save_it_once_for_one_tap_rides)
+    val textSearchAddress = stringResource(R.string.text_search_address)
+    val textUseCurrentLocation = stringResource(R.string.text_use_current_location)
+    val text128MeridianWalkSector7 = stringResource(R.string.text_text_128_meridian_walk_sector_7)
+    val textSaveAddress = stringResource(R.string.text_save_address)
+
     val c = RideTheme.colors
     var label by rememberSaveable { mutableStateOf(initialLabel) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -44,20 +56,20 @@ fun AddAddressScreen(initialLabel: String, onBack: () -> Unit, onSave: (String, 
     val q = query.trim()
     val hits = if (q.isEmpty()) emptyList() else Suggestions.filter { it.first.contains(q, true) || it.second.contains(q, true) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
-        ScreenTop("Add ${label.lowercase()} address", onBack, subtitle = "Save it once for one-tap rides.")
+        ScreenTop(textAddValueAddress.format(localizedLabel(label).lowercase()), onBack, subtitle = textSaveItOnceForOneTapRides)
         BasicTextField(
             query, { query = it; address = "" }, singleLine = true, textStyle = TextStyle(color = c.fg, fontSize = 16.sp), cursorBrush = SolidColor(c.accent),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), modifier = Modifier.padding(top = 14.dp).fillMaxWidth().height(56.dp),
             decorationBox = { inner ->
                 Row(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     RideIcon(RideIcons.Search, c.accent); Spacer(Modifier.width(12.dp))
-                    Box(Modifier.weight(1f)) { if (query.isEmpty()) Text("Search address", color = c.muted, fontSize = 16.sp); inner() }
+                    Box(Modifier.weight(1f)) { if (query.isEmpty()) Text(textSearchAddress, color = c.muted, fontSize = 16.sp); inner() }
                 }
             },
         )
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             Spacer(Modifier.height(12.dp))
-            GroupCard { NavRow(RideIcons.Pin, "Use current location", { address = "128 Meridian Walk, Sector 7"; query = "" }, subtitle = "128 Meridian Walk, Sector 7") }
+            GroupCard { NavRow(RideIcons.Pin, textUseCurrentLocation, { address = text128MeridianWalkSector7; query = "" }, subtitle = text128MeridianWalkSector7) }
             if (hits.isNotEmpty()) GroupCard(Modifier.padding(top = 10.dp)) {
                 hits.forEachIndexed { i, (t, s) -> if (i > 0) RowDivider(); NavRow(RideIcons.Pin, t, { address = "$t, $s"; query = "" }, subtitle = s) }
             }
@@ -67,15 +79,15 @@ fun AddAddressScreen(initialLabel: String, onBack: () -> Unit, onSave: (String, 
             Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("Home", "Work", "Other").forEach { l ->
                     val on = l == label
-                    Text(l, color = c.fg, fontSize = 14.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                    Text(localizedLabel(l), color = c.fg, fontSize = 14.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
                         modifier = Modifier.height(40.dp).wrapContentHeight().clip(RoundedCornerShape(20.dp)).background(if (on) c.accent.copy(alpha = 0.14f) else androidx.compose.ui.graphics.Color.Transparent).border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(20.dp)).clickable(role = Role.RadioButton) { label = l }.padding(horizontal = 18.dp, vertical = 9.dp))
                 }
             }
         }
-        RideButton("Save address", { onSave(label, address) }, enabled = address.isNotEmpty(), modifier = Modifier.padding(vertical = 12.dp))
+        RideButton(textSaveAddress, { onSave(label, address) }, enabled = address.isNotEmpty(), modifier = Modifier.padding(vertical = 12.dp))
     }
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun AddAddressPreview() = RideNowTheme(darkTheme = true) { AddAddressScreen("Home", {}, { _, _ -> }) }
+private fun AddAddressPreview() = RideNowTheme(darkTheme = true) { AddAddressScreen(stringResource(R.string.home_saved_home), {}, { _, _ -> }) }

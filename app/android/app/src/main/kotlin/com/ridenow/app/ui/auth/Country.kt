@@ -1,12 +1,17 @@
 package com.ridenow.app.ui.auth
 
 import androidx.compose.ui.text.AnnotatedString
+import java.util.Locale
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 
 /** [pattern] uses '#' for a digit, e.g. "(###) ### ####". [min]..[max] is the national number length. */
 data class Country(val iso: String, val name: String, val dial: String, val pattern: String, val min: Int, val max: Int) {
+    /** Country name in the app's current language, provided by Android from the ISO code. */
+    val displayName: String
+        get() = Locale("", iso).getDisplayCountry(Locale.getDefault()).ifBlank { name }
+
     /** Flag emoji built from the ISO code, e.g. "LK" -> flag of Sri Lanka. */
     val flag: String
         get() = iso.map { String(Character.toChars(0x1F1E6 + (it - 'A'))) }.joinToString("")

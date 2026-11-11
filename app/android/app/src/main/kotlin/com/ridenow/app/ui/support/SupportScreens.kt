@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.support
 
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -48,36 +51,59 @@ private const val SupportEmail = "support@ridenow.app"
 /** Ways to reach support. Call and email open the phone's own apps. */
 @Composable
 fun ContactSupportScreen(onBack: () -> Unit, onChat: () -> Unit, onReport: () -> Unit, modifier: Modifier = Modifier) {
+    val textContactSupport = stringResource(R.string.text_contact_support)
+    val textChooseHowYouWouldLikeToReachUs = stringResource(R.string.text_choose_how_you_would_like_to_reach_us)
+    val textChatWithSupport = stringResource(R.string.text_chat_with_support)
+    val textSendAMessageFromTheApp = stringResource(R.string.text_send_a_message_from_the_app)
+    val textCallSupport = stringResource(R.string.text_call_support)
+    val textSpeakWithSomeone = stringResource(R.string.text_speak_with_someone)
+    val textEmailUs = stringResource(R.string.text_email_us)
+    val textAboutARecentTrip = stringResource(R.string.text_about_a_recent_trip)
+    val textHelixGardenPlaza = stringResource(R.string.text_helix_garden_plaza)
+    val textToday1680 = stringResource(R.string.text_today_16_80)
+    val textReportAnIssue = stringResource(R.string.text_report_an_issue)
+
     val c = RideTheme.colors
     val context = LocalContext.current
     fun launch(i: Intent) { runCatching { context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
-        ScreenTop("Contact support", onBack, subtitle = "Choose how you would like to reach us.")
+        ScreenTop(textContactSupport, onBack, subtitle = textChooseHowYouWouldLikeToReachUs)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             GroupCard(Modifier.padding(top = 16.dp)) {
-                NavRow(RideIcons.Message, "Chat with support", onChat, subtitle = "Send a message from the app"); RowDivider()
-                NavRow(RideIcons.Call, "Call support", { launch(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$SupportPhone"))) }, subtitle = "Speak with someone"); RowDivider()
-                NavRow(RideIcons.Mail, "Email us", { launch(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$SupportEmail"))) }, subtitle = SupportEmail)
+                NavRow(RideIcons.Message, textChatWithSupport, onChat, subtitle = textSendAMessageFromTheApp); RowDivider()
+                NavRow(RideIcons.Call, textCallSupport, { launch(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$SupportPhone"))) }, subtitle = textSpeakWithSomeone); RowDivider()
+                NavRow(RideIcons.Mail, textEmailUs, { launch(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$SupportEmail"))) }, subtitle = SupportEmail)
             }
-            SectionLabel("ABOUT A RECENT TRIP")
-            GroupCard { NavRow(RideIcons.Car, "Helix Garden Plaza", onReport, subtitle = "Today · $16.80") }
+            SectionLabel(textAboutARecentTrip)
+            GroupCard { NavRow(RideIcons.Car, textHelixGardenPlaza, onReport, subtitle = textToday1680) }
         }
-        RideButton("Report an issue", onReport, style = RideButtonStyle.Text, modifier = Modifier.padding(vertical = 12.dp).border(1.dp, c.border, RoundedCornerShape(28.dp)).height(52.dp))
+        RideButton(textReportAnIssue, onReport, style = RideButtonStyle.Text, modifier = Modifier.padding(vertical = 12.dp).border(1.dp, c.border, RoundedCornerShape(28.dp)).height(52.dp))
     }
 }
 
 private class Msg(val mine: Boolean, val text: String)
-private val Replies = listOf(
-    "Thanks for telling us. Can you confirm which trip this was?",
-    "I am sorry about that. I have noted it on your trip and a specialist will follow up here.",
-    "Is there anything else we can help with?",
-)
+
 
 /** Demo support chat: the agent replies with canned answers after a short delay. */
 @Composable
 fun SupportChatScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
+    val Replies = listOf(
+        stringResource(R.string.extra_thanks_for_telling_us_can_you_confirm_which_trip_this_was),
+        stringResource(R.string.extra_i_am_sorry_about_that_i_have_noted_it_on_your_trip_and_a_specialist_wi),
+        stringResource(R.string.extra_is_there_anything_else_we_can_help_with),
+    )
+    val textHiAlexHowCanWeHelpWithYourTripToday = stringResource(R.string.text_hi_alex_how_can_we_help_with_your_trip_today)
+    val textSearchBack = stringResource(R.string.search_back)
+    val textRidenowSupport = stringResource(R.string.text_ridenow_support)
+    val textOnline = stringResource(R.string.text_online)
+    val textMyDriverTookADifferentRoute = stringResource(R.string.text_my_driver_took_a_different_route)
+    val textIWasChargedMore = stringResource(R.string.text_i_was_charged_more)
+    val textILostAnItem = stringResource(R.string.text_i_lost_an_item)
+    val textTypeAMessage = stringResource(R.string.text_type_a_message)
+    val textSend = stringResource(R.string.text_send)
+
     val c = RideTheme.colors
-    val messages = remember { mutableStateListOf(Msg(false, "Hi Alex, how can we help with your trip today?")) }
+    val messages = remember { mutableStateListOf(Msg(false, textHiAlexHowCanWeHelpWithYourTripToday)) }
     var draft by remember { mutableStateOf("") }
     var replies by remember { mutableIntStateOf(0) }
     val list = rememberLazyListState()
@@ -90,10 +116,10 @@ fun SupportChatScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = "Back" }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
+            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
             Box(Modifier.size(40.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)).border(1.dp, c.accent, CircleShape), contentAlignment = Alignment.Center) { RideIcon(RideIcons.Message, c.accent) }
             Spacer(Modifier.width(12.dp))
-            Column { Text("RideNow Support", color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold); Text("Online", color = c.accent, fontSize = 12.sp) }
+            Column { Text(textRidenowSupport, color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold); Text(textOnline, color = c.accent, fontSize = 12.sp) }
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
             items(messages) { m ->
@@ -107,7 +133,7 @@ fun SupportChatScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             }
         }
         if (messages.size == 1) Row(Modifier.horizontalScroll(rememberScrollState()).padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("My driver took a different route", "I was charged more", "I lost an item").forEach { q ->
+            listOf(textMyDriverTookADifferentRoute, textIWasChargedMore, textILostAnItem).forEach { q ->
                 Text(q, color = c.fg, fontSize = 13.sp, modifier = Modifier.clip(RoundedCornerShape(19.dp)).border(1.dp, c.border, RoundedCornerShape(19.dp)).clickable(role = Role.Button) { send(q) }.padding(horizontal = 14.dp, vertical = 10.dp))
             }
         }
@@ -116,10 +142,10 @@ fun SupportChatScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 draft, { draft = it.take(500) }, singleLine = true, textStyle = TextStyle(color = c.fg, fontSize = 15.sp), cursorBrush = SolidColor(c.accent),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send(draft) }),
                 modifier = Modifier.weight(1f).height(52.dp),
-                decorationBox = { inner -> Box(Modifier.fillMaxSize().clip(RoundedCornerShape(26.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(26.dp)).padding(horizontal = 18.dp), contentAlignment = Alignment.CenterStart) { if (draft.isEmpty()) Text("Type a message", color = c.muted, fontSize = 15.sp); inner() } },
+                decorationBox = { inner -> Box(Modifier.fillMaxSize().clip(RoundedCornerShape(26.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(26.dp)).padding(horizontal = 18.dp), contentAlignment = Alignment.CenterStart) { if (draft.isEmpty()) Text(textTypeAMessage, color = c.muted, fontSize = 15.sp); inner() } },
             )
             Spacer(Modifier.width(10.dp))
-            Box(Modifier.size(52.dp).clip(CircleShape).background(BrandYellow).clickable(role = Role.Button) { send(draft) }.semantics { contentDescription = "Send" }, contentAlignment = Alignment.Center) {
+            Box(Modifier.size(52.dp).clip(CircleShape).background(BrandYellow).clickable(role = Role.Button) { send(draft) }.semantics { contentDescription = textSend }, contentAlignment = Alignment.Center) {
                 RideIcon(listOf("M3 10l14-6-5 14-2-6z"), Ink, size = 20.dp)
             }
         }

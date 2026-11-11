@@ -66,4 +66,4 @@ fun RideNowTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composabl
 }
 
 /** Appearance setting: follow the phone, or force light or dark. */
-enum class ThemeMode(val label: String) { System("System default"), Light("Light"), Dark("Dark") }
+enum class ThemeMode(val labelRes: Int) { System(com.ridenow.app.R.string.theme_system), Light(com.ridenow.app.R.string.theme_light), Dark(com.ridenow.app.R.string.theme_dark) }

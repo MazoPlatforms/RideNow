@@ -76,6 +76,9 @@ private const val CODE_LENGTH = 6
 /** Step 2 of 3. Demo rule: any code is accepted except 000000, which shows the error state. */
 @Composable
 fun OtpScreen(phone: String, onBack: () -> Unit, onVerified: () -> Unit, modifier: Modifier = Modifier) {
+    val textSearchBack = stringResource(R.string.search_back)
+    val text6DigitVerificationCode = stringResource(R.string.text_text_6_digit_verification_code)
+
     val c = RideTheme.colors
     val haptics = LocalHapticFeedback.current
     var code by rememberSaveable { mutableStateOf("") }
@@ -109,7 +112,7 @@ fun OtpScreen(phone: String, onBack: () -> Unit, onVerified: () -> Unit, modifie
     ) {
         Box(
             Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack)
-                .semantics { contentDescription = "Back" },
+                .semantics { contentDescription = textSearchBack },
             contentAlignment = Alignment.Center,
         ) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
 
@@ -142,7 +145,7 @@ fun OtpScreen(phone: String, onBack: () -> Unit, onVerified: () -> Unit, modifie
             },
             modifier = Modifier.padding(top = 20.dp).fillMaxWidth().offset(x = shake.value.dp)
                 .focusRequester(focusRequester).onFocusChanged { focused = it.isFocused }
-                .semantics { contentDescription = "6-digit verification code" },
+                .semantics { contentDescription = text6DigitVerificationCode },
             singleLine = true,
             textStyle = TextStyle(color = Color.Transparent),
             cursorBrush = SolidColor(Color.Transparent),

@@ -87,6 +87,8 @@ private val EmailRegex = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailsScreen(onBack: () -> Unit, onDone: (name: String, email: String) -> Unit, modifier: Modifier = Modifier) {
+    val textSearchBack = stringResource(R.string.search_back)
+
     val c = RideTheme.colors
     val context = LocalContext.current
     val focus = LocalFocusManager.current
@@ -109,7 +111,7 @@ fun DetailsScreen(onBack: () -> Unit, onDone: (name: String, email: String) -> U
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Box(
                 Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack)
-                    .semantics { contentDescription = "Back" },
+                    .semantics { contentDescription = textSearchBack },
                 contentAlignment = Alignment.Center,
             ) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
 
@@ -168,9 +170,11 @@ fun DetailsScreen(onBack: () -> Unit, onDone: (name: String, email: String) -> U
 
 @Composable
 private fun Avatar(photo: Bitmap?, onClick: () -> Unit) {
+    val textPhotoTitle = stringResource(R.string.photo_title)
+
     val c = RideTheme.colors
     val accent = c.accent
-    Box(Modifier.size(112.dp).semantics { contentDescription = "Profile photo" }) {
+    Box(Modifier.size(112.dp).semantics { contentDescription = textPhotoTitle }) {
         Box(
             Modifier.fillMaxSize().clip(CircleShape).background(c.field).clickable(role = Role.Button, onClick = onClick)
                 .drawBehind {

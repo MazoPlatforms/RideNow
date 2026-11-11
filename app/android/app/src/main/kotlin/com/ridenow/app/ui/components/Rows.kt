@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.components
 
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -18,9 +21,11 @@ import com.ridenow.app.ui.theme.RideTheme
 /** Back button, large title and optional subtitle used at the top of list-style screens. */
 @Composable
 fun ScreenTop(title: String, onBack: () -> Unit, modifier: Modifier = Modifier, subtitle: String? = null) {
+    val textSearchBack = stringResource(R.string.search_back)
+
     val c = RideTheme.colors
     Column(modifier) {
-        Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = "Back" }, contentAlignment = Alignment.Center) {
+        Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) {
             RideIcon(RideIcons.Back, c.fg, size = 22.dp)
         }
         Text(title, color = c.fg, fontSize = 30.sp, fontWeight = FontWeight.Light, modifier = Modifier.semantics { heading() })

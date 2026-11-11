@@ -1,5 +1,10 @@
 package com.ridenow.app.ui
 
+import com.ridenow.app.ui.components.localizedLabel
+
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
+
 import androidx.activity.compose.BackHandler
 import com.ridenow.app.ui.more.*
 import com.ridenow.app.ui.theme.AccentPrefs
@@ -86,9 +91,26 @@ private object SessionFlags { var splashDone = false }
 
 @Composable
 fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
+    val textAlexMorgan = stringResource(R.string.text_alex_morgan)
+    val textAna = stringResource(R.string.text_ana)
+    val textBen = stringResource(R.string.text_ben)
+    val text128MeridianWalk = stringResource(R.string.text_text_128_meridian_walk)
+    val text128MeridianWalkSector7 = stringResource(R.string.text_text_128_meridian_walk_sector_7)
+    val textNovaTerminalGate4 = stringResource(R.string.text_nova_terminal_gate_4)
+    val textSector12OrbitRing = stringResource(R.string.text_sector_12_orbit_ring)
+    val textHelixGardenPlaza = stringResource(R.string.text_helix_garden_plaza)
+    val textSector9GardenLoop = stringResource(R.string.text_sector_9_garden_loop)
+    val textAuroraMedicalCentre = stringResource(R.string.text_aurora_medical_centre)
+    val textSector3SkylineWay = stringResource(R.string.text_sector_3_skyline_way)
+    val textSetPickup = stringResource(R.string.text_set_pickup)
+    val textPickupConfirm = stringResource(R.string.pickup_confirm)
+    val textMapSetDrop = stringResource(R.string.map_set_drop)
+    val textSavedPlace = stringResource(R.string.text_saved_place)
+    val textValueScreenGoesHere = stringResource(R.string.text_value_screen_goes_here)
+
     var screen by rememberSaveable { mutableStateOf(Screen.Splash) }
     var phone by rememberSaveable { mutableStateOf("") }
-    var name by rememberSaveable { mutableStateOf("Alex Morgan") }
+    var name by rememberSaveable { mutableStateOf(textAlexMorgan) }
     var email by rememberSaveable { mutableStateOf("") }
     var stub by rememberSaveable { mutableStateOf("") }
     var stubBack by rememberSaveable { mutableStateOf(Screen.Home) }
@@ -102,7 +124,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     val backStack = remember { mutableStateListOf<Screen>() }
     val back = { screen = backStack.removeLastOrNull() ?: Screen.Home }
     var doc by rememberSaveable { mutableStateOf("") }
-    val contacts = remember { mutableStateListOf(Contact("Ana", "+15550101"), Contact("Ben", "+15550102")) }
+    val contacts = remember { mutableStateListOf(Contact(textAna, "+15550101"), Contact(textBen, "+15550102")) }
     val scope = rememberCoroutineScope()
     val me = rememberUserLocation()
     var destLat by rememberSaveable { mutableStateOf(0.0) }
@@ -127,13 +149,13 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     }
     var netKey by remember { mutableIntStateOf(0) }
     val online = rememberOnline(netKey)
-    var pickup by rememberSaveable { mutableStateOf("128 Meridian Walk") }
-    var home by rememberSaveable { mutableStateOf<String?>("128 Meridian Walk, Sector 7") }
+    var pickup by rememberSaveable { mutableStateOf(text128MeridianWalk) }
+    var home by rememberSaveable { mutableStateOf<String?>(text128MeridianWalkSector7) }
     var work by rememberSaveable { mutableStateOf<String?>(null) }
     var friend by rememberSaveable { mutableStateOf<String?>(null) }
     var mapFor by rememberSaveable { mutableStateOf("drop") }
     var addLabel by rememberSaveable { mutableStateOf("Home") }
-    val others = remember { mutableStateListOf("Nova Terminal, Gate 4" to "Sector 12, Orbit Ring", "Helix Garden Plaza" to "Sector 9, Garden Loop", "Aurora Medical Centre" to "Sector 3, Skyline Way") }
+    val others = remember { mutableStateListOf(textNovaTerminalGate4 to textSector12OrbitRing, textHelixGardenPlaza to textSector9GardenLoop, textAuroraMedicalCentre to textSector3SkylineWay) }
     val nav = { to: Screen -> backStack.add(screen); screen = to }
     val shownPhone = formatPhoneForDisplay(phone.ifBlank { "+1 555 012 3456" })
     val open = { label: String -> stubBack = screen; stub = label; screen = Screen.Stub }
@@ -330,8 +352,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.MapPick -> {
                 BackHandler { back() }
-                if (mapFor == "pickup") MapPickerScreen("Set pickup", "Confirm pickup", onBack = { back() }, onConfirm = { addr, _ -> pickup = addr; back() })
-                else MapPickerScreen("Set drop location", "Set drop location", onBack = { back() }, onConfirm = { addr, ll -> pickDest(addr, null, ll); isReturn = false; screen = Screen.Options })
+                if (mapFor == "pickup") MapPickerScreen(textSetPickup, textPickupConfirm, onBack = { back() }, onConfirm = { addr, _ -> pickup = addr; back() })
+                else MapPickerScreen(textMapSetDrop, textMapSetDrop, onBack = { back() }, onConfirm = { addr, ll -> pickDest(addr, null, ll); isReturn = false; screen = Screen.Options })
             }
             Screen.ShareTrip -> {
                 BackHandler { back() }
@@ -340,7 +362,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             Screen.ChangePickup -> {
                 BackHandler { back() }
                 val places = buildList {
-                    add("Current location" to "128 Meridian Walk"); home?.let { add("Home" to it) }; work?.let { add("Work" to it) }; others.forEach { add(it.first to it.second) }
+                    add("Current location" to text128MeridianWalk); home?.let { add("Home" to it) }; work?.let { add("Work" to it) }; others.forEach { add(it.first to it.second) }
                 }
                 ChangePickupScreen(pickup, places, onBack = { back() }, onConfirm = { pickup = it; back() }, onMap = { mapFor = "pickup"; screen = Screen.MapPick })
             }
@@ -351,17 +373,17 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             Screen.AddAddr -> {
                 BackHandler { back() }
                 AddAddressScreen(addLabel, onBack = { back() }, onSave = { l, a ->
-                    when (l) { "Home" -> home = a; "Work" -> work = a; else -> others.add(0, a.substringBefore(",") to a.substringAfter(", ", "Saved place")) }
+                    when (l) { "Home" -> home = a; "Work" -> work = a; else -> others.add(0, a.substringBefore(",") to a.substringAfter(", ", textSavedPlace)) }
                     back()
                 })
             }
             Screen.Stub -> if (MoreRoutes.handles(stub)) {
-                key(stub) { MoreHost(stub, MoreCtx(name, shownPhone, dest.ifBlank { "Helix Garden Plaza" }, pickup, vehicle, scheduled), moreNav) }
+                key(stub) { MoreHost(stub, MoreCtx(name, shownPhone, dest.ifBlank { textHelixGardenPlaza }, pickup, vehicle, scheduled), moreNav) }
             } else {
                 BackHandler { screen = stubBack }
                 val c = RideTheme.colors
                 Box(Modifier.fillMaxSize().background(c.bg), contentAlignment = Alignment.Center) {
-                    Text("$stub screen goes here", color = c.muted, fontSize = 14.sp)
+                    Text(textValueScreenGoesHere.format(localizedLabel(stub)), color = c.muted, fontSize = 14.sp)
                 }
             }
         }

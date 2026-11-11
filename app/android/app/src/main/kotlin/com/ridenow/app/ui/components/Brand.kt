@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.components
 
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
@@ -27,10 +29,12 @@ fun LogoMark(width: Dp, modifier: Modifier = Modifier) {
 /** The "RideNow" wordmark, sized by height. */
 @Composable
 fun Wordmark(height: Dp, modifier: Modifier = Modifier) {
+    val textAppName = stringResource(R.string.app_name)
+
     val dark = RideTheme.colors.isDark
     Image(
         painter = painterResource(if (dark) R.drawable.ridenow_wordmark_dark else R.drawable.ridenow_wordmark_light),
-        contentDescription = "RideNow",
+        contentDescription = textAppName,
         modifier = modifier.height(height).aspectRatio(if (dark) 929f / 178f else 1057f / 183f),
         contentScale = ContentScale.Fit,
     )

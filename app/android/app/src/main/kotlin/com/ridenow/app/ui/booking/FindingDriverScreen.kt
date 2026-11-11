@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.booking
 
+import androidx.compose.ui.res.stringResource
+import com.ridenow.app.R
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.remember
 import com.google.android.gms.maps.model.CameraPosition
@@ -65,6 +67,8 @@ import kotlinx.coroutines.delay
 /** Radar-style search for a driver. Demo: finds one after about 6 seconds and calls [onFound]. */
 @Composable
 fun FindingDriverScreen(destination: String, vehicleIndex: Int, returnTrip: Boolean, onFound: () -> Unit, onCancel: () -> Unit, me: LatLng, modifier: Modifier = Modifier) {
+    val textValueValueSeats = stringResource(R.string.text_value_value_seats)
+
     val c = RideTheme.colors
     val v = Vehicles[vehicleIndex]
     val reduce = rememberReducedMotion()
@@ -89,7 +93,7 @@ fun FindingDriverScreen(destination: String, vehicleIndex: Int, returnTrip: Bool
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent)); Spacer(Modifier.width(8.dp))
-            Text("Current location  →  $destination", color = c.fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(stringResource(R.string.finding_route, stringResource(R.string.search_current), destination), color = c.fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().shadow(16.dp, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), ambientColor = Color.Black, spotColor = Color.Black)
@@ -97,8 +101,8 @@ fun FindingDriverScreen(destination: String, vehicleIndex: Int, returnTrip: Bool
                 .navigationBarsPadding().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 14.dp).entrance(100, 40),
         ) {
             Box(Modifier.align(Alignment.CenterHorizontally).size(width = 40.dp, height = 4.dp).clip(CircleShape).background(c.border))
-            Text("Finding your driver…", color = c.fg, fontSize = 26.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 16.dp).semantics { heading() })
-            Text("Matching you with the nearest ${v.name}.", color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+            Text(stringResource(R.string.finding_title), color = c.fg, fontSize = 26.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 16.dp).semantics { heading() })
+            Text(stringResource(R.string.finding_match, v.name), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
             BoxWithConstraints(Modifier.padding(top = 18.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(c.line)) {
                 Box(Modifier.fillMaxHeight().width(maxWidth * 0.4f).offset(x = maxWidth * (-0.4f + 1.4f * bar)).background(c.accent))
             }
@@ -108,16 +112,16 @@ fun FindingDriverScreen(destination: String, vehicleIndex: Int, returnTrip: Bool
             ) {
                 VehicleArt(v.style, 64.dp); Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("${v.name} · ${v.seats} seats", color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    Text("Pickup in about ${v.etaMin} min", color = c.muted, fontSize = 12.sp)
+                    Text(textValueValueSeats.format(v.name, v.seats), color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.finding_eta, v.etaMin), color = c.muted, fontSize = 12.sp)
                 }
                 Text(money(v.fareFor(returnTrip)), color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
-            RideButton("Cancel request", onCancel, style = RideButtonStyle.Text, modifier = Modifier.padding(top = 14.dp).border(1.dp, c.border, RoundedCornerShape(28.dp)))
+            RideButton(stringResource(R.string.finding_cancel), onCancel, style = RideButtonStyle.Text, modifier = Modifier.padding(top = 14.dp).border(1.dp, c.border, RoundedCornerShape(28.dp)))
         }
     }
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun FindingPreview() = RideNowTheme(darkTheme = true) { FindingDriverScreen("Helix Garden Plaza", 1, false, {}, {}, LatLng(0.0, 0.0)) }
+private fun FindingPreview() = RideNowTheme(darkTheme = true) { FindingDriverScreen(stringResource(R.string.text_helix_garden_plaza), 1, false, {}, {}, LatLng(0.0, 0.0)) }

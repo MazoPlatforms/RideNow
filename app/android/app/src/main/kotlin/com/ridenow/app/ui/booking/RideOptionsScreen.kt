@@ -56,21 +56,27 @@ fun RideOptionsScreen(
     destination: String, returnTrip: Boolean, initial: Int, onBack: () -> Unit,
     onContinue: (Int) -> Unit, onLater: (Int) -> Unit, route: RouteInfo?, from: LatLng, to: LatLng?, modifier: Modifier = Modifier,
 ) {
+    val textValueKmValueMin = stringResource(R.string.text_value_km_value_min)
+    val textValueKm = stringResource(R.string.text_value_km)
+    val textValueMin = stringResource(R.string.text_value_min)
+    val textValueBags = stringResource(R.string.text_value_bags)
+
     val c = RideTheme.colors
+    val backLabel = stringResource(R.string.search_back)
     var selected by rememberSaveable { mutableIntStateOf(initial) }
     val v = Vehicles[selected]
     Box(modifier.fillMaxSize().background(c.bg)) {
-        RouteMap(Modifier.fillMaxSize(), from, to, route, "${route?.km ?: TripKm} km · ${route?.minutes ?: TripMinutes} min", bottomPadding = 430.dp)
+        RouteMap(Modifier.fillMaxSize(), from, to, route, textValueKmValueMin.format(route?.km ?: TripKm, route?.minutes ?: TripMinutes), bottomPadding = 430.dp)
 
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(48.dp).clip(CircleShape).background(c.bg).border(1.dp, c.line, CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = "Back" },
+                Modifier.size(48.dp).clip(CircleShape).background(c.bg).border(1.dp, c.line, CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = backLabel },
                 contentAlignment = Alignment.Center,
             ) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
             Spacer(Modifier.width(10.dp))
             Row(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(24.dp)).background(c.bg).border(1.dp, c.line, RoundedCornerShape(24.dp)).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent)); Spacer(Modifier.width(8.dp))
-                Text("Current location", color = c.fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.search_current), color = c.fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("  →  ", color = c.muted, fontSize = 13.sp)
                 Text(destination, color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -88,10 +94,10 @@ fun RideOptionsScreen(
                 Vehicles.forEachIndexed { i, veh -> VehicleRow(veh, returnTrip, i == selected) { selected = i } }
             }
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Stat(stringResource(R.string.ride_distance), "${route?.km ?: TripKm} km", Modifier.weight(1f))
-                Stat(stringResource(R.string.ride_time), "${route?.minutes ?: TripMinutes} min", Modifier.weight(1f))
+                Stat(stringResource(R.string.ride_distance), textValueKm.format(route?.km ?: TripKm), Modifier.weight(1f))
+                Stat(stringResource(R.string.ride_time), textValueMin.format(route?.minutes ?: TripMinutes), Modifier.weight(1f))
                 Stat(stringResource(R.string.ride_seats), "${v.seats}", Modifier.weight(1f))
-                Stat(stringResource(R.string.ride_luggage), "${v.luggage} bags", Modifier.weight(1f))
+                Stat(stringResource(R.string.ride_luggage), textValueBags.format(v.luggage), Modifier.weight(1f))
             }
             Row(Modifier.padding(top = 14.dp, bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) { RideButton(stringResource(R.string.ride_continue), { onContinue(selected) }) }
@@ -103,11 +109,14 @@ fun RideOptionsScreen(
 
 @Composable
 private fun VehicleRow(v: Vehicle, returnTrip: Boolean, on: Boolean, onClick: () -> Unit) {
+    val textValueValueSeatsValue = stringResource(R.string.text_value_value_seats_value)
+    val textValueSeatsValueMinAway = stringResource(R.string.text_value_seats_value_min_away)
+
     val c = RideTheme.colors
     Row(
         Modifier.fillMaxWidth().height(76.dp).clip(RoundedCornerShape(16.dp)).background(if (on) c.accent.copy(alpha = 0.14f) else c.field)
             .border(if (on) 1.5.dp else 1.dp, if (on) c.accent else c.border, RoundedCornerShape(16.dp)).clickable(role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 12.dp).semantics { contentDescription = "${v.name}, ${v.seats} seats, ${money(v.fareFor(returnTrip))}" },
+            .padding(horizontal = 12.dp).semantics { contentDescription = textValueValueSeatsValue.format(v.name, v.seats, money(v.fareFor(returnTrip))) },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         VehicleArt(v.style, 76.dp)
@@ -116,12 +125,12 @@ private fun VehicleRow(v: Vehicle, returnTrip: Boolean, on: Boolean, onClick: ()
             Text(v.name, color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RideIcon(RideIcons.Person, c.muted, size = 14.dp); Spacer(Modifier.width(5.dp))
-                Text("${v.seats} seats · ${v.etaMin} min away", color = c.muted, fontSize = 12.sp)
+                Text(textValueSeatsValueMinAway.format(v.seats, v.etaMin), color = c.muted, fontSize = 12.sp)
             }
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(money(v.fareFor(returnTrip)), color = c.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            Text("Est. fare", color = c.muted, fontSize = 11.sp)
+            Text(stringResource(R.string.ride_est_fare), color = c.muted, fontSize = 11.sp)
         }
     }
 }
@@ -137,8 +146,8 @@ private fun Stat(label: String, value: String, modifier: Modifier) {
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun RideOptionsDarkPreview() = RideNowTheme(darkTheme = true) { RideOptionsScreen("Helix Garden Plaza", false, 1, {}, {}, {}, null, LatLng(0.0, 0.0), null) }
+private fun RideOptionsDarkPreview() = RideNowTheme(darkTheme = true) { RideOptionsScreen(stringResource(R.string.text_helix_garden_plaza), false, 1, {}, {}, {}, null, LatLng(0.0, 0.0), null) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun RideOptionsLightPreview() = RideNowTheme(darkTheme = false) { RideOptionsScreen("Helix Garden Plaza", true, 1, {}, {}, {}, null, LatLng(0.0, 0.0), null) }
+private fun RideOptionsLightPreview() = RideNowTheme(darkTheme = false) { RideOptionsScreen(stringResource(R.string.text_helix_garden_plaza), true, 1, {}, {}, {}, null, LatLng(0.0, 0.0), null) }

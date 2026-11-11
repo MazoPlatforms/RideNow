@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.post
 
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -56,14 +59,48 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 
-private val Good = listOf("Smooth driving", "Clean vehicle", "Friendly", "Good navigation", "Felt safe")
-private val Bad = listOf("Unsafe driving", "Rude behavior", "Dirty vehicle", "Wrong route", "Arrived late", "Poor navigation", "Other")
-private val Words = listOf("", "Terrible", "Poor", "Okay", "Great", "Excellent")
+
+
+
 
 /** Rate the driver 1-5. Low scores switch the tags to problems. [onSubmit] gets the star count. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RateDriverScreen(onBack: () -> Unit, onSubmit: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val textSmoothDriving = stringResource(R.string.text_smooth_driving)
+    val textCleanVehicle = stringResource(R.string.text_clean_vehicle)
+    val textFriendly = stringResource(R.string.text_friendly)
+    val textGoodNavigation = stringResource(R.string.text_good_navigation)
+    val textFeltSafe = stringResource(R.string.text_felt_safe)
+    val textUnsafeDriving = stringResource(R.string.text_unsafe_driving)
+    val textRudeBehavior = stringResource(R.string.text_rude_behavior)
+    val textDirtyVehicle = stringResource(R.string.text_dirty_vehicle)
+    val textWrongRoute = stringResource(R.string.text_wrong_route)
+    val textArrivedLate = stringResource(R.string.text_arrived_late)
+    val textPoorNavigation = stringResource(R.string.text_poor_navigation)
+    val textReasonOther = stringResource(R.string.reason_other)
+    val textTerrible = stringResource(R.string.text_terrible)
+    val textPoor = stringResource(R.string.text_poor)
+    val textOkay = stringResource(R.string.text_okay)
+    val textGreat = stringResource(R.string.text_great)
+    val textExcellent = stringResource(R.string.text_excellent)
+    val textSearchBack = stringResource(R.string.search_back)
+    val textMiraTanaka = stringResource(R.string.text_mira_tanaka)
+    val textOrbitSilverRn2100 = stringResource(R.string.text_orbit_silver_rn_2100)
+    val textWeAreSorryAboutThat = stringResource(R.string.text_we_are_sorry_about_that)
+    val textHowWasYourRide = stringResource(R.string.text_how_was_your_ride)
+    val textValueStarValueOne = stringResource(R.string.extra_1_s_star)
+    val textValueStarValueMany = stringResource(R.string.extra_1_s_stars)
+    val textWhatWentWrong = stringResource(R.string.text_what_went_wrong)
+    val textWhatWentWell = stringResource(R.string.text_what_went_well)
+    val textAddACommentOptional = stringResource(R.string.text_add_a_comment_optional)
+    val textSubmitRating = stringResource(R.string.text_submit_rating)
+    val textSkip = stringResource(R.string.text_skip)
+
+    val Good = listOf(textSmoothDriving, textCleanVehicle, textFriendly, textGoodNavigation, textFeltSafe)
+    val Bad = listOf(textUnsafeDriving, textRudeBehavior, textDirtyVehicle, textWrongRoute, textArrivedLate, textPoorNavigation, textReasonOther)
+    val Words = listOf("", textTerrible, textPoor, textOkay, textGreat, textExcellent)
+
     val c = RideTheme.colors
     var stars by rememberSaveable { mutableIntStateOf(0) }
     var picked by remember { mutableStateOf(setOf<String>()) }
@@ -71,21 +108,21 @@ fun RateDriverScreen(onBack: () -> Unit, onSubmit: (Int) -> Unit, modifier: Modi
     val tags = if (stars in 1..3) Bad else Good
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
-        Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = "Back" }, contentAlignment = Alignment.Center) {
+        Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) {
             RideIcon(RideIcons.Back, c.fg, size = 22.dp)
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(0), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.size(80.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)).border(1.5.dp, c.accent, CircleShape), contentAlignment = Alignment.Center) {
-                Text("MT", color = c.accent, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.driver_initials), color = c.accent, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
             }
-            Text("Mira Tanaka", color = c.fg, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))
-            Text("Orbit · Silver · RN 2100", color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp))
-            Text(if (stars in 1..3) "We are sorry about that." else "How was your ride?", color = c.fg, fontSize = 24.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 20.dp).semantics { heading() })
+            Text(textMiraTanaka, color = c.fg, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))
+            Text(textOrbitSilverRn2100, color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp))
+            Text(if (stars in 1..3) textWeAreSorryAboutThat else textHowWasYourRide, color = c.fg, fontSize = 24.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 20.dp).semantics { heading() })
             Row(Modifier.padding(top = 10.dp)) {
                 (1..5).forEach { n ->
                     Box(
                         Modifier.size(52.dp).clickable(role = Role.RadioButton) { stars = n; picked = emptySet() }
-                            .semantics { contentDescription = "$n star${if (n > 1) "s" else ""}"; selected = n == stars },
+                            .semantics { contentDescription = (if (n > 1) textValueStarValueMany else textValueStarValueOne).format(n); selected = n == stars },
                         contentAlignment = Alignment.Center,
                     ) { Star(n <= stars, 40.dp) }
                 }
@@ -93,7 +130,7 @@ fun RateDriverScreen(onBack: () -> Unit, onSubmit: (Int) -> Unit, modifier: Modi
             Text(Words[stars], color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.height(22.dp))
 
             if (stars > 0) {
-                Text(if (stars in 1..3) "WHAT WENT WRONG?" else "WHAT WENT WELL?", color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp, modifier = Modifier.padding(top = 16.dp).align(Alignment.Start))
+                Text(if (stars in 1..3) textWhatWentWrong else textWhatWentWell, color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp, modifier = Modifier.padding(top = 16.dp).align(Alignment.Start))
                 FlowRow(Modifier.padding(top = 10.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     tags.forEach { t ->
                         val on = t in picked
@@ -112,7 +149,7 @@ fun RateDriverScreen(onBack: () -> Unit, onSubmit: (Int) -> Unit, modifier: Modi
                     modifier = Modifier.padding(top = 16.dp).fillMaxWidth().height(84.dp),
                     decorationBox = { inner ->
                         Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(14.dp)) {
-                            if (comment.isEmpty()) Text("Add a comment (optional)", color = c.muted, fontSize = 15.sp)
+                            if (comment.isEmpty()) Text(textAddACommentOptional, color = c.muted, fontSize = 15.sp)
                             inner()
                         }
                     },
@@ -120,8 +157,8 @@ fun RateDriverScreen(onBack: () -> Unit, onSubmit: (Int) -> Unit, modifier: Modi
             }
             Spacer(Modifier.height(12.dp))
         }
-        RideButton("Submit rating", { onSubmit(stars) }, enabled = stars > 0)
-        RideButton("Skip", onBack, style = RideButtonStyle.Text, modifier = Modifier.padding(bottom = 8.dp))
+        RideButton(textSubmitRating, { onSubmit(stars) }, enabled = stars > 0)
+        RideButton(textSkip, onBack, style = RideButtonStyle.Text, modifier = Modifier.padding(bottom = 8.dp))
     }
 }
 

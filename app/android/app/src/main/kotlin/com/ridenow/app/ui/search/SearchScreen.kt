@@ -90,7 +90,11 @@ fun SearchScreen(
     onBack: () -> Unit, onPlace: (Place, Boolean) -> Unit, onFriend: () -> Unit, onEditPickup: () -> Unit,
     onSaved: () -> Unit, onMap: () -> Unit, onAdd: (String) -> Unit, modifier: Modifier = Modifier, scheduled: String? = null, pickup: String? = null, friend: String? = null, near: LatLng? = null,
 ) {
+    val textNovaTerminalGate4 = stringResource(R.string.text_nova_terminal_gate_4)
+    val textSector12OrbitRing = stringResource(R.string.text_sector_12_orbit_ring)
+
     val c = RideTheme.colors
+    val backLabel = stringResource(R.string.search_back)
     var returnTrip by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     val focus = remember { FocusRequester() }
@@ -110,7 +114,7 @@ fun SearchScreen(
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = "Back" }, contentAlignment = Alignment.Center) {
+            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = backLabel }, contentAlignment = Alignment.Center) {
                 RideIcon(RideIcons.Back, c.fg, size = 22.dp)
             }
             Spacer(Modifier.weight(1f))
@@ -129,14 +133,14 @@ fun SearchScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RideIcon(RideIcons.Clock, c.accent, size = 18.dp); Spacer(Modifier.width(10.dp))
-            Text("Scheduled · $scheduled", color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.search_scheduled, scheduled), color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
         if (friend != null) Row(
             Modifier.padding(top = 10.dp).fillMaxWidth().height(44.dp).clip(RoundedCornerShape(14.dp)).background(c.accent.copy(alpha = 0.14f)).padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RideIcon(RideIcons.Person, c.accent, size = 18.dp); Spacer(Modifier.width(10.dp))
-            Text("Booking for $friend", color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.search_booking_for, friend), color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
         TripTypeToggle(returnTrip, { returnTrip = it }, Modifier.padding(top = 14.dp).entrance(60))
 
@@ -152,7 +156,7 @@ fun SearchScreen(
                 item { OptionRow(RideIcons.Map, stringResource(R.string.search_map), null, chevron = true, onClick = onMap) }
                 item { OptionRow(RideIcons.Home, stringResource(R.string.search_add_home), null, plus = true) { onAdd("Home") } }
                 item { OptionRow(RideIcons.Work, stringResource(R.string.search_add_work), null, plus = true) { onAdd("Work") } }
-                item { OptionRow(RideIcons.Clock, "Nova Terminal, Gate 4", "Sector 12, Orbit Ring", chevron = true) { onPlace(Places[4], returnTrip) } }
+                item { OptionRow(RideIcons.Clock, textNovaTerminalGate4, textSector12OrbitRing, chevron = true) { onPlace(Places[4], returnTrip) } }
             }
             loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator(Modifier.size(28.dp), color = c.accent, strokeWidth = 3.dp) }
             results.isEmpty() -> EmptyResults(q, onMap, Modifier.weight(1f))
@@ -190,6 +194,8 @@ private fun RouteCard(
     onEditPickup: () -> Unit, pickup: String?, onSubmit: () -> Unit, modifier: Modifier = Modifier,
 ) {
     val c = RideTheme.colors
+    val clearLabel = stringResource(R.string.search_clear)
+    val editPickupLabel = stringResource(R.string.search_edit_pickup)
     val rows = if (returnTrip) 3 else 2
     Column(
         modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp))
@@ -200,7 +206,7 @@ private fun RouteCard(
     ) {
         RouteRow(stringResource(R.string.search_pickup), false, Marker.Pickup) {
             Text(pickup ?: stringResource(R.string.search_current), color = c.fg, fontSize = 16.sp, modifier = Modifier.weight(1f))
-            Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup).semantics { contentDescription = "Edit pickup location" }, contentAlignment = Alignment.Center) {
+            Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup).semantics { contentDescription = editPickupLabel }, contentAlignment = Alignment.Center) {
                 RideIcon(RideIcons.Pencil, c.accent, size = 18.dp)
             }
         }
@@ -212,7 +218,7 @@ private fun RouteCard(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
                 decorationBox = { inner -> Box { if (query.isEmpty()) Text(stringResource(R.string.search_hint), color = c.muted, fontSize = 16.sp); inner() } },
             )
-            if (query.isNotEmpty()) Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button) { onQuery("") }.semantics { contentDescription = "Clear" }, contentAlignment = Alignment.Center) {
+            if (query.isNotEmpty()) Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button) { onQuery("") }.semantics { contentDescription = clearLabel }, contentAlignment = Alignment.Center) {
                 RideIcon(RideIcons.Close, c.muted, size = 16.dp)
             } else if (!returnTrip) Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { RideIcon(RideIcons.Plus, c.accent) }
         }

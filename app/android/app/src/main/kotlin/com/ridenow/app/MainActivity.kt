@@ -18,6 +18,10 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.ThemeMode
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(applyAppLanguage(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // System splash hands off instantly to the animated Compose splash (same background colour).
         installSplashScreen()

@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.share
 
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -34,6 +37,17 @@ private const val TripLink = "https://ridenow.app/t/8F3K2Q"   // placeholder lin
 /** Pick trusted contacts, copy the live-trip link, or send it with the phone's share sheet. */
 @Composable
 fun ShareTripScreen(contacts: List<Contact>, onBack: () -> Unit, onManage: () -> Unit, modifier: Modifier = Modifier) {
+    val textTripShareLive = stringResource(R.string.trip_share_live)
+    val textTrustedContactsCanFollowYourRouteInRealTime = stringResource(R.string.text_trusted_contacts_can_follow_your_route_in_real_time)
+    val textAdd = stringResource(R.string.text_add)
+    val textCopied = stringResource(R.string.text_copied)
+    val textCopy = stringResource(R.string.text_copy)
+    val textShareAutomaticallyOnEveryRide = stringResource(R.string.text_share_automatically_on_every_ride)
+    val textShareLink = stringResource(R.string.text_share_link)
+    val textShareWithValueContactValueOne = stringResource(R.string.extra_share_with_1_s_contact)
+    val textShareWithValueContactValueMany = stringResource(R.string.extra_share_with_1_s_contacts)
+    val textFollowMyRidenowTripValue = stringResource(R.string.text_follow_my_ridenow_trip_value)
+
     val c = RideTheme.colors
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -41,7 +55,7 @@ fun ShareTripScreen(contacts: List<Contact>, onBack: () -> Unit, onManage: () ->
     var copied by remember { mutableStateOf(false) }
     var auto by rememberSaveable { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
-        ScreenTop("Share live trip", onBack, subtitle = "Trusted contacts can follow your route in real time.")
+        ScreenTop(textTripShareLive, onBack, subtitle = textTrustedContactsCanFollowYourRouteInRealTime)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             Row(Modifier.padding(top = 20.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 contacts.forEach { k ->
@@ -58,26 +72,26 @@ fun ShareTripScreen(contacts: List<Contact>, onBack: () -> Unit, onManage: () ->
                 }
                 Column(Modifier.width(64.dp).clickable(role = Role.Button, onClick = onManage), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.size(56.dp).clip(CircleShape).border(1.5.dp, c.border, CircleShape), contentAlignment = Alignment.Center) { RideIcon(RideIcons.Plus, c.accent) }
-                    Text("Add", color = c.fg, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                    Text(textAdd, color = c.fg, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                 }
             }
             Row(Modifier.padding(top = 20.dp).fillMaxWidth().height(56.dp).clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(start = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 RideIcon(listOf("M8.5 11.5a3 3 0 0 0 4.2 0l2.5-2.5a3 3 0 0 0-4.2-4.2L10 5.8", "M11.5 8.5a3 3 0 0 0-4.2 0L4.8 11A3 3 0 0 0 9 15.2l1-1"), c.accent); Spacer(Modifier.width(12.dp))
-                Text("ridenow.app/t/8F3K2Q", color = c.fg, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.sample_trip_link_display), color = c.fg, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
                 Box(Modifier.heightIn(min = 48.dp).clickable(role = Role.Button) { clipboard.setText(AnnotatedString(TripLink)); copied = true }.padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
-                    Text(if (copied) "Copied" else "Copy", color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(if (copied) textCopied else textCopy, color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             Row(Modifier.padding(top = 8.dp).fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Share automatically on every ride", color = c.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                RideSwitch(auto, "Share automatically on every ride") { auto = it }
+                Text(textShareAutomaticallyOnEveryRide, color = c.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                RideSwitch(auto, textShareAutomaticallyOnEveryRide) { auto = it }
             }
         }
         RideButton(
-            if (picked.isEmpty()) "Share link" else "Share with ${picked.size} contact${if (picked.size == 1) "" else "s"}",
+            if (picked.isEmpty()) textShareLink else (if (picked.size != 1) textShareWithValueContactValueMany else textShareWithValueContactValueOne).format(picked.size),
             {
-                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "Follow my RideNow trip: $TripLink")
-                runCatching { context.startActivity(Intent.createChooser(send, "Share live trip").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, textFollowMyRidenowTripValue.format(TripLink))
+                runCatching { context.startActivity(Intent.createChooser(send, textTripShareLive).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             },
             modifier = Modifier.padding(vertical = 12.dp),
         )
@@ -86,4 +100,4 @@ fun ShareTripScreen(contacts: List<Contact>, onBack: () -> Unit, onManage: () ->
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun SharePreview() = RideNowTheme(darkTheme = true) { ShareTripScreen(listOf(Contact("Ana", "1"), Contact("Ben", "2")), {}, {}) }
+private fun SharePreview() = RideNowTheme(darkTheme = true) { ShareTripScreen(listOf(Contact(stringResource(R.string.text_ana), "1"), Contact(stringResource(R.string.text_ben), "2")), {}, {}) }

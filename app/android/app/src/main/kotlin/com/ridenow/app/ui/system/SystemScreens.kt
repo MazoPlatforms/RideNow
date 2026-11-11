@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.system
 
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -86,24 +89,39 @@ private fun StateLayout(
 /** Shown over the whole app while the phone is offline. */
 @Composable
 fun NoInternetScreen(onRetry: () -> Unit, onOpenRides: () -> Unit, modifier: Modifier = Modifier) {
+    val textYouAreOffline = stringResource(R.string.text_you_are_offline)
+    val textCheckYourConnectionBookingNeedsTheInternet = stringResource(R.string.text_check_your_connection_booking_needs_the_internet)
+    val textTryAgain = stringResource(R.string.text_try_again)
+    val textAvailableOffline = stringResource(R.string.text_available_offline)
+    val textMenuRides = stringResource(R.string.menu_rides)
+    val textPastTripsAndReceipts = stringResource(R.string.text_past_trips_and_receipts)
+
     val c = RideTheme.colors
-    StateLayout(RideIcons.WifiOff, "You are offline.", "Check your connection. Booking needs the internet.", "Try again", onRetry, modifier, extra = {
-        SectionLabel("AVAILABLE OFFLINE", Modifier.align(Alignment.Start))
-        GroupCard { NavRow(RideIcons.Clock, "Your Rides", onOpenRides, subtitle = "Past trips and receipts") }
+    StateLayout(RideIcons.WifiOff, textYouAreOffline, textCheckYourConnectionBookingNeedsTheInternet, textTryAgain, onRetry, modifier, extra = {
+        SectionLabel(textAvailableOffline, Modifier.align(Alignment.Start))
+        GroupCard { NavRow(RideIcons.Clock, textMenuRides, onOpenRides, subtitle = textPastTripsAndReceipts) }
     })
 }
 
 /** Generic failure screen with a copyable reference code. */
 @Composable
 fun ServerErrorScreen(reference: String, onRetry: () -> Unit, onContact: () -> Unit, modifier: Modifier = Modifier) {
+    val textWeHitABump = stringResource(R.string.text_we_hit_a_bump)
+    val textSomethingWentWrongOnOurSideYourAccountAndRidesAreSafe = stringResource(R.string.text_something_went_wrong_on_our_side_your_account_and_rides_are_safe)
+    val textTryAgain = stringResource(R.string.text_try_again)
+    val textContactSupport = stringResource(R.string.text_contact_support)
+    val textReference = stringResource(R.string.text_reference)
+    val textCopied = stringResource(R.string.text_copied)
+    val textCopy = stringResource(R.string.text_copy)
+
     val c = RideTheme.colors
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
-    StateLayout(RideIcons.Alert, "We hit a bump.", "Something went wrong on our side. Your account and rides are safe.", "Try again", onRetry, modifier, "Contact support", onContact, danger = true, extra = {
+    StateLayout(RideIcons.Alert, textWeHitABump, textSomethingWentWrongOnOurSideYourAccountAndRidesAreSafe, textTryAgain, onRetry, modifier, textContactSupport, onContact, danger = true, extra = {
         Row(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { Text("REFERENCE", color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp); Text(reference, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp) }
+            Column(Modifier.weight(1f)) { Text(textReference, color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp); Text(reference, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp) }
             Box(Modifier.heightIn(min = 48.dp).clickable(role = Role.Button) { clipboard.setText(AnnotatedString(reference)); copied = true }.padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-                Text(if (copied) "Copied" else "Copy", color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (copied) textCopied else textCopy, color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     })
@@ -112,13 +130,19 @@ fun ServerErrorScreen(reference: String, onRetry: () -> Unit, onContact: () -> U
 /** Signed out for inactivity: shows the account and asks for a new code. */
 @Composable
 fun SessionExpiredScreen(name: String, phone: String, onSendCode: () -> Unit, onOther: () -> Unit, modifier: Modifier = Modifier) {
+    val textPleaseSignInAgain = stringResource(R.string.text_please_sign_in_again)
+    val textForYourSecurityWeEndedYourSessionWeWillSendACodeToConfirmI = stringResource(R.string.text_for_your_security_we_ended_your_session_we_will_send_a_code_to_confirm_i)
+    val textSendMeACode = stringResource(R.string.text_send_me_a_code)
+    val textUseADifferentNumber = stringResource(R.string.text_use_a_different_number)
+    val textSignedOutAfterInactivity = stringResource(R.string.text_signed_out_after_inactivity)
+
     val c = RideTheme.colors
-    StateLayout(RideIcons.Lock, "Please sign in again.", "For your security, we ended your session. We will send a code to confirm it is you.", "Send me a code", onSendCode, modifier, "Use a different number", onOther, extra = {
+    StateLayout(RideIcons.Lock, textPleaseSignInAgain, textForYourSecurityWeEndedYourSessionWeWillSendACodeToConfirmI, textSendMeACode, onSendCode, modifier, textUseADifferentNumber, onOther, extra = {
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(24.dp)).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.size(72.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)).border(1.5.dp, c.accent, CircleShape), contentAlignment = Alignment.Center) { Text(initialsOf(name), color = c.accent, fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
             Text(name, color = c.fg, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
             Text(phone, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 2.dp))
-            Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) { RideIcon(RideIcons.Clock, c.muted, size = 16.dp); Text("  Signed out after inactivity", color = c.muted, fontSize = 13.sp) }
+            Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) { RideIcon(RideIcons.Clock, c.muted, size = 16.dp); Text(textSignedOutAfterInactivity, color = c.muted, fontSize = 13.sp) }
         }
     })
 }
@@ -126,16 +150,19 @@ fun SessionExpiredScreen(name: String, phone: String, onSendCode: () -> Unit, on
 /** Shimmering skeleton of the Home screen. Calls [onDone] after about a second (stand-in for real loading). */
 @Composable
 fun LoadingScreen(onDone: () -> Unit, modifier: Modifier = Modifier) {
+    val textLoading = stringResource(R.string.text_loading)
+    val textFindingVehiclesNearYou = stringResource(R.string.text_finding_vehicles_near_you)
+
     val c = RideTheme.colors
     val reduce = rememberReducedMotion()
     LaunchedEffect(Unit) { delay(1100); onDone() }
     val x by rememberInfiniteTransition(label = "shimmer").animateFloat(-300f, 900f, infiniteRepeatable(tween(1400, easing = LinearEasing)), label = "x")
     val brush = Brush.linearGradient(listOf(c.line, c.border, c.line), Offset(if (reduce) 0f else x, 0f), Offset((if (reduce) 0f else x) + 300f, 0f))
     @Composable fun Bone(w: Dp?, h: Dp, r: Dp = 8.dp, mod: Modifier = Modifier) = Box((if (w != null) mod.width(w) else mod.fillMaxWidth()).height(h).clip(RoundedCornerShape(r)).background(brush))
-    Box(modifier.fillMaxSize().background(c.bg).semantics { contentDescription = "Loading" }) {
+    Box(modifier.fillMaxSize().background(c.bg).semantics { contentDescription = textLoading }) {
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) { Bone(48.dp, 48.dp, 24.dp); Bone(48.dp, 48.dp, 24.dp) }
         Box(Modifier.align(Alignment.Center).clip(RoundedCornerShape(22.dp)).background(c.bg).border(1.dp, c.border, RoundedCornerShape(22.dp)).padding(horizontal = 18.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), color = c.accent, strokeWidth = 2.dp); Text("  Finding vehicles near you", color = c.fg, fontSize = 13.sp) }
+            Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), color = c.accent, strokeWidth = 2.dp); Text(textFindingVehiclesNearYou, color = c.fg, fontSize = 13.sp) }
         }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(c.bg).border(1.dp, c.line, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).navigationBarsPadding().padding(24.dp)) {
             Bone(40.dp, 4.dp, 2.dp, Modifier.align(Alignment.CenterHorizontally))

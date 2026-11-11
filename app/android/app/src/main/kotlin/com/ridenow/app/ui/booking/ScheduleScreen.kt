@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.booking
 
+import androidx.compose.ui.res.stringResource
+import com.ridenow.app.R
 import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -66,14 +68,15 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.abs
 
-private val Repeats = listOf("Does not repeat", "Daily", "Weekdays", "Weekly")
-private val Reminders = listOf("None", "5 min before", "15 min before", "30 min before", "1 hour before")
-private val Passengers = listOf("Me", "Someone else")
 
 /** Pick a pickup date and time. [onContinue] receives a label such as "Wed, 4 Nov, 8:30 AM". */
 @Composable
 fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: Modifier = Modifier) {
+    val textAm = stringResource(R.string.text_am)
+    val textPm = stringResource(R.string.text_pm)
+
     val c = RideTheme.colors
+    val backLabel = stringResource(R.string.search_back)
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
     val startTime = remember { LocalDateTime.now().plusMinutes(30).let { it.plusMinutes(((15 - it.minute % 15) % 15).toLong()) } }
@@ -95,16 +98,16 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = "Back" }, contentAlignment = Alignment.Center) {
+            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = backLabel }, contentAlignment = Alignment.Center) {
                 RideIcon(RideIcons.Back, c.fg, size = 22.dp)
             }
             Spacer(Modifier.weight(1f))
-            Text("Schedule a ride", color = c.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
+            Text(stringResource(R.string.schedule_title), color = c.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
             Spacer(Modifier.weight(1f)); Spacer(Modifier.width(36.dp))
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(80)) {
-            Text("Pick a day and time for your pickup.", color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
-            Label("DATE")
+            Text(stringResource(R.string.schedule_sub), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+            Label(stringResource(R.string.schedule_date))
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 chips.forEach { d ->
                     val on = d == date
@@ -113,7 +116,7 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
                             .border(1.dp, if (on) BrandYellow else c.border, RoundedCornerShape(16.dp)).clickable(role = Role.RadioButton) { dateDay = d.toEpochDay() },
                         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
                     ) {
-                        Text(if (d == today) "Today" else d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()), color = if (on) Ink else c.fg, fontSize = 12.sp)
+                        Text(if (d == today) stringResource(R.string.schedule_today) else d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()), color = if (on) Ink else c.fg, fontSize = 12.sp)
                         Text("${d.dayOfMonth}", color = if (on) Ink else c.fg, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
@@ -125,41 +128,41 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RideIcon(listOf("M3,4.5h14v12.5h-14z", "M3 8.5h14M7 3v3M13 3v3"), c.accent, size = 18.dp); Spacer(Modifier.width(8.dp))
-                Text("Pick another date", color = c.accent, fontSize = 14.sp)
+                Text(stringResource(R.string.schedule_other_date), color = c.accent, fontSize = 14.sp)
             }
 
-            Label("TIME")
+            Label(stringResource(R.string.schedule_time))
             Box(Modifier.padding(top = 10.dp).fillMaxWidth().height(132.dp).clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp))) {
                 Box(Modifier.align(Alignment.Center).padding(horizontal = 10.dp).fillMaxWidth().height(44.dp).clip(RoundedCornerShape(12.dp)).background(c.accent.copy(alpha = 0.14f)))
                 Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                     Wheel((1..12).map { "$it" }, hour, Modifier.weight(1f)) { hour = it }
                     Text(":", color = c.fg, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                     Wheel(listOf("00", "15", "30", "45"), minute, Modifier.weight(1f)) { minute = it }
-                    Wheel(listOf("AM", "PM"), pm, Modifier.weight(1f)) { pm = it }
+                    Wheel(listOf(textAm, textPm), pm, Modifier.weight(1f)) { pm = it }
                 }
             }
-            if (!valid) Text("Pick a time at least 15 minutes from now.", color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            if (!valid) Text(stringResource(R.string.schedule_min), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
 
-            Label("OPTIONS")
+            Label(stringResource(R.string.schedule_options))
             Column(Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp))) {
-                OptionRow(RideIcons.Person, "Passenger", Passengers[passenger]) { sheet = "Passenger" }
+                OptionRow(RideIcons.Person, stringResource(R.string.passenger_title), passengerOptions()[passenger]) { sheet = "Passenger" }
                 HorizontalDivider(color = c.line)
-                OptionRow(listOf("M4 9V8a3 3 0 0 1 3-3h8l-2-2M16 11v1a3 3 0 0 1-3 3H5l2 2"), "Repeat", Repeats[repeat]) { sheet = "Repeat" }
+                OptionRow(listOf("M4 9V8a3 3 0 0 1 3-3h8l-2-2M16 11v1a3 3 0 0 1-3 3H5l2 2"), stringResource(R.string.repeat_title), repeatOptions()[repeat]) { sheet = "Repeat" }
                 HorizontalDivider(color = c.line)
-                OptionRow(RideIcons.Bell, "Reminder", Reminders[reminder]) { sheet = "Reminder" }
+                OptionRow(RideIcons.Bell, stringResource(R.string.reminder_title), reminderOptions()[reminder]) { sheet = "Reminder" }
             }
             if (sheet.isNotEmpty()) androidx.compose.ui.window.Dialog({ sheet = "" }, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
                 when (sheet) {
                     "date" -> com.ridenow.app.ui.more.CalendarSheet(date, { dateDay = it.toEpochDay(); sheet = "" }, { sheet = "" })
-                    "Passenger" -> com.ridenow.app.ui.more.ChoiceSheet("Passenger", Passengers, passenger, { passenger = it; sheet = "" }, { sheet = "" })
-                    "Repeat" -> com.ridenow.app.ui.more.ChoiceSheet("Repeat", Repeats, repeat, { repeat = it; sheet = "" }, { sheet = "" })
-                    else -> com.ridenow.app.ui.more.ChoiceSheet("Reminder", Reminders, reminder, { reminder = it; sheet = "" }, { sheet = "" })
+                    "Passenger" -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.passenger_title), passengerOptions(), passenger, { passenger = it; sheet = "" }, { sheet = "" })
+                    "Repeat" -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.repeat_title), repeatOptions(), repeat, { repeat = it; sheet = "" }, { sheet = "" })
+                    else -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.reminder_title), reminderOptions(), reminder, { reminder = it; sheet = "" }, { sheet = "" })
                 }
             }
             Spacer(Modifier.height(16.dp))
         }
-        Text("Pickup · $label", color = c.muted, fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
-        RideButton("Continue", { onContinue(label) }, enabled = valid, modifier = Modifier.padding(top = 10.dp, bottom = 12.dp))
+        Text(stringResource(R.string.home_pickup, label), color = c.muted, fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
+        RideButton(stringResource(R.string.ride_continue), { onContinue(label) }, enabled = valid, modifier = Modifier.padding(top = 10.dp, bottom = 12.dp))
     }
 }
 

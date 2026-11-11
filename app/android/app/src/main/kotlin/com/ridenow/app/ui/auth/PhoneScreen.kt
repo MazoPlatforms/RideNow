@@ -70,6 +70,9 @@ import kotlinx.coroutines.delay
 /** Step 1 of 3: ask for the rider's mobile number. [onCodeSent] receives the number in +E.164 style. */
 @Composable
 fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modifier = Modifier) {
+    val textSearchBack = stringResource(R.string.search_back)
+    val textCountryCodeValueValue = stringResource(R.string.text_country_code_value_value)
+
     val c = RideTheme.colors
     val context = LocalContext.current
     var iso by rememberSaveable { mutableStateOf(detectCountryIso(context)) }
@@ -109,7 +112,7 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modi
     ) {
         Box(
             Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack)
-                .semantics { contentDescription = "Back" },
+                .semantics { contentDescription = textSearchBack },
             contentAlignment = Alignment.Center,
         ) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
 
@@ -136,7 +139,7 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modi
                     Modifier.fillMaxHeight().width(96.dp).clip(RoundedCornerShape(16.dp)).background(c.field)
                         .border(1.dp, c.border, RoundedCornerShape(16.dp))
                         .clickable(role = Role.Button) { showPicker = true }.padding(horizontal = 14.dp)
-                        .semantics { contentDescription = "Country code, ${country.name} ${country.dial}" },
+                        .semantics { contentDescription = textCountryCodeValueValue.format(country.displayName, country.dial) },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(country.dial, color = c.fg, fontSize = 17.sp)

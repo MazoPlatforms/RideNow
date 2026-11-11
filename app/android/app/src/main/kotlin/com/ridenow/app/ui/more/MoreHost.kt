@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.more
 
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,26 +40,31 @@ fun MoreHost(start: String, ctx: MoreCtx, root: MoreNav) {
 
 @Composable
 private fun MoreScreen(label: String, ctx: MoreCtx, nav: MoreNav) {
+    val textSearchCurrent = stringResource(R.string.search_current)
+    val textChooseAContact = stringResource(R.string.text_choose_a_contact)
+    val textSetStopLocation = stringResource(R.string.text_set_stop_location)
+    val textReasonPlans = stringResource(R.string.reason_plans)
+
     when {
         label.startsWith("Help topic:") -> HelpTopicScreen(label.removePrefix("Help topic:"), nav.back, nav.open)
         label.startsWith("Help article:") -> HelpArticleScreen(label.removePrefix("Help article:"), nav.back, nav.support)
         else -> when (label) {
             // Booking
-            "Your route" -> YourRouteScreen("Current location", ctx.dest, nav.exit)
+            "Your route" -> YourRouteScreen(textSearchCurrent, ctx.dest, nav.exit)
             "Vehicle info" -> VehicleInfoSheet(ctx.vehicle, { nav.setVehicle(it); nav.exit() }, nav.exit)
             "High demand" -> HighDemandSheet(ctx.vehicle, nav.exit, { nav.exit(); nav.schedule() }, nav.exit)
             "Pick up later" -> PickUpLaterSheet({ nav.setScheduled(it); nav.confirm() }, nav.exit, { nav.open("Pick another date") })
-            "Passenger" -> ChoiceSheet("Passenger", PassengerOptions, 0, { nav.exit() }, nav.exit, listOf(ctx.name, "Choose a contact"))
-            "Repeat" -> ChoiceSheet("Repeat", RepeatOptions, 0, { nav.exit() }, nav.exit)
-            "Reminder" -> ChoiceSheet("Reminder", ReminderOptions, 2, { nav.exit() }, nav.exit)
+            "Passenger" -> ChoiceSheet(stringResource(R.string.passenger_title), passengerOptions(), 0, { nav.exit() }, nav.exit, listOf(ctx.name, textChooseAContact))
+            "Repeat" -> ChoiceSheet(stringResource(R.string.repeat_title), repeatOptions(), 0, { nav.exit() }, nav.exit)
+            "Reminder" -> ChoiceSheet(stringResource(R.string.reminder_title), reminderOptions(), 2, { nav.exit() }, nav.exit)
             "Pick another date" -> CalendarSheet(LocalDate.now(), { nav.back() }, nav.back)
-            "Set stop location" -> StopLocationScreen("Current location", ctx.dest, nav.exit, { nav.open("Stop on map") }, { nav.exit() })
-            "Stop on map" -> MapPickerScreen("Set stop location", "Set stop location", nav.back, onConfirm = { _, _ -> nav.exit() })
+            "Set stop location" -> StopLocationScreen(textSearchCurrent, ctx.dest, nav.exit, { nav.open("Stop on map") }, { nav.exit() })
+            "Stop on map" -> MapPickerScreen(textSetStopLocation, textSetStopLocation, nav.back, onConfirm = { _, _ -> nav.exit() })
             // During the trip
             "No drivers available" -> NoDriversScreen(ctx, nav.finding, nav.schedule, nav.options, nav.home)
             "Driver cancelled" -> DriverCancelledScreen(ctx, nav.trip, nav.home)
             "Driver arrived" -> DriverWaitingScreen(ctx, { nav.open("In-app call") }, { nav.open("Chat with driver") }, { nav.open("Ride cancelled") }, nav.trip)
-            "Ride cancelled" -> RideCancelledScreen(ctx, "Changed my plans", nav.options, nav.home)
+            "Ride cancelled" -> RideCancelledScreen(ctx, textReasonPlans, nav.options, nav.home)
             "Change drop-off" -> ChangeDropScreen(ctx, nav.exit) { nav.changeDrop(it); nav.exit() }
             "Emergency call" -> EmergencyCountdownScreen(ctx, nav.exit)
             "In-app call" -> InAppCallScreen(nav.back)

@@ -54,6 +54,8 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CountryPickerSheet(selected: Country, onSelect: (Country) -> Unit, onDismiss: () -> Unit) {
+    val textClose = stringResource(R.string.text_close)
+
     val c = RideTheme.colors
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -62,7 +64,7 @@ fun CountryPickerSheet(selected: Country, onSelect: (Country) -> Unit, onDismiss
     val q = query.trim()
     val results = remember(q) {
         if (q.isEmpty()) Countries.all
-        else Countries.all.filter { it.name.contains(q, true) || it.dial.contains(q) || it.iso.equals(q, true) }
+        else Countries.all.filter { (it.name.contains(q, true) || it.displayName.contains(q, true)) || it.dial.contains(q) || it.iso.equals(q, true) }
     }
     fun close(after: () -> Unit) { scope.launch { state.hide() }.invokeOnCompletion { after() } }
 
@@ -81,7 +83,7 @@ fun CountryPickerSheet(selected: Country, onSelect: (Country) -> Unit, onDismiss
                 Text(stringResource(R.string.country_title), color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Box(
                     Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button) { close(onDismiss) }
-                        .semantics { contentDescription = "Close" },
+                        .semantics { contentDescription = textClose },
                     contentAlignment = Alignment.Center,
                 ) { RideIcon(RideIcons.Close, c.fg) }
             }
@@ -137,7 +139,7 @@ private fun CountryRow(country: Country, selected: Boolean, onClick: () -> Unit)
         Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(14.dp))
             .background(if (selected) c.accent.copy(alpha = 0.14f) else androidx.compose.ui.graphics.Color.Transparent)
             .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 12.dp)
-            .semantics { contentDescription = "${country.name} ${country.dial}" },
+            .semantics { contentDescription = "${country.displayName} ${country.dial}" },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -145,7 +147,7 @@ private fun CountryRow(country: Country, selected: Boolean, onClick: () -> Unit)
             contentAlignment = Alignment.Center,
         ) { Text(country.flag, fontSize = 18.sp) }
         Spacer(Modifier.width(14.dp))
-        Text(country.name, color = c.fg, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
+        Text(country.displayName, color = c.fg, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
         Text(country.dial, color = c.muted, fontSize = 14.sp)
         if (selected) {
             Spacer(Modifier.width(12.dp))

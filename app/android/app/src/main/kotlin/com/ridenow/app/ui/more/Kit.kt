@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.more
 
+import com.ridenow.app.R
+import androidx.compose.ui.res.stringResource
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -218,15 +221,19 @@ fun Hero(icon: List<String>, title: String, subtitle: String, danger: Boolean = 
 /** Pickup and drop-off lines joined by a dotted rail. */
 @Composable
 fun RouteBlock(pickup: String, drop: String, modifier: Modifier = Modifier, stops: List<String> = emptyList()) {
+    val textConfirmPickup = stringResource(R.string.confirm_pickup)
+    val textSearchStop = stringResource(R.string.search_stop)
+    val textConfirmDrop = stringResource(R.string.confirm_drop)
+
     val c = RideTheme.colors
     Column(modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp)).padding(16.dp)) {
-        Text("PICKUP", color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp)
+        Text(textConfirmPickup, color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp)
         Text(pickup, color = c.fg, fontSize = 15.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
         stops.forEach { s ->
-            Text("STOP", color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp)
+            Text(textSearchStop, color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp)
             Text(s, color = c.fg, fontSize = 15.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
         }
-        Text("DROP", color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp)
+        Text(textConfirmDrop, color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp)
         Text(drop, color = c.fg, fontSize = 15.sp, modifier = Modifier.padding(top = 2.dp))
     }
 }
@@ -234,12 +241,14 @@ fun RouteBlock(pickup: String, drop: String, modifier: Modifier = Modifier, stop
 /** Six digit style code entry drawn as boxes over one hidden text field. */
 @Composable
 fun CodeField(value: String, onChange: (String) -> Unit, length: Int = 6) {
+    val textVerificationCodeValueOfValueDigitsEntered = stringResource(R.string.text_verification_code_value_of_value_digits_entered)
+
     val c = RideTheme.colors
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     BasicTextField(
         value = value, onValueChange = { onChange(it.filter(Char::isDigit).take(length)) },
-        modifier = Modifier.fillMaxWidth().focusRequester(focus).semantics { contentDescription = "Verification code, ${value.length} of $length digits entered" },
+        modifier = Modifier.fillMaxWidth().focusRequester(focus).semantics { contentDescription = textVerificationCodeValueOfValueDigitsEntered.format(value.length, length) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
         cursorBrush = SolidColor(Color.Transparent), textStyle = TextStyle(color = Color.Transparent),
         decorationBox = { inner ->

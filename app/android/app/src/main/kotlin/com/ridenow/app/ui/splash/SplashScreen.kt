@@ -71,6 +71,8 @@ import kotlin.math.sin
  */
 @Composable
 fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
+    val textFromSifric = stringResource(R.string.text_from_sifric)
+
     val c = RideTheme.colors
     val context = LocalContext.current
     val reduceMotion = remember {
@@ -132,7 +134,7 @@ fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
         // "from Sifric" credit, like "from Meta" on Meta apps. Dark and light artwork follow the active theme.
         Image(
             painter = painterResource(if (c.isDark) R.drawable.ridenow_from_sifric_dark else R.drawable.ridenow_from_sifric_light),
-            contentDescription = "from Sifric",
+            contentDescription = textFromSifric,
             contentScale = ContentScale.Fit,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 64.dp).width(96.dp).graphicsLayer { alpha = intro.value },
         )
