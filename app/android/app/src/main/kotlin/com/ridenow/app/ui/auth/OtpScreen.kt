@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.auth
 
+import com.ridenow.app.ui.components.offsetByStartDirection
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -111,7 +113,7 @@ fun OtpScreen(phone: String, onBack: () -> Unit, onVerified: () -> Unit, modifie
         modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp),
     ) {
         Box(
-            Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack)
+            Modifier.offsetByStartDirection((-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack)
                 .semantics { contentDescription = textSearchBack },
             contentAlignment = Alignment.Center,
         ) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }

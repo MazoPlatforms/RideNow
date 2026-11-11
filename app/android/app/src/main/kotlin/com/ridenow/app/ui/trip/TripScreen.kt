@@ -63,6 +63,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -205,23 +207,24 @@ private fun CircleAction(icon: List<String>, label: String, onClick: () -> Unit)
     Box(Modifier.padding(end = 6.dp).size(44.dp).clip(CircleShape).border(1.dp, c.border, CircleShape).clickable(role = Role.Button, onClick = onClick).semantics { contentDescription = label }, contentAlignment = Alignment.Center) { RideIcon(icon, c.accent) }
 }
 
-/** Drag the red knob right to cancel. Tap works too, for accessibility. */
+/** Drag the red knob toward the logical end edge to cancel. Tap works too, for accessibility. */
 @Composable
 private fun SwipeToCancel(onCancel: () -> Unit) {
     val c = RideTheme.colors
     val cancelDesc = stringResource(R.string.trip_cancel_desc)
     val scope = rememberCoroutineScope()
     val offset = remember { Animatable(0f) }
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     BoxWithConstraints(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(28.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(28.dp))) {
         val maxPx = with(LocalDensity.current) { (maxWidth - 54.dp).toPx() }
         val pad = with(LocalDensity.current) { 4.dp.roundToPx() }
         Text(stringResource(R.string.trip_swipe_cancel), color = c.muted, fontSize = 15.sp, modifier = Modifier.align(Alignment.Center))
         Box(
-            Modifier.offset { IntOffset(offset.value.roundToInt() + pad, pad) }.size(46.dp).clip(CircleShape).background(c.danger)
+            Modifier.offset { IntOffset((if (isRtl) maxPx - offset.value else offset.value).roundToInt() + pad, pad) }.size(46.dp).clip(CircleShape).background(c.danger)
                 .clickable(role = Role.Button) { onCancel() }.semantics { contentDescription = cancelDesc }
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(onDragEnd = { scope.launch { if (offset.value > maxPx * 0.7f) onCancel(); offset.animateTo(0f) } }) { change, dx ->
-                        change.consume(); scope.launch { offset.snapTo((offset.value + dx).coerceIn(0f, maxPx)) }
+                        change.consume(); scope.launch { offset.snapTo((offset.value + dx * (if (isRtl) -1f else 1f)).coerceIn(0f, maxPx)) }
                     }
                 },
             contentAlignment = Alignment.Center,

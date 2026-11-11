@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.profile
 
+import com.ridenow.app.getAppLanguage
+import java.util.Locale
+
 import com.ridenow.app.ui.components.localizedLabel
 
 import com.ridenow.app.R
@@ -85,6 +88,8 @@ fun ProfileScreen(
     val textLogOut = stringResource(R.string.text_log_out)
 
     val c = RideTheme.colors
+    val language = Locale.forLanguageTag(getAppLanguage(LocalContext.current))
+    val languageName = language.getDisplayLanguage(language).replaceFirstChar { it.titlecaseChar() }
     var sheet by rememberSaveable { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         ScreenTop(textSettingsProfile, onBack)
@@ -105,7 +110,7 @@ fun ProfileScreen(
             GroupCard(Modifier.padding(top = 12.dp)) {
                 NavRow(RideIcons.Person, textPersonalInformation, onEdit, subtitle = textNamePhoneEmail); RowDivider()
                 NavRow(RideIcons.Bell, textMenuNotifications, { onOpen("Notification settings") }, subtitle = textManageYourPreferences); RowDivider()
-                NavRow(RideIcons.Globe, textSettingsLanguage, { onOpen("Language") }, subtitle = localizedLabel("English")); RowDivider()
+                NavRow(RideIcons.Globe, textSettingsLanguage, { onOpen("Language") }, subtitle = languageName); RowDivider()
                 NavRow(RideIcons.Moon, stringResource(R.string.settings_appearance), { sheet = true }, subtitle = stringResource(mode.labelRes))
             }
             GroupCard(Modifier.padding(top = 10.dp)) {

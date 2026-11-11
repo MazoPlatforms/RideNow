@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.booking
 
+import com.ridenow.app.ui.components.offsetByStartDirection
+
 import com.google.android.gms.maps.model.LatLng
 import com.ridenow.app.ui.map.RouteInfo
 
@@ -69,7 +71,7 @@ fun ConfirmScreen(
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = backLabel }, contentAlignment = Alignment.Center) {
+            Box(Modifier.offsetByStartDirection((-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = backLabel }, contentAlignment = Alignment.Center) {
                 RideIcon(RideIcons.Back, c.fg, size = 22.dp)
             }
             Spacer(Modifier.weight(1f))

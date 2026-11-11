@@ -2,6 +2,8 @@ package com.ridenow.app.ui.components
 
 import com.ridenow.app.R
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -18,6 +20,14 @@ import androidx.compose.ui.unit.*
 import androidx.compose.foundation.selection.toggleable
 import com.ridenow.app.ui.theme.RideTheme
 
+
+/** Applies a horizontal offset relative to the current layout direction. */
+@Composable
+fun Modifier.offsetByStartDirection(x: Dp): Modifier {
+    val direction = LocalLayoutDirection.current
+    return offset(x = if (direction == LayoutDirection.Rtl) -x else x)
+}
+
 /** Back button, large title and optional subtitle used at the top of list-style screens. */
 @Composable
 fun ScreenTop(title: String, onBack: () -> Unit, modifier: Modifier = Modifier, subtitle: String? = null) {
@@ -25,7 +35,7 @@ fun ScreenTop(title: String, onBack: () -> Unit, modifier: Modifier = Modifier, 
 
     val c = RideTheme.colors
     Column(modifier) {
-        Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) {
+        Box(Modifier.offsetByStartDirection((-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) {
             RideIcon(RideIcons.Back, c.fg, size = 22.dp)
         }
         Text(title, color = c.fg, fontSize = 30.sp, fontWeight = FontWeight.Light, modifier = Modifier.semantics { heading() })
@@ -73,5 +83,5 @@ fun RideSwitch(on: Boolean, label: String, onChange: (Boolean) -> Unit) {
         Modifier.size(width = 48.dp, height = 28.dp).clip(RoundedCornerShape(14.dp)).background(if (on) c.accent else c.line)
             .then(if (on) Modifier else Modifier.border(1.dp, c.border, RoundedCornerShape(14.dp)))
             .toggleable(on, role = Role.Switch, onValueChange = onChange).semantics { contentDescription = label },
-    ) { Box(Modifier.padding(if (on) 4.dp else 3.dp).offset(x = if (on) 20.dp else 0.dp).size(20.dp).clip(CircleShape).background(if (on) c.onAccent else c.muted)) }
+    ) { Box(Modifier.padding(if (on) 4.dp else 3.dp).offsetByStartDirection(if (on) 20.dp else 0.dp).size(20.dp).clip(CircleShape).background(if (on) c.onAccent else c.muted)) }
 }

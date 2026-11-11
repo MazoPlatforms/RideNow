@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.safety
 
+import com.ridenow.app.ui.components.offsetByStartDirection
+
 import com.ridenow.app.R
 import androidx.compose.ui.res.stringResource
 
@@ -49,7 +51,7 @@ private fun Switch(on: Boolean, label: String, onChange: (Boolean) -> Unit) {
     Box(
         Modifier.size(width = 48.dp, height = 28.dp).clip(RoundedCornerShape(14.dp)).background(if (on) c.accent else c.line).then(if (on) Modifier else Modifier.border(1.dp, c.border, RoundedCornerShape(14.dp)))
             .toggleable(on, role = Role.Switch, onValueChange = onChange).semantics { contentDescription = label },
-    ) { Box(Modifier.padding(if (on) 4.dp else 3.dp).offset(x = if (on) 20.dp else 0.dp).size(20.dp).clip(CircleShape).background(if (on) c.onAccent else c.muted)) }
+    ) { Box(Modifier.padding(if (on) 4.dp else 3.dp).offsetByStartDirection(if (on) 20.dp else 0.dp).size(20.dp).clip(CircleShape).background(if (on) c.onAccent else c.muted)) }
 }
 
 /** Emergency call, ride details and safety tools. */

@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.auth
 
+import com.ridenow.app.ui.components.offsetByStartDirection
+
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -111,7 +113,7 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modi
             .padding(horizontal = 20.dp),
     ) {
         Box(
-            Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack)
+            Modifier.offsetByStartDirection((-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack)
                 .semantics { contentDescription = textSearchBack },
             contentAlignment = Alignment.Center,
         ) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }

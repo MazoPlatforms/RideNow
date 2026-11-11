@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.post
 
+import com.ridenow.app.ui.components.offsetByStartDirection
+
 import com.ridenow.app.R
 import androidx.compose.ui.res.stringResource
 
@@ -108,7 +110,7 @@ fun RateDriverScreen(onBack: () -> Unit, onSubmit: (Int) -> Unit, modifier: Modi
     val tags = if (stars in 1..3) Bad else Good
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
-        Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) {
+        Box(Modifier.offsetByStartDirection((-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) {
             RideIcon(RideIcons.Back, c.fg, size = 22.dp)
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(0), horizontalAlignment = Alignment.CenterHorizontally) {

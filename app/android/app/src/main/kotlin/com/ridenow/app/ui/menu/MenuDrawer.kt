@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.*
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
 import com.ridenow.app.ui.profile.initialsOf
@@ -43,11 +45,12 @@ private val More = listOf(
 fun MenuDrawer(open: Boolean, name: String, phone: String, onClose: () -> Unit, onProfile: () -> Unit, onItem: (String) -> Unit, onSignOut: () -> Unit) {
     val mainMenuLabel = stringResource(R.string.menu_main_menu)
     val c = RideTheme.colors
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     BackHandler(enabled = open) { onClose() }
     AnimatedVisibility(open, enter = fadeIn(), exit = fadeOut()) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (c.isDark) 0.62f else 0.45f)).clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onClose))
     }
-    AnimatedVisibility(open, enter = slideInHorizontally { -it }, exit = slideOutHorizontally { -it }) {
+    AnimatedVisibility(open, enter = slideInHorizontally { if (isRtl) it else -it }, exit = slideOutHorizontally { if (isRtl) it else -it }) {
         Column(
             Modifier.fillMaxHeight().width(320.dp).background(c.bg).border(1.dp, c.line).statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 16.dp)
                 .semantics { contentDescription = mainMenuLabel },

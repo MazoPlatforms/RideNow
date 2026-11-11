@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.more
 
+import com.ridenow.app.getAppLanguage
+import com.ridenow.app.setAppLanguage
+
 import com.ridenow.app.R
 import androidx.compose.ui.res.stringResource
 
@@ -377,6 +380,10 @@ fun LanguageScreen(onBack: () -> Unit) {
     val textArabic = stringResource(R.string.text_arabic)
     val textValue3 = stringResource(R.string.language_native_hindi)
     val textHindi = stringResource(R.string.text_hindi)
+    val textTamil = stringResource(R.string.text_tamil)
+    val textSinhala = stringResource(R.string.text_sinhala)
+    val nativeTamil = stringResource(R.string.language_native_tamil)
+    val nativeSinhala = stringResource(R.string.language_native_sinhala)
     val textSettingsLanguage = stringResource(R.string.settings_language)
     val textChooseTheLanguageForRidenow = stringResource(R.string.text_choose_the_language_for_ridenow)
     val textSave = stringResource(R.string.text_save)
@@ -386,15 +393,14 @@ fun LanguageScreen(onBack: () -> Unit) {
         Triple("en", textEnglish, textEnglish), Triple("es", textEspaOl, textSpanish), Triple("fr", textFranAis, textFrench),
         Triple("de", textDeutsch, textGerman), Triple("ja", textValue, textJapanese), Triple("ar", textValue2, textArabic),
         Triple("hi", textValue3, textHindi),
+        Triple("ta", nativeTamil, textTamil), Triple("si", nativeSinhala, textSinhala),
     )
-    var sel by rememberSaveable { mutableStateOf(context.prefs().getString("lang", "en") ?: "en") }
-    val activity = context as? android.app.Activity
+    var sel by rememberSaveable { mutableStateOf(getAppLanguage(context)) }
     MoreScaffold(textSettingsLanguage, onBack, subtitle = textChooseTheLanguageForRidenow, bottom = {
         RideButton(textSave, {
-            val saved = context.prefs().getString("lang", "en") ?: "en"
+            val saved = getAppLanguage(context)
             if (sel != saved) {
-                context.prefs().edit().putString("lang", sel).commit()
-                activity?.recreate() // restart the activity so the new language applies everywhere
+                setAppLanguage(context, sel)
             } else onBack()
         })
     }) {

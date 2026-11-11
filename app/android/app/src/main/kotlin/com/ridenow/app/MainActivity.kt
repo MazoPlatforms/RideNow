@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
         // System splash hands off instantly to the animated Compose splash (same background colour).
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        migrateAppLanguageToSystem(this)
         setContent {
             var mode by rememberSaveable { mutableStateOf(ThemeMode.System) }
             val dark = when (mode) { ThemeMode.System -> isSystemInDarkTheme(); ThemeMode.Light -> false; ThemeMode.Dark -> true }

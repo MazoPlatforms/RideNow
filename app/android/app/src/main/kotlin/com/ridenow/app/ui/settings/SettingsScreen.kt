@@ -1,7 +1,8 @@
 package com.ridenow.app.ui.settings
 
+import com.ridenow.app.getAppLanguage
+
 import java.util.Locale
-import com.ridenow.app.ui.more.prefs
 import androidx.compose.ui.platform.LocalContext
 import com.ridenow.app.R
 import androidx.compose.ui.res.stringResource
@@ -37,7 +38,7 @@ fun SettingsScreen(
     val c = RideTheme.colors
     var sheet by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
-    val langCode = context.prefs().getString("lang", "en") ?: "en"
+    val langCode = getAppLanguage(context)
     val nativeLanguageName = Locale.forLanguageTag(langCode).let { loc -> loc.getDisplayLanguage(loc).replaceFirstChar { it.titlecaseChar() } }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         ScreenTop(stringResource(R.string.settings_title), onBack, subtitle = stringResource(R.string.settings_subtitle))

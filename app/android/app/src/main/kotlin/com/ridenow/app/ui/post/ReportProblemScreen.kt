@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.post
 
+import com.ridenow.app.ui.components.offsetByStartDirection
+
 import com.ridenow.app.R
 import androidx.compose.ui.res.stringResource
 
@@ -132,7 +134,7 @@ fun ReportProblemScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifi
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         if (submitted) { Submitted(onDone); return@Column }
-        Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button) { if (cat >= 0) { cat = -1; picked = emptySet() } else onBack() }.semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) {
+        Box(Modifier.offsetByStartDirection((-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button) { if (cat >= 0) { cat = -1; picked = emptySet() } else onBack() }.semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) {
             RideIcon(RideIcons.Back, c.fg, size = 22.dp)
         }
         if (cat < 0) {

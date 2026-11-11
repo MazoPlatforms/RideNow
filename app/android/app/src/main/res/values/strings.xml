@@ -420,6 +420,10 @@
     <string name="text_arabic">"Arabic"</string>
     <string name="language_native_hindi" translatable="false">"हिन्दी"</string>
     <string name="text_hindi">"Hindi"</string>
+    <string name="language_native_tamil" translatable="false">தமிழ்</string>
+    <string name="text_tamil">"Tamil"</string>
+    <string name="language_native_sinhala" translatable="false">සිංහල</string>
+    <string name="text_sinhala">"Sinhala"</string>
     <string name="text_choose_the_language_for_ridenow">"Choose the language for RideNow."</string>
     <string name="text_control_your_data_and_keep_your_account_safe">"Control your data and keep your account safe."</string>
     <string name="text_account_security">"ACCOUNT SECURITY"</string>
@@ -827,7 +831,7 @@
     <string name="text_trip_completed">"Trip completed"</string>
     <string name="text_your_16_80_receipt_is_ready_to_download">"Your $16.80 receipt is ready to download."</string>
     <string name="text_text_2h">"2h"</string>
-    <string name="text_text_20_off_your_next_3_rides">"20% off your next 3 rides"</string>
+    <string name="text_text_20_off_your_next_3_rides" formatted="false">"20% off your next 3 rides"</string>
     <string name="text_use_code_nova20_before_sunday">"Use code NOVA20 before Sunday."</string>
     <string name="text_text_5h">"5h"</string>
     <string name="text_new_ride_later">"New: ride later"</string>

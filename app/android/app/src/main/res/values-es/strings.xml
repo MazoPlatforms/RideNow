@@ -793,7 +793,7 @@
     <string name="text_trip_completed">"Viaje completado"</string>
     <string name="text_your_16_80_receipt_is_ready_to_download">"Tu recibo de $16.80 está listo para descargar."</string>
     <string name="text_text_2h">"2 h"</string>
-    <string name="text_text_20_off_your_next_3_rides">"20% de descuento en tus próximos 3 viajes"</string>
+    <string name="text_text_20_off_your_next_3_rides" formatted="false">"20% de descuento en tus próximos 3 viajes"</string>
     <string name="text_use_code_nova20_before_sunday">"Usa el código NOVA20 antes del domingo."</string>
     <string name="text_text_5h">"5 h"</string>
     <string name="text_new_ride_later">"Nuevo: viaja más tarde"</string>
@@ -1077,4 +1077,6 @@
     <string name="add_other_address">"Añadir otra dirección"</string>
     <string name="scheduled_sample_date">"Mié, 4 nov, 8:30 a. m."</string>
     <string name="trip_waiting">"en espera"</string>
+    <string name="text_tamil">Tamil</string>
+    <string name="text_sinhala">cingalés</string>
 </resources>

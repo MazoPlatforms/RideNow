@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.support
 
+import com.ridenow.app.ui.components.offsetByStartDirection
+
 import com.ridenow.app.R
 import androidx.compose.ui.res.stringResource
 
@@ -116,7 +118,7 @@ fun SupportChatScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
+            Box(Modifier.offsetByStartDirection((-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
             Box(Modifier.size(40.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)).border(1.dp, c.accent, CircleShape), contentAlignment = Alignment.Center) { RideIcon(RideIcons.Message, c.accent) }
             Spacer(Modifier.width(12.dp))
             Column { Text(textRidenowSupport, color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold); Text(textOnline, color = c.accent, fontSize = 12.sp) }

@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.notifications
 
+import com.ridenow.app.ui.components.offsetByStartDirection
+
 import com.ridenow.app.ui.components.localizedLabel
 
 import com.ridenow.app.R
@@ -75,7 +77,7 @@ fun NotificationsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val shown = All.filter { filter == null || it.kind.label == filter }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
+            Box(Modifier.offsetByStartDirection((-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = textSearchBack }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
             Spacer(Modifier.weight(1f))
             Text(textMenuNotifications, color = c.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
             Spacer(Modifier.weight(1f))

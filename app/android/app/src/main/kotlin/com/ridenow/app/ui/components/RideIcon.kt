@@ -11,6 +11,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -69,9 +72,15 @@ object RideIcons {
 @Composable
 fun RideIcon(paths: List<String>, tint: Color, modifier: Modifier = Modifier, size: Dp = 20.dp) {
     val parsed = remember(paths) { paths.map { PathParser().parsePathString(it).toPath() } }
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val mirror = rtl && (paths == RideIcons.Back || paths == RideIcons.Logout || paths == listOf("M7 4l6 6-6 6"))
     Canvas(modifier.size(size)) {
         val s = this.size.width / 20f
-        scale(s, Offset.Zero) {
+        val center = Offset(this.size.width / 2f, this.size.height / 2f)
+        withTransform({
+            if (mirror) scale(-1f, 1f, center)
+            scale(s, Offset.Zero)
+        }) {
             parsed.forEach { drawPath(it, tint, style = Stroke(1.5f, cap = StrokeCap.Round, join = StrokeJoin.Round)) }
         }
     }
