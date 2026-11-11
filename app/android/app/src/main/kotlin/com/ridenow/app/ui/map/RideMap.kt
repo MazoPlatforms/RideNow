@@ -20,7 +20,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.ridenow.app.maps.MazoMapsClient
+import com.ridenow.app.maps.OpenStreetMapStyle
 import com.ridenow.app.ui.theme.RideTheme
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory as LibreCameraUpdateFactory
@@ -90,8 +90,7 @@ fun RideMap(
     LaunchedEffect(map, dark) {
         val active = map ?: return@LaunchedEffect
         styleReady = false
-        val styleUrl = if (dark) "${MazoMapsClient.baseUrl}/style/dark.json" else "${MazoMapsClient.baseUrl}/style.json"
-        active.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
+        active.setStyle(Style.Builder().fromJson(OpenStreetMapStyle.json)) { style ->
             styleReady = true
             addRouteAndPinLayers(style, dark)
             onLoaded()

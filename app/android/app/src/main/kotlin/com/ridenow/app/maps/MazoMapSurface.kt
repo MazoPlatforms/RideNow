@@ -89,7 +89,7 @@ fun MazoMapSurface(modifier: Modifier = Modifier, selectedPlace: MapPlace? = nul
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var styleReady by remember { mutableStateOf(false) }
     var online by remember { mutableStateOf(isOnline(context)) }
-    var mapStatus by remember { mutableStateOf("Connecting to Mazo Maps…") }
+    var mapStatus by remember { mutableStateOf("Loading OpenStreetMap tiles…") }
     var route by remember { mutableStateOf<MapRoute?>(null) }
     var routeError by remember { mutableStateOf<String?>(null) }
     var routeLoading by remember { mutableStateOf(false) }
@@ -130,10 +130,9 @@ fun MazoMapSurface(modifier: Modifier = Modifier, selectedPlace: MapPlace? = nul
     LaunchedEffect(map, dark) {
         val currentMap = map ?: return@LaunchedEffect
         styleReady = false
-        val url = if (dark) "${MazoMapsClient.baseUrl}/style/dark.json" else "${MazoMapsClient.baseUrl}/style.json"
-        currentMap.setStyle(Style.Builder().fromUri(url)) { style ->
+        currentMap.setStyle(Style.Builder().fromJson(OpenStreetMapStyle.json)) { style ->
             styleReady = true
-            mapStatus = "Mazo Maps · place coverage"
+            mapStatus = "© OpenStreetMap contributors"
             applySelectedPlace(style, currentPlace.value, currentDark.value)
             applyRoute(style, currentRoute.value, currentDark.value)
             val hasLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
@@ -160,33 +159,6 @@ fun MazoMapSurface(modifier: Modifier = Modifier, selectedPlace: MapPlace? = nul
         applyRoute(style, route, dark)
         selectedPlace?.let {
             currentMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 15.0))
-        }
-    }
-
-    // The guide's /version route currently returns 404 in production. style.json exposes an ETag and
-    // X-Mazo-Data-Revision today, so revalidate that small resource and refresh only on revision changes.
-    LaunchedEffect(map) {
-        var etag: String? = null
-        var revision: String? = null
-        while (isActive) {
-            try {
-                val latest = MazoMapsClient.checkStyleRevision(etag)
-                if (latest != null) {
-                    etag = latest.etag.ifBlank { etag.orEmpty() }
-                    if (revision != null && latest.revision != revision) {
-                        map?.setStyle(Style.Builder().fromJson(latest.styleJson)) { style ->
-                            styleReady = true
-                            mapStatus = "Mazo Maps · map data updated"
-                            applySelectedPlace(style, currentPlace.value, currentDark.value)
-                            applyRoute(style, currentRoute.value, currentDark.value)
-                        }
-                    }
-                    revision = latest.revision
-                }
-            } catch (_: Exception) {
-                // Keep the current style available; the next conditional check will retry in 15 seconds.
-            }
-            delay(15_000)
         }
     }
 
@@ -220,8 +192,8 @@ fun MazoMapSurface(modifier: Modifier = Modifier, selectedPlace: MapPlace? = nul
                 .background(colors.bg.copy(alpha = 0.92f)).border(1.dp, colors.border, RoundedCornerShape(12.dp))
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            Text("MAZO MAPS · KATTANKUDY", color = colors.fg, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.7.sp)
-            Text("Place preview · roads and buildings not included", color = colors.muted, fontSize = 9.sp)
+            Text("OPENSTREETMAP · KATTANKUDY", color = colors.fg, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.7.sp)
+            Text("© OpenStreetMap contributors", color = colors.muted, fontSize = 9.sp)
         }
 
         Box(
