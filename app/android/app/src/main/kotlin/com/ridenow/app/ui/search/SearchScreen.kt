@@ -1,5 +1,11 @@
 package com.ridenow.app.ui.search
 
+import com.ridenow.app.ui.components.offsetByStartDirection
+
+import com.ridenow.app.ui.map.LatLng
+import com.ridenow.app.ui.map.OpenStreetMapApi
+import kotlinx.coroutines.delay
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -56,10 +62,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
-import com.ridenow.app.maps.MapPlace
-import com.ridenow.app.maps.MazoMapsClient
 import com.ridenow.app.R
 import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideButtonStyle
@@ -71,46 +73,50 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 
+data class Place(val name: String, val area: String, val distance: String, val placeId: String? = null)
+
+private val Places = listOf(
+    Place("Helix Garden Plaza", "Sector 9, Garden Loop", "6.2 km"),
+    Place("Helix City Hall", "Sector 2, Civic Square", "3.1 km"),
+    Place("Helios Medical Centre", "Sector 5, Skyline Way", "4.8 km"),
+    Place("Hello Bakery & Café", "Sector 7, Meridian Walk", "0.4 km"),
+    Place("Nova Terminal, Gate 4", "Sector 12, Orbit Ring", "6.2 km"),
+    Place("Orbit Ring Station", "Sector 1, Ring Road", "5.5 km"),
+    Place("Aurora Medical Centre", "Sector 3, Skyline Way", "4.1 km"),
+    Place("Zenith Café", "Sector 7, Meridian Walk", "0.9 km"),
+)
+
 /** Destination search: trip type, route card with live search field, suggestions and shortcuts. */
 @Composable
 fun SearchScreen(
-    onBack: () -> Unit, onPlace: (MapPlace, Boolean) -> Unit, onFriend: () -> Unit, onEditPickup: () -> Unit,
-    onSaved: () -> Unit, onMap: () -> Unit, onAdd: (String) -> Unit, modifier: Modifier = Modifier,
+    onBack: () -> Unit, onPlace: (Place, Boolean) -> Unit, onFriend: () -> Unit, onEditPickup: () -> Unit,
+    onSaved: () -> Unit, onMap: () -> Unit, onAdd: (String) -> Unit, modifier: Modifier = Modifier, scheduled: String? = null, pickup: String? = null, friend: String? = null, near: LatLng? = null,
 ) {
+    val textNovaTerminalGate4 = stringResource(R.string.text_nova_terminal_gate_4)
+    val textSector12OrbitRing = stringResource(R.string.text_sector_12_orbit_ring)
+
     val c = RideTheme.colors
+    val backLabel = stringResource(R.string.search_back)
     var returnTrip by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
-    var results by remember { mutableStateOf<List<MapPlace>>(emptyList()) }
-    var loading by remember { mutableStateOf(false) }
-    var searchError by remember { mutableStateOf<String?>(null) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     val q = query.trim()
+    var remote by remember { mutableStateOf<List<Place>?>(null) }
     LaunchedEffect(q) {
-        if (q.isBlank()) {
-            results = emptyList()
-            searchError = null
-            loading = false
-            return@LaunchedEffect
-        }
-        delay(300)
-        loading = true
-        searchError = null
-        try {
-            results = MazoMapsClient.searchPlaces(q)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (failure: Exception) {
-            results = emptyList()
-            searchError = failure.message ?: "Map search is unavailable."
-        } finally {
-            loading = false
+        remote = null
+        if (q.length >= 2) {
+            delay(250)
+            val r = OpenStreetMapApi.autocomplete(q, near)
+            remote = r?.map { Place(it.name, it.area, "", it.placeId) } ?: Places.filter { it.name.contains(q, true) || it.area.contains(q, true) }
         }
     }
+    val results = remote ?: emptyList()
+    val loading = q.length >= 2 && remote == null
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = "Back" }, contentAlignment = Alignment.Center) {
+            Box(Modifier.offsetByStartDirection((-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = backLabel }, contentAlignment = Alignment.Center) {
                 RideIcon(RideIcons.Back, c.fg, size = 22.dp)
             }
             Spacer(Modifier.weight(1f))
@@ -124,10 +130,24 @@ fun SearchScreen(
             Spacer(Modifier.weight(1f)); Spacer(Modifier.width(36.dp))
         }
 
+        if (scheduled != null) Row(
+            Modifier.padding(top = 10.dp).fillMaxWidth().height(44.dp).clip(RoundedCornerShape(14.dp)).background(c.accent.copy(alpha = 0.14f)).padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RideIcon(RideIcons.Clock, c.accent, size = 18.dp); Spacer(Modifier.width(10.dp))
+            Text(stringResource(R.string.search_scheduled, scheduled), color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+        if (friend != null) Row(
+            Modifier.padding(top = 10.dp).fillMaxWidth().height(44.dp).clip(RoundedCornerShape(14.dp)).background(c.accent.copy(alpha = 0.14f)).padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RideIcon(RideIcons.Person, c.accent, size = 18.dp); Spacer(Modifier.width(10.dp))
+            Text(stringResource(R.string.search_booking_for, friend), color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
         TripTypeToggle(returnTrip, { returnTrip = it }, Modifier.padding(top = 14.dp).entrance(60))
 
         RouteCard(
-            returnTrip, query, { query = it }, focus, onEditPickup,
+            returnTrip, query, { query = it }, focus, onEditPickup, pickup,
             onSubmit = { results.firstOrNull()?.let { onPlace(it, returnTrip) } },
             modifier = Modifier.padding(top = 14.dp).entrance(120),
         )
@@ -138,13 +158,12 @@ fun SearchScreen(
                 item { OptionRow(RideIcons.Map, stringResource(R.string.search_map), null, chevron = true, onClick = onMap) }
                 item { OptionRow(RideIcons.Home, stringResource(R.string.search_add_home), null, plus = true) { onAdd("Home") } }
                 item { OptionRow(RideIcons.Work, stringResource(R.string.search_add_work), null, plus = true) { onAdd("Work") } }
-                item { CoverageNote() }
+                item { OptionRow(RideIcons.Clock, textNovaTerminalGate4, textSector12OrbitRing, chevron = true) { onPlace(Places[4], returnTrip) } }
             }
-            loading -> SearchLoading(Modifier.weight(1f))
-            searchError != null -> SearchError(searchError.orEmpty(), Modifier.weight(1f))
+            loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator(Modifier.size(28.dp), color = c.accent, strokeWidth = 3.dp) }
             results.isEmpty() -> EmptyResults(q, onMap, Modifier.weight(1f))
             else -> LazyColumn(Modifier.weight(1f).padding(top = 6.dp)) {
-                items(results, key = { it.id }) { p -> SuggestionRow(p, q) { onPlace(p, returnTrip) } }
+                items(results, key = { it.placeId ?: it.name }) { p -> SuggestionRow(p, q) { onPlace(p, returnTrip) } }
             }
         }
     }
@@ -174,20 +193,22 @@ private fun TripTypeToggle(returnTrip: Boolean, onChange: (Boolean) -> Unit, mod
 @Composable
 private fun RouteCard(
     returnTrip: Boolean, query: String, onQuery: (String) -> Unit, focus: FocusRequester,
-    onEditPickup: () -> Unit, onSubmit: () -> Unit, modifier: Modifier = Modifier,
+    onEditPickup: () -> Unit, pickup: String?, onSubmit: () -> Unit, modifier: Modifier = Modifier,
 ) {
     val c = RideTheme.colors
+    val clearLabel = stringResource(R.string.search_clear)
+    val editPickupLabel = stringResource(R.string.search_edit_pickup)
     val rows = if (returnTrip) 3 else 2
     Column(
         modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp))
             .drawBehind {
                 val x = 21.dp.toPx()
-                drawLine(c.border, Offset(x, 32.dp.toPx()), Offset(x, ((rows - 1) * 64 + 32).dp.toPx()), 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
+                drawLine(c.border, Offset(x, 28.dp.toPx()), Offset(x, ((rows - 1) * 56 + 28).dp.toPx()), 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
             },
     ) {
         RouteRow(stringResource(R.string.search_pickup), false, Marker.Pickup) {
-            Text(stringResource(R.string.search_current), color = c.fg, fontSize = 16.sp, modifier = Modifier.weight(1f))
-            Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup).semantics { contentDescription = "Edit pickup location" }, contentAlignment = Alignment.Center) {
+            Text(pickup ?: stringResource(R.string.search_current), color = c.fg, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup).semantics { contentDescription = editPickupLabel }, contentAlignment = Alignment.Center) {
                 RideIcon(RideIcons.Pencil, c.accent, size = 18.dp)
             }
         }
@@ -199,7 +220,7 @@ private fun RouteCard(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
                 decorationBox = { inner -> Box { if (query.isEmpty()) Text(stringResource(R.string.search_hint), color = c.muted, fontSize = 16.sp); inner() } },
             )
-            if (query.isNotEmpty()) Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button) { onQuery("") }.semantics { contentDescription = "Clear" }, contentAlignment = Alignment.Center) {
+            if (query.isNotEmpty()) Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button) { onQuery("") }.semantics { contentDescription = clearLabel }, contentAlignment = Alignment.Center) {
                 RideIcon(RideIcons.Close, c.muted, size = 16.dp)
             } else if (!returnTrip) Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { RideIcon(RideIcons.Plus, c.accent) }
         }
@@ -217,7 +238,7 @@ private enum class Marker { Pickup, Stop, Drop }
 @Composable
 private fun RouteRow(label: String, active: Boolean, marker: Marker, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     val c = RideTheme.colors
-    Row(Modifier.fillMaxWidth().height(63.dp).padding(start = 16.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().height(56.dp).padding(start = 16.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.width(10.dp), contentAlignment = Alignment.Center) {
             when (marker) {
                 Marker.Pickup -> Box(Modifier.size(10.dp).clip(CircleShape).background(BrandYellow))
@@ -228,7 +249,7 @@ private fun RouteRow(label: String, active: Boolean, marker: Marker, content: @C
         Spacer(Modifier.width(20.dp))
         Column(Modifier.weight(1f)) {
             Text(label, color = if (active) c.accent else c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp)
-            Row(verticalAlignment = Alignment.CenterVertically, content = content)
+            Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically, content = content)
         }
     }
 }
@@ -252,7 +273,7 @@ private fun OptionRow(icon: List<String>, title: String, subtitle: String?, chev
 }
 
 @Composable
-private fun SuggestionRow(place: MapPlace, query: String, onClick: () -> Unit) {
+private fun SuggestionRow(place: Place, query: String, onClick: () -> Unit) {
     val c = RideTheme.colors
     val title = buildAnnotatedString {
         val i = place.name.indexOf(query, ignoreCase = true)
@@ -268,39 +289,11 @@ private fun SuggestionRow(place: MapPlace, query: String, onClick: () -> Unit) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, color = c.fg, fontSize = 15.sp)
-                Text(place.address ?: place.category?.replaceFirstChar(Char::uppercase) ?: "Place", color = c.muted, fontSize = 12.sp, maxLines = 1)
+                Text(place.area, color = c.muted, fontSize = 12.sp)
             }
-            place.category?.let { Text(it.replaceFirstChar(Char::uppercase), color = c.muted, fontSize = 10.sp) }
+            Text(place.distance, color = c.muted, fontSize = 12.sp)
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.line))
-    }
-}
-
-@Composable
-private fun CoverageNote() {
-    val c = RideTheme.colors
-    Column(
-        Modifier.fillMaxWidth().padding(top = 18.dp).clip(RoundedCornerShape(16.dp)).background(c.field)
-            .border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(16.dp),
-    ) {
-        Text("Mazo Maps place search", color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        Text("The current map shows place points only. Full road and building layers are still in progress; local routing is limited to Kattankudy.", color = c.muted, fontSize = 11.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 5.dp))
-    }
-}
-
-@Composable
-private fun SearchLoading(modifier: Modifier = Modifier) {
-    val c = RideTheme.colors
-    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Text("Searching Mazo Maps…", color = c.muted, fontSize = 14.sp)
-    }
-}
-
-@Composable
-private fun SearchError(message: String, modifier: Modifier = Modifier) {
-    val c = RideTheme.colors
-    Box(modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.TopCenter) {
-        Text(message, color = c.danger, fontSize = 13.sp, lineHeight = 19.sp)
     }
 }
 

@@ -1,5 +1,7 @@
 package com.ridenow.app.ui.auth
 
+import com.ridenow.app.ui.components.offsetByStartDirection
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -37,7 +39,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,84 +72,35 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 private const val CODE_LENGTH = 6
 
-/** Step 2 of 3: verifies the provider-issued code against the RideNow backend. */
+/** Step 2 of 3. Demo rule: any code is accepted except 000000, which shows the error state. */
 @Composable
-fun OtpScreen(
-    phone: String,
-    initialChallengeId: String,
-    onBack: () -> Unit,
-    onRequestCode: suspend (String) -> String,
-    onVerify: suspend (String, String) -> Unit,
-    onVerified: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun OtpScreen(phone: String, onBack: () -> Unit, onVerified: () -> Unit, modifier: Modifier = Modifier) {
+    val textSearchBack = stringResource(R.string.search_back)
+    val text6DigitVerificationCode = stringResource(R.string.text_text_6_digit_verification_code)
+
     val c = RideTheme.colors
     val haptics = LocalHapticFeedback.current
     var code by rememberSaveable { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
     var errorTick by remember { mutableIntStateOf(0) }
     var verifying by remember { mutableStateOf(false) }
     var resendKey by remember { mutableIntStateOf(0) }
-    var seconds by remember { mutableIntStateOf(60) }
-    var activeChallengeId by rememberSaveable { mutableStateOf(initialChallengeId) }
+    var seconds by remember { mutableIntStateOf(24) }
     var focused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val shake = remember { Animatable(0f) }
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { delay(400); focusRequester.requestFocus() }
-    LaunchedEffect(initialChallengeId) {
-        activeChallengeId = initialChallengeId
-        code = ""
-        error = false
-        errorMessage = null
-        resendKey++
-    }
-    LaunchedEffect(resendKey) { seconds = 60; while (seconds > 0) { delay(1000); seconds-- } }
-    fun verify() {
-        if (code.length != CODE_LENGTH || verifying) return
-        val submittedCode = code
-        scope.launch {
-            verifying = true
-            error = false
-            errorMessage = null
-            try {
-                onVerify(activeChallengeId, submittedCode)
-                onVerified()
-            } catch (failure: Exception) {
-                code = ""
-                error = true
-                errorTick++
-                errorMessage = failure.message ?: "Could not verify that code. Try again."
-            } finally {
-                verifying = false
-            }
+    LaunchedEffect(resendKey) { seconds = 24; while (seconds > 0) { delay(1000); seconds-- } }
+    LaunchedEffect(verifying) {
+        if (verifying) {
+            delay(900)
+            if (code == "000000") { error = true; errorTick++; verifying = false; code = "" } else onVerified()
         }
     }
-    fun resend() {
-        if (seconds > 0 || verifying) return
-        scope.launch {
-            verifying = true
-            errorMessage = null
-            try {
-                activeChallengeId = onRequestCode(phone)
-                code = ""
-                error = false
-                resendKey++
-            } catch (failure: Exception) {
-                errorMessage = failure.message ?: "Could not send a new code. Try again."
-                if (failure is com.ridenow.app.auth.AuthApiException && failure.code == "OTP_RATE_LIMIT") resendKey++
-            } finally {
-                verifying = false
-            }
-        }
-    }
-    LaunchedEffect(code) { if (code.length == CODE_LENGTH) verify() }
     LaunchedEffect(errorTick) {
         if (errorTick > 0) {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -161,8 +113,8 @@ fun OtpScreen(
         modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp),
     ) {
         Box(
-            Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack)
-                .semantics { contentDescription = "Back" },
+            Modifier.offsetByStartDirection((-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack)
+                .semantics { contentDescription = textSearchBack },
             contentAlignment = Alignment.Center,
         ) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
 
@@ -189,17 +141,18 @@ fun OtpScreen(
             value = code,
             onValueChange = { v ->
                 if (!verifying) {
-                    code = v.filter(Char::isDigit).take(CODE_LENGTH); error = false; errorMessage = null
+                    code = v.filter(Char::isDigit).take(CODE_LENGTH); error = false
+                    if (code.length == CODE_LENGTH) verifying = true
                 }
             },
             modifier = Modifier.padding(top = 20.dp).fillMaxWidth().offset(x = shake.value.dp)
                 .focusRequester(focusRequester).onFocusChanged { focused = it.isFocused }
-                .semantics { contentDescription = "6-digit verification code" },
+                .semantics { contentDescription = text6DigitVerificationCode },
             singleLine = true,
             textStyle = TextStyle(color = Color.Transparent),
             cursorBrush = SolidColor(Color.Transparent),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { verify() }),
+            keyboardActions = KeyboardActions(onDone = { if (code.length == CODE_LENGTH) verifying = true }),
             decorationBox = { inner ->
                 Box(Modifier.alpha(0f).size(1.dp)) { inner() }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -219,8 +172,7 @@ fun OtpScreen(
             },
         )
 
-        if (error) Text(errorMessage ?: stringResource(R.string.otp_error), color = c.danger, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 12.dp))
-        else errorMessage?.let { Text(it, color = c.danger, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 12.dp)) }
+        if (error) Text(stringResource(R.string.otp_error), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp))
 
         Row(Modifier.padding(top = 12.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
             if (seconds > 0) {
@@ -228,14 +180,14 @@ fun OtpScreen(
             } else {
                 Text(
                     stringResource(R.string.otp_resend), color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable(role = Role.Button) { resend() }.padding(vertical = 12.dp),
+                    modifier = Modifier.clickable(role = Role.Button) { code = ""; error = false; resendKey++ }.padding(vertical = 12.dp),
                 )
             }
         }
 
         Spacer(Modifier.weight(1f))
         RideButton(
-            stringResource(R.string.otp_verify), onClick = { verify() },
+            stringResource(R.string.otp_verify), onClick = { verifying = true },
             modifier = Modifier.padding(bottom = 12.dp).entrance(200), enabled = code.length == CODE_LENGTH, loading = verifying,
         )
     }
@@ -243,8 +195,8 @@ fun OtpScreen(
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun OtpDarkPreview() = RideNowTheme(darkTheme = true) { OtpScreen("+94 77 000 0000", "preview", {}, { "preview" }, { _, _ -> }, {}) }
+private fun OtpDarkPreview() = RideNowTheme(darkTheme = true) { OtpScreen("+1 555 012 3456", {}, {}) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun OtpLightPreview() = RideNowTheme(darkTheme = false) { OtpScreen("+94 77 000 0000", "preview", {}, { "preview" }, { _, _ -> }, {}) }
+private fun OtpLightPreview() = RideNowTheme(darkTheme = false) { OtpScreen("+1 555 012 3456", {}, {}) }

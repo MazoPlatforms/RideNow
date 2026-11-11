@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.splash
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -19,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -69,14 +71,12 @@ import kotlin.math.sin
  */
 @Composable
 fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
+    val textFromSifric = stringResource(R.string.text_from_sifric)
+
     val c = RideTheme.colors
     val context = LocalContext.current
     val reduceMotion = remember {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    }
-    val versionName = remember {
-        @Suppress("DEPRECATION")
-        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: ""
     }
 
     val route = remember { Animatable(if (reduceMotion) 1f else 0f) }
@@ -93,17 +93,14 @@ fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
     val loop = rememberInfiniteTransition(label = "splash")
     val orbitRaw by loop.animateFloat(0f, 360f, infiniteRepeatable(tween(9000, easing = LinearEasing)), label = "orbit")
     val pulseRaw by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearOutSlowInEasing)), label = "pulse")
-    val loaderRaw by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing)), label = "loader")
     val orbit = if (reduceMotion) 0f else orbitRaw
     val pulse = if (reduceMotion) 0f else pulseRaw
-    val loader = if (reduceMotion) 0.5f else loaderRaw
     val description = stringResource(R.string.splash_description)
 
     BoxWithConstraints(
         modifier.fillMaxSize().background(c.bg).semantics { contentDescription = description },
     ) {
         val textTop = maxHeight * 0.60f
-        val loaderTop = maxHeight * 0.82f
 
         Canvas(Modifier.fillMaxSize()) {
             drawStreets(c)
@@ -134,22 +131,14 @@ fun SplashScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
             )
         }
 
-        // Indeterminate loader
-        Box(
-            Modifier.align(Alignment.TopCenter).padding(top = loaderTop).width(120.dp).height(3.dp)
-                .clip(RoundedCornerShape(2.dp)).background(c.line),
-        ) {
-            Box(
-                Modifier.fillMaxHeight().fillMaxWidth(0.4f)
-                    .offset { IntOffset(((-48f + 168f * loader).dp.roundToPx()), 0) }
-                    .background(c.accent),
-            )
-        }
-
-        Text(
-            "Version $versionName", color = c.muted, fontSize = 12.sp,
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 34.dp),
+        // "from Sifric" credit, like "from Meta" on Meta apps. Dark and light artwork follow the active theme.
+        Image(
+            painter = painterResource(if (c.isDark) R.drawable.ridenow_from_sifric_dark else R.drawable.ridenow_from_sifric_light),
+            contentDescription = textFromSifric,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 64.dp).width(96.dp).graphicsLayer { alpha = intro.value },
         )
+
     }
 }
 

@@ -1,7 +1,8 @@
 package com.ridenow.app.ui.components
 
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
+
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.ridenow.app.ui.theme.RideColors

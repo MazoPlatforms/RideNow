@@ -1,5 +1,12 @@
 package com.ridenow.app.ui.auth
 
+import com.ridenow.app.ui.components.offsetByStartDirection
+
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,7 +38,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -62,52 +68,53 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /** Step 1 of 3: ask for the rider's mobile number. [onCodeSent] receives the number in +E.164 style. */
 @Composable
-fun PhoneScreen(
-    onBack: () -> Unit,
-    onRequestCode: suspend (String) -> String,
-    onCodeSent: (String, String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modifier = Modifier) {
+    val textSearchBack = stringResource(R.string.search_back)
+    val textCountryCodeValueValue = stringResource(R.string.text_country_code_value_value)
+
     val c = RideTheme.colors
-    var iso by rememberSaveable { mutableStateOf("LK") }
+    val context = LocalContext.current
+    var iso by rememberSaveable { mutableStateOf(detectCountryIso(context)) }
+    var hintAsked by rememberSaveable { mutableStateOf(false) }
     var digits by rememberSaveable { mutableStateOf("") }
     var showPicker by rememberSaveable { mutableStateOf(false) }
     var sending by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
     var focused by remember { mutableStateOf(false) }
     val country = Countries.byIso(iso)
     val valid = digits.length >= country.min
     val focusRequester = remember { FocusRequester() }
-    val scope = rememberCoroutineScope()
     val borderColor by animateColorAsState(if (focused) c.accent else c.border, label = "border")
 
-    LaunchedEffect(Unit) { delay(400); focusRequester.requestFocus() }
-    fun send() {
-        if (valid && !sending) scope.launch {
-            sending = true
-            errorMessage = null
-            try {
-                val fullPhone = country.dial + digits
-                onCodeSent(fullPhone, onRequestCode(fullPhone))
-            } catch (failure: Exception) {
-                errorMessage = failure.message ?: "Could not send a code. Try again."
-            } finally {
-                sending = false
+    // Android's own phone number prompt: picks the number and country for the user. No permission needed.
+    val hintLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            readPhoneFromHint(context, result.data) { full ->
+                splitFullNumber(full)?.let { (picked, rest) -> iso = picked.iso; digits = rest.take(picked.max) }
             }
         }
     }
+    LaunchedEffect(Unit) {
+        if (!hintAsked) {
+            hintAsked = true
+            requestPhoneHint(context) { sender -> hintLauncher.launch(IntentSenderRequest.Builder(sender).build()) }
+        }
+    }
+    LaunchedEffect(Unit) { delay(400); focusRequester.requestFocus() }
+    LaunchedEffect(sending) {
+        if (sending) { delay(900); onCodeSent(country.dial + digits) }
+    }
+    fun send() { if (valid && !sending) sending = true }
 
     Column(
         modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding()
             .padding(horizontal = 20.dp),
     ) {
         Box(
-            Modifier.offset(x = (-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack)
-                .semantics { contentDescription = "Back" },
+            Modifier.offsetByStartDirection((-12).dp).size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack)
+                .semantics { contentDescription = textSearchBack },
             contentAlignment = Alignment.Center,
         ) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
 
@@ -134,7 +141,7 @@ fun PhoneScreen(
                     Modifier.fillMaxHeight().width(96.dp).clip(RoundedCornerShape(16.dp)).background(c.field)
                         .border(1.dp, c.border, RoundedCornerShape(16.dp))
                         .clickable(role = Role.Button) { showPicker = true }.padding(horizontal = 14.dp)
-                        .semantics { contentDescription = "Country code, ${country.name} ${country.dial}" },
+                        .semantics { contentDescription = textCountryCodeValueValue.format(country.displayName, country.dial) },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(country.dial, color = c.fg, fontSize = 17.sp)
@@ -168,7 +175,6 @@ fun PhoneScreen(
                 Spacer(Modifier.width(10.dp))
                 Text(stringResource(R.string.phone_privacy), color = c.muted, fontSize = 13.sp, lineHeight = 19.sp)
             }
-            errorMessage?.let { Text(it, color = c.danger, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 12.dp)) }
         }
 
         Spacer(Modifier.weight(1f))
@@ -192,8 +198,8 @@ fun PhoneScreen(
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun PhoneDarkPreview() = RideNowTheme(darkTheme = true) { PhoneScreen({}, { "preview" }, { _, _ -> }) }
+private fun PhoneDarkPreview() = RideNowTheme(darkTheme = true) { PhoneScreen({}, {}) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun PhoneLightPreview() = RideNowTheme(darkTheme = false) { PhoneScreen({}, { "preview" }, { _, _ -> }) }
+private fun PhoneLightPreview() = RideNowTheme(darkTheme = false) { PhoneScreen({}, {}) }
