@@ -1069,4 +1069,13 @@
     <string name="trip_waiting">"en attente"</string>
     <string name="text_tamil">tamoul</string>
     <string name="text_sinhala">cinghalais</string>
+    <string name="help_report_category">"Catégorie"</string>
+    <string name="help_report_describe">"Décrivez le problème"</string>
+    <string name="help_report_placeholder">"Qu\'est-ce qui s\'est mal passé ?"</string>
+    <string name="help_report_cat_trip">"Problème de trajet"</string>
+    <string name="help_report_cat_payment">"Problème de paiement"</string>
+    <string name="help_report_cat_app">"Problème avec l\'appli"</string>
+    <string name="help_report_cat_other">"Autre chose"</string>
+    <string name="help_report_received_title">"Signalement reçu"</string>
+    <string name="help_report_received_body">"Notre équipe d\'assistance l\'examinera et vous répondra sous 24 heures."</string>
 </resources>

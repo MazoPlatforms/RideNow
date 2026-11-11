@@ -332,7 +332,7 @@ fun CalendarSheet(initial: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: ()
 // ---------- Passenger, Repeat and Reminder sheets ----------
 
 @Composable
-fun ChoiceSheet(title: String, options: List<String>, initial: Int, onSave: (Int) -> Unit, onDismiss: () -> Unit, subs: List<String?> = emptyList()) {
+fun ChoiceSheet(title: String, options: List<String>, initial: Int, onSave: (Int) -> Unit, onDismiss: () -> Unit, subs: List<String?> = emptyList(), icons: List<List<String>> = emptyList()) {
     val textSave = stringResource(R.string.text_save)
 
     var pick by rememberSaveable { mutableIntStateOf(initial) }
@@ -340,7 +340,7 @@ fun ChoiceSheet(title: String, options: List<String>, initial: Int, onSave: (Int
         Column(Modifier.padding(top = 8.dp)) {
             options.forEachIndexed { i, o ->
                 if (i > 0) RowDivider()
-                RadioRow(o, pick == i, { pick = i }, subs.getOrNull(i))
+                RadioRow(o, pick == i, { pick = i }, subs.getOrNull(i), icons.getOrNull(i), highlight = true)
             }
         }
         val close = LocalSheetClose.current

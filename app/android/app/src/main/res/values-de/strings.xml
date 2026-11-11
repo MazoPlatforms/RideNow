@@ -1062,4 +1062,13 @@
     <string name="trip_waiting">"wartet"</string>
     <string name="text_tamil">Tamil</string>
     <string name="text_sinhala">Singhalesisch</string>
+    <string name="help_report_category">"Kategorie"</string>
+    <string name="help_report_describe">"Problem beschreiben"</string>
+    <string name="help_report_placeholder">"Was ist schiefgelaufen?"</string>
+    <string name="help_report_cat_trip">"Problem mit der Fahrt"</string>
+    <string name="help_report_cat_payment">"Zahlungsproblem"</string>
+    <string name="help_report_cat_app">"App-Problem"</string>
+    <string name="help_report_cat_other">"Etwas anderes"</string>
+    <string name="help_report_received_title">"Meldung erhalten"</string>
+    <string name="help_report_received_body">"Unser Support-Team prüft sie und antwortet innerhalb von 24 Stunden."</string>
 </resources>

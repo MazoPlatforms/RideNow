@@ -1062,4 +1062,13 @@
     <string name="add_other_address">"மற்ற முகவரியைச் சேர்க்கவும்"</string>
     <string name="scheduled_sample_date">"புதன், 4 நவ., 8:30 காலை"</string>
     <string name="trip_waiting">"காத்திருக்கிறது"</string>
+    <string name="help_report_category">"வகை"</string>
+    <string name="help_report_describe">"சிக்கலை விவரிக்கவும்"</string>
+    <string name="help_report_placeholder">"என்ன தவறு நடந்தது?"</string>
+    <string name="help_report_cat_trip">"பயண சிக்கல்"</string>
+    <string name="help_report_cat_payment">"பணம் செலுத்தும் சிக்கல்"</string>
+    <string name="help_report_cat_app">"ஆப் சிக்கல்"</string>
+    <string name="help_report_cat_other">"வேறு ஏதாவது"</string>
+    <string name="help_report_received_title">"புகார் பெறப்பட்டது"</string>
+    <string name="help_report_received_body">"எங்கள் ஆதரவுக் குழு இதை ஆய்வு செய்து 24 மணி நேரத்துக்குள் பதிலளிக்கும்."</string>
 </resources>

@@ -277,3 +277,49 @@ fun ReportSafetyScreen(onBack: () -> Unit, onSafety: () -> Unit) {
         Spacer(Modifier.height(12.dp))
     }
 }
+
+@Composable
+fun ReportIssueScreen(onBack: () -> Unit, onDone: () -> Unit) {
+    val textReportAnIssue = stringResource(R.string.text_report_an_issue)
+    val textTellUsWhatHappened = stringResource(R.string.label_tell_us_what_happened)
+    val textCategory = stringResource(R.string.help_report_category)
+    val textDescribeTheIssue = stringResource(R.string.help_report_describe)
+    val textWhatWentWrong = stringResource(R.string.help_report_placeholder)
+    val textTripProblem = stringResource(R.string.help_report_cat_trip)
+    val textPaymentProblem = stringResource(R.string.help_report_cat_payment)
+    val textAppProblem = stringResource(R.string.help_report_cat_app)
+    val textSomethingElse = stringResource(R.string.help_report_cat_other)
+    val textSubmitReport = stringResource(R.string.text_submit_report)
+    val textDone = stringResource(R.string.text_done)
+    val textReportReceived = stringResource(R.string.help_report_received_title)
+    val textReviewWithin24Hours = stringResource(R.string.help_report_received_body)
+
+    val c = RideTheme.colors
+    val kinds = listOf(textTripProblem, textPaymentProblem, textAppProblem, textSomethingElse)
+    var kind by rememberSaveable { mutableIntStateOf(-1) }
+    var text by rememberSaveable { mutableStateOf("") }
+    var sent by rememberSaveable { mutableStateOf(false) }
+    if (sent) {
+        MoreScaffold(textReportAnIssue, onBack, bottom = { RideButton(textDone, onDone) }) {
+            Hero(RideIcons.Flag, textReportReceived, textReviewWithin24Hours)
+        }
+        return
+    }
+    MoreScaffold(textReportAnIssue, onBack, subtitle = textTellUsWhatHappened, bottom = {
+        RideButton(textSubmitReport, { sent = true }, enabled = kind >= 0 && text.isNotBlank())
+    }) {
+        SectionLabel(textCategory)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { kinds.chunked(2).forEach { r -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { r.forEach { k -> Chip(k, kinds.indexOf(k) == kind, { kind = kinds.indexOf(k) }) } } } }
+        SectionLabel(textDescribeTheIssue)
+        BasicTextField(
+            text, { text = it.take(500) }, Modifier.fillMaxWidth().heightIn(min = 120.dp), textStyle = TextStyle(color = c.fg, fontSize = 15.sp), cursorBrush = SolidColor(c.accent),
+            decorationBox = { inner ->
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(16.dp)) {
+                    if (text.isEmpty()) Text(textWhatWentWrong, color = c.muted, fontSize = 15.sp)
+                    inner()
+                }
+            },
+        )
+        Spacer(Modifier.height(12.dp))
+    }
+}

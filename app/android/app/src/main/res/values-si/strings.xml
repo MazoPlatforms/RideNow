@@ -1062,4 +1062,13 @@
     <string name="add_other_address">"වෙනත් ලිපිනයක් එක් කරන්න"</string>
     <string name="scheduled_sample_date">"බදාදා, නොවැ. 4, පෙ.ව. 8:30"</string>
     <string name="trip_waiting">"බලා සිටීම"</string>
+    <string name="help_report_category">"ප්‍රවර්ගය"</string>
+    <string name="help_report_describe">"ගැටලුව විස්තර කරන්න"</string>
+    <string name="help_report_placeholder">"කුමක් වැරදී ගියාද?"</string>
+    <string name="help_report_cat_trip">"ගමන් ගැටලුව"</string>
+    <string name="help_report_cat_payment">"ගෙවීම් ගැටලුව"</string>
+    <string name="help_report_cat_app">"යෙදුම් ගැටලුව"</string>
+    <string name="help_report_cat_other">"වෙනත් දෙයක්"</string>
+    <string name="help_report_received_title">"වාර්තාව ලැබුණි"</string>
+    <string name="help_report_received_body">"අපගේ සහාය කණ්ඩායම එය සමාලෝචනය කර පැය 24ක් ඇතුළත පිළිතුරු දෙයි."</string>
 </resources>

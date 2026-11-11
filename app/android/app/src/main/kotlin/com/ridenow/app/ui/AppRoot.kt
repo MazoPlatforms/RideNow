@@ -83,7 +83,7 @@ import com.ridenow.app.ui.welcome.WelcomeScreen
 
 enum class Screen {
     Splash, Welcome, Phone, Otp, Details, Location, Notifications, Home, Search, Options, Schedule, Confirm, Finding, Trip,
-    Complete, Rate, Report, Profile, EditProfile, MyRides, Payments, Settings, Intro, Loading, Expired, ServerError, Notifs, Saved, Help, Legal, Doc, Support, Chat, Safety, Contacts, MapPick, ShareTrip, ChangePickup, Friend, AddAddr, Stub,
+    Complete, Rate, Report, Profile, EditProfile, MyRides, Payments, Settings, Intro, Loading, Expired, ServerError, Notifs, Saved, Help, Legal, Doc, Support, Chat, Safety, Contacts, MapPick, ShareTrip, ChangePickup, Friend, AddAddr, ReportIssue, Stub,
 }
 
 /** Survives activity recreation within one app process, so the splash does not replay on rotation or theme changes. */
@@ -158,7 +158,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     val others = remember { mutableStateListOf(textNovaTerminalGate4 to textSector12OrbitRing, textHelixGardenPlaza to textSector9GardenLoop, textAuroraMedicalCentre to textSector3SkylineWay) }
     val nav = { to: Screen -> backStack.add(screen); screen = to }
     val shownPhone = formatPhoneForDisplay(phone.ifBlank { "+1 555 012 3456" })
-    val open = { label: String -> stubBack = screen; stub = label; screen = Screen.Stub }
+    val open = { label: String -> if (label == "Report an issue") nav(Screen.ReportIssue) else { stubBack = screen; stub = label; screen = Screen.Stub }; Unit }
     // Opens a destination by its menu or settings title; unknown titles show a placeholder.
     val go = { label: String ->
         drawer = false
@@ -337,6 +337,10 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             Screen.Support -> {
                 BackHandler { back() }
                 ContactSupportScreen(onBack = { back() }, onChat = { screen = Screen.Chat }, onReport = { open("Report an issue") })
+            }
+            Screen.ReportIssue -> {
+                BackHandler { back() }
+                ReportIssueScreen(onBack = { back() }, onDone = { back() })
             }
             Screen.Chat -> {
                 BackHandler { screen = Screen.Support }

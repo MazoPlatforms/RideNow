@@ -1062,4 +1062,13 @@
     <string name="trip_waiting">"待機中"</string>
     <string name="text_tamil">タミル語</string>
     <string name="text_sinhala">シンハラ語</string>
+    <string name="help_report_category">"カテゴリ"</string>
+    <string name="help_report_describe">"問題を説明してください"</string>
+    <string name="help_report_placeholder">"何が問題でしたか？"</string>
+    <string name="help_report_cat_trip">"乗車の問題"</string>
+    <string name="help_report_cat_payment">"支払いの問題"</string>
+    <string name="help_report_cat_app">"アプリの問題"</string>
+    <string name="help_report_cat_other">"その他"</string>
+    <string name="help_report_received_title">"報告を受け付けました"</string>
+    <string name="help_report_received_body">"サポートチームが確認し、24時間以内にご連絡します。"</string>
 </resources>

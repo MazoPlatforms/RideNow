@@ -1121,4 +1121,13 @@
     <string name="sample_report_number" translatable="false">"R-48213"</string>
     <string name="sample_trip_link_display" translatable="false">"ridenow.app/t/8F3K2Q"</string>
     <string name="trip_waiting">"waiting"</string>
+    <string name="help_report_category">"Category"</string>
+    <string name="help_report_describe">"Describe the issue"</string>
+    <string name="help_report_placeholder">"What went wrong?"</string>
+    <string name="help_report_cat_trip">"Trip problem"</string>
+    <string name="help_report_cat_payment">"Payment problem"</string>
+    <string name="help_report_cat_app">"App problem"</string>
+    <string name="help_report_cat_other">"Something else"</string>
+    <string name="help_report_received_title">"Report received"</string>
+    <string name="help_report_received_body">"Our support team will review it and reply within 24 hours."</string>
 </resources>

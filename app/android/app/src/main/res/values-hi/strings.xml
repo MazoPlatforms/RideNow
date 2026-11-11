@@ -1062,4 +1062,13 @@
     <string name="trip_waiting">"प्रतीक्षारत है"</string>
     <string name="text_tamil">तमिल</string>
     <string name="text_sinhala">सिंहली</string>
+    <string name="help_report_category">"श्रेणी"</string>
+    <string name="help_report_describe">"समस्या का विवरण दें"</string>
+    <string name="help_report_placeholder">"क्या गलत हुआ?"</string>
+    <string name="help_report_cat_trip">"यात्रा की समस्या"</string>
+    <string name="help_report_cat_payment">"भुगतान की समस्या"</string>
+    <string name="help_report_cat_app">"ऐप की समस्या"</string>
+    <string name="help_report_cat_other">"कुछ और"</string>
+    <string name="help_report_received_title">"रिपोर्ट मिल गई"</string>
+    <string name="help_report_received_body">"हमारी सहायता टीम इसकी समीक्षा करेगी और 24 घंटे के भीतर जवाब देगी।"</string>
 </resources>

@@ -62,7 +62,7 @@ fun HelpScreen(onBack: () -> Unit, onOpen: (String) -> Unit, modifier: Modifier 
         Topic(RideIcons.Car, "Ride bookings", stringResource(R.string.label_book_schedule_and_cancel_rides)),
         Topic(RideIcons.Shield, "Safety & security", stringResource(R.string.label_trusted_contacts_and_emergency_help)),
     )
-    val Articles = listOf("How to book a ride", "How to schedule a ride", "How to cancel a ride", "Change your drop-off", "Book for a friend", "Find a lost item")
+    val Articles = listOf("How to book a ride", "How to schedule a ride", "How to cancel a ride", "Change your drop-off", "Book for a friend", "Report a lost item")
 
     val c = RideTheme.colors
     var query by rememberSaveable { mutableStateOf("") }
@@ -93,12 +93,12 @@ fun HelpScreen(onBack: () -> Unit, onOpen: (String) -> Unit, modifier: Modifier 
                     }
                 }
                 SectionLabel(textPopularTopics)
-                GroupCard { Topics.forEachIndexed { i, t -> if (i > 0) RowDivider(); NavRow(t.icon, localizedLabel(t.title), { onOpen(t.title) }, subtitle = t.sub) } }
+                GroupCard { Topics.forEachIndexed { i, t -> if (i > 0) RowDivider(); NavRow(t.icon, localizedLabel(t.title), { onOpen("Help topic:${t.title}") }, subtitle = t.sub) } }
             } else {
-                val hits = (Topics.map { it.title } + Articles).filter { localizedLabel(it).contains(q, ignoreCase = true) }
+                val hits = (Topics.map { it.title to "Help topic:${it.title}" } + Articles.map { it to "Help article:$it" }).filter { localizedLabel(it.first).contains(q, ignoreCase = true) }
                 SectionLabel(textResults)
                 if (hits.isEmpty()) Text(textNoHelpArticlesFoundForValueTryDifferentWordsOrContactSupport.format(q), color = c.muted, fontSize = 14.sp, lineHeight = 21.sp)
-                else GroupCard { hits.forEachIndexed { i, t -> if (i > 0) RowDivider(); NavRow(RideIcons.Doc, localizedLabel(t), { onOpen(t) }) } }
+                else GroupCard { hits.forEachIndexed { i, h -> if (i > 0) RowDivider(); NavRow(RideIcons.Doc, localizedLabel(h.first), { onOpen(h.second) }) } }
             }
             Spacer(Modifier.height(16.dp))
         }

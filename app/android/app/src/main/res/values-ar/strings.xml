@@ -1062,4 +1062,13 @@
     <string name="add_other_address">"أضف عنوانًا آخر"</string>
     <string name="scheduled_sample_date">"الأربعاء, 4 نوفمبر, 8:30 ص"</string>
     <string name="trip_waiting">"في انتظار"</string>
+    <string name="help_report_category">"الفئة"</string>
+    <string name="help_report_describe">"صف المشكلة"</string>
+    <string name="help_report_placeholder">"ماذا حدث بالضبط؟"</string>
+    <string name="help_report_cat_trip">"مشكلة في الرحلة"</string>
+    <string name="help_report_cat_payment">"مشكلة في الدفع"</string>
+    <string name="help_report_cat_app">"مشكلة في التطبيق"</string>
+    <string name="help_report_cat_other">"شيء آخر"</string>
+    <string name="help_report_received_title">"تم استلام البلاغ"</string>
+    <string name="help_report_received_body">"سيراجع فريق الدعم بلاغك ويرد عليك خلال 24 ساعة."</string>
 </resources>

@@ -123,14 +123,14 @@ fun SheetScreen(onDismiss: () -> Unit, title: String? = null, subtitle: String? 
         CompositionLocalProvider(LocalSheetClose provides requestClose) {
             SheetCard(
                 Modifier.align(Alignment.BottomCenter).graphicsLayer { translationY = (1f - progress.value) * 600.dp.toPx() },
-                title, subtitle, content,
+                title, subtitle, onClose = { requestClose(onDismiss) }, content = content,
             )
         }
     }
 }
 
 @Composable
-fun SheetCard(modifier: Modifier = Modifier, title: String? = null, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
+fun SheetCard(modifier: Modifier = Modifier, title: String? = null, subtitle: String? = null, onClose: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     val c = RideTheme.colors
     val shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     Column(
@@ -139,25 +139,41 @@ fun SheetCard(modifier: Modifier = Modifier, title: String? = null, subtitle: St
             .navigationBarsPadding().padding(horizontal = 20.dp).padding(top = 10.dp, bottom = 14.dp),
     ) {
         Box(Modifier.align(Alignment.CenterHorizontally).size(width = 40.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(c.border))
-        if (title != null) Text(title, color = c.fg, fontSize = 22.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 16.dp).semantics { heading() })
+        if (title != null || onClose != null) Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (title != null) Text(title, color = c.fg, fontSize = 22.sp, fontWeight = FontWeight.Light, modifier = Modifier.weight(1f).semantics { heading() })
+            else Spacer(Modifier.weight(1f))
+            if (onClose != null) Box(Modifier.size(40.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onClose), contentAlignment = Alignment.Center) {
+                RideIcon(RideIcons.Close, c.muted, size = 20.dp)
+            }
+        }
         if (subtitle != null) Text(subtitle, color = c.muted, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 4.dp))
         content()
     }
 }
 
 @Composable
-fun RadioRow(title: String, selected: Boolean, onClick: () -> Unit, sub: String? = null) {
+fun RadioRow(title: String, selected: Boolean, onClick: () -> Unit, sub: String? = null, icon: List<String>? = null, highlight: Boolean = false) {
     val c = RideTheme.colors
+    val rowBg by androidx.compose.animation.animateColorAsState(if (highlight && selected) c.accent.copy(alpha = 0.10f) else Color.Transparent, androidx.compose.animation.core.tween(220), label = "rowBg")
+    val iconTint by androidx.compose.animation.animateColorAsState(if (selected) c.accent else c.muted, androidx.compose.animation.core.tween(220), label = "radioIcon")
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 56.dp).selectable(selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 8.dp),
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).background(rowBg, RoundedCornerShape(12.dp)).selectable(selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (icon != null) {
+            RideIcon(icon, iconTint, size = 22.dp)
+            Spacer(Modifier.width(14.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(title, color = c.fg, fontSize = 16.sp)
             if (sub != null) Text(sub, color = c.muted, fontSize = 13.sp, lineHeight = 18.sp)
         }
         Box(Modifier.size(24.dp).clip(CircleShape).border(2.dp, if (selected) c.accent else c.border, CircleShape), contentAlignment = Alignment.Center) {
-            if (selected) Box(Modifier.size(12.dp).clip(CircleShape).background(c.accent))
+            androidx.compose.animation.AnimatedVisibility(
+                visible = selected,
+                enter = androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(180)) + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(120)) + androidx.compose.animation.fadeOut(),
+            ) { Box(Modifier.size(12.dp).clip(CircleShape).background(c.accent)) }
         }
     }
 }

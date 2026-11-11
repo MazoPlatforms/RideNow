@@ -2,6 +2,16 @@ package com.ridenow.app.ui.booking
 
 import com.ridenow.app.ui.components.offsetByStartDirection
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.res.stringResource
 import com.ridenow.app.R
 import android.app.DatePickerDialog
@@ -39,13 +49,16 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -61,7 +74,6 @@ import com.ridenow.app.ui.components.RideIcons
 import com.ridenow.app.ui.more.passengerOptions
 import com.ridenow.app.ui.more.repeatOptions
 import com.ridenow.app.ui.more.reminderOptions
-import com.ridenow.app.ui.theme.BrandYellow
 import com.ridenow.app.ui.theme.Ink
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
@@ -72,7 +84,6 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.abs
-
 
 /** Pick a pickup date and time. [onContinue] receives a label such as "Wed, 4 Nov, 8:30 AM". */
 @Composable
@@ -115,21 +126,16 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
             Label(stringResource(R.string.schedule_date))
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 chips.forEach { d ->
-                    val on = d == date
-                    Column(
-                        Modifier.weight(1f).height(76.dp).clip(RoundedCornerShape(16.dp)).background(if (on) BrandYellow else c.field)
-                            .border(1.dp, if (on) BrandYellow else c.border, RoundedCornerShape(16.dp)).clickable(role = Role.RadioButton) { dateDay = d.toEpochDay() },
-                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(if (d == today) stringResource(R.string.schedule_today) else d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()), color = if (on) Ink else c.fg, fontSize = 12.sp)
-                        Text("${d.dayOfMonth}", color = if (on) Ink else c.fg, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                    DateChip(
+                        on = d == date,
+                        dayLabel = if (d == today) stringResource(R.string.schedule_today) else d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                        dayOfMonth = d.dayOfMonth,
+                        modifier = Modifier.weight(1f),
+                    ) { dateDay = d.toEpochDay() }
                 }
             }
             Row(
-                Modifier.height(48.dp).clickable(role = Role.Button) {
-                    sheet = "date"
-                },
+                Modifier.height(48.dp).clickable(role = Role.Button) { sheet = "date" },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RideIcon(listOf("M3,4.5h14v12.5h-14z", "M3 8.5h14M7 3v3M13 3v3"), c.accent, size = 18.dp); Spacer(Modifier.width(8.dp))
@@ -146,7 +152,13 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
                     Wheel(listOf(textAm, textPm), pm, Modifier.weight(1f)) { pm = it }
                 }
             }
-            if (!valid) Text(stringResource(R.string.schedule_min), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            AnimatedVisibility(
+                visible = !valid,
+                enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 2 },
+                exit = fadeOut(tween(150)) + slideOutVertically(tween(150)) { -it / 2 },
+            ) {
+                Text(stringResource(R.string.schedule_min), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            }
 
             Label(stringResource(R.string.schedule_options))
             Column(Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp))) {
@@ -156,18 +168,39 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
                 HorizontalDivider(color = c.line)
                 OptionRow(RideIcons.Bell, stringResource(R.string.reminder_title), reminderOptions()[reminder]) { sheet = "Reminder" }
             }
-            if (sheet.isNotEmpty()) androidx.compose.ui.window.Dialog({ sheet = "" }, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+            if (sheet.isNotEmpty()) androidx.compose.ui.window.Dialog({ }, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false)) {
                 when (sheet) {
                     "date" -> com.ridenow.app.ui.more.CalendarSheet(date, { dateDay = it.toEpochDay(); sheet = "" }, { sheet = "" })
-                    "Passenger" -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.passenger_title), passengerOptions(), passenger, { passenger = it; sheet = "" }, { sheet = "" })
-                    "Repeat" -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.repeat_title), repeatOptions(), repeat, { repeat = it; sheet = "" }, { sheet = "" })
-                    else -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.reminder_title), reminderOptions(), reminder, { reminder = it; sheet = "" }, { sheet = "" })
+                    "Passenger" -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.passenger_title), passengerOptions(), passenger, { passenger = it; sheet = "" }, { sheet = "" }, icons = listOf(RideIcons.Person, RideIcons.Group))
+                    "Repeat" -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.repeat_title), repeatOptions(), repeat, { repeat = it; sheet = "" }, { sheet = "" }, icons = List(5) { RideIcons.Calendar })
+                    else -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.reminder_title), reminderOptions(), reminder, { reminder = it; sheet = "" }, { sheet = "" }, icons = List(5) { RideIcons.Clock })
                 }
             }
             Spacer(Modifier.height(16.dp))
         }
-        Text(stringResource(R.string.home_pickup, label), color = c.muted, fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
+        AnimatedContent(targetState = label, transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) }, label = "pickupLabel", modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)) { l ->
+            Text(stringResource(R.string.home_pickup, l), color = c.muted, fontSize = 13.sp)
+        }
         RideButton(stringResource(R.string.ride_continue), { onContinue(label) }, enabled = valid, modifier = Modifier.padding(top = 10.dp, bottom = 12.dp))
+    }
+}
+
+/** Date chip that eases its colours and gently scales up when chosen. */
+@Composable
+private fun DateChip(on: Boolean, dayLabel: String, dayOfMonth: Int, modifier: Modifier, onClick: () -> Unit) {
+    val c = RideTheme.colors
+    val onAccent = if (c.bg.luminance() > 0.5f) Color.White else Ink
+    val bg by animateColorAsState(if (on) c.accent else c.field, tween(260), label = "chipBg")
+    val border by animateColorAsState(if (on) c.accent else c.border, tween(260), label = "chipBorder")
+    val fg by animateColorAsState(if (on) onAccent else c.fg, tween(260), label = "chipFg")
+    val scale by animateFloatAsState(if (on) 1f else 0.96f, spring(dampingRatio = 0.6f, stiffness = 400f), label = "chipScale")
+    Column(
+        modifier.graphicsLayer { scaleX = scale; scaleY = scale }.height(76.dp).clip(RoundedCornerShape(16.dp)).background(bg)
+            .border(1.dp, border, RoundedCornerShape(16.dp)).clickable(role = Role.RadioButton, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+    ) {
+        Text(dayLabel, color = fg, fontSize = 12.sp)
+        Text("$dayOfMonth", color = fg, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -180,12 +213,15 @@ private fun OptionRow(icon: List<String>, title: String, value: String, onClick:
     Row(Modifier.fillMaxWidth().height(56.dp).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         RideIcon(icon, c.accent); Spacer(Modifier.width(14.dp))
         Text(title, color = c.fg, fontSize = 15.sp, modifier = Modifier.weight(1f))
-        Text(value, color = c.muted, fontSize = 14.sp); Spacer(Modifier.width(8.dp))
+        AnimatedContent(targetState = value, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) }, label = "optValue") { v ->
+            Text(v, color = c.muted, fontSize = 14.sp)
+        }
+        Spacer(Modifier.width(8.dp))
         RideIcon(listOf("M7 4l6 6-6 6"), c.muted, size = 18.dp)
     }
 }
 
-/** Snapping wheel: the item nearest the vertical centre is selected. */
+/** Snapping wheel: the item nearest the vertical centre is selected; labels ease in size and colour. */
 @Composable
 private fun Wheel(items: List<String>, initial: Int, modifier: Modifier, onSelected: (Int) -> Unit) {
     val c = RideTheme.colors
@@ -203,8 +239,11 @@ private fun Wheel(items: List<String>, initial: Int, modifier: Modifier, onSelec
     LazyColumn(state = state, modifier = modifier.height(132.dp), flingBehavior = rememberSnapFlingBehavior(state, SnapPosition.Center)) {
         item { Spacer(Modifier.height(44.dp)) }
         itemsIndexed(items) { i, t ->
+            val on = i == sel
+            val fontSp by animateFloatAsState(if (on) 24f else 18f, tween(200), label = "wheelSize")
+            val col by animateColorAsState(if (on) c.fg else c.muted, tween(200), label = "wheelColor")
             Box(Modifier.height(44.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text(t, color = if (i == sel) c.fg else c.muted, fontSize = if (i == sel) 24.sp else 18.sp, fontWeight = if (i == sel) FontWeight.SemiBold else FontWeight.Light)
+                Text(t, color = col, fontSize = fontSp.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Light)
             }
         }
         item { Spacer(Modifier.height(44.dp)) }
