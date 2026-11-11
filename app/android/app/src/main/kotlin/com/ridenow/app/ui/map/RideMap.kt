@@ -75,7 +75,6 @@ fun RideMap(
                 Lifecycle.Event.ON_RESUME -> view.onResume()
                 Lifecycle.Event.ON_PAUSE -> view.onPause()
                 Lifecycle.Event.ON_STOP -> view.onStop()
-                Lifecycle.Event.ON_LOW_MEMORY -> view.onLowMemory()
                 else -> Unit
             }
         }
@@ -135,12 +134,14 @@ fun RideMap(
                     )
                     ready.addOnCameraMoveStartedListener { camera.sync(camera.position.target, ready.cameraPosition.zoom, true) }
                     ready.addOnCameraMoveListener {
-                        val target = ready.cameraPosition.target
-                        camera.sync(LatLng(target.latitude, target.longitude), ready.cameraPosition.zoom, true)
+                        ready.cameraPosition.target?.let { target ->
+                            camera.sync(LatLng(target.latitude, target.longitude), ready.cameraPosition.zoom, true)
+                        }
                     }
                     ready.addOnCameraIdleListener {
-                        val target = ready.cameraPosition.target
-                        camera.sync(LatLng(target.latitude, target.longitude), ready.cameraPosition.zoom, false)
+                        ready.cameraPosition.target?.let { target ->
+                            camera.sync(LatLng(target.latitude, target.longitude), ready.cameraPosition.zoom, false)
+                        }
                     }
                 }
             }
