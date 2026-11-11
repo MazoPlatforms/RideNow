@@ -56,6 +56,9 @@ import androidx.compose.ui.unit.sp
 import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
+import com.ridenow.app.ui.more.passengerOptions
+import com.ridenow.app.ui.more.repeatOptions
+import com.ridenow.app.ui.more.reminderOptions
 import com.ridenow.app.ui.theme.BrandYellow
 import com.ridenow.app.ui.theme.Ink
 import com.ridenow.app.ui.theme.RideNowTheme

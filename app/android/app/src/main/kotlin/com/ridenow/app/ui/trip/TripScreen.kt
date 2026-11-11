@@ -106,7 +106,6 @@ fun TripScreen(destination: String, vehicleIndex: Int, onCancelled: () -> Unit, 
     val textValueSeats = stringResource(R.string.text_value_seats)
 
     val c = RideTheme.colors
-    val cancelDesc = stringResource(R.string.trip_cancel_desc)
     val v = Vehicles[vehicleIndex]
     var phase by rememberSaveable { mutableIntStateOf(0) }
     var showCancel by rememberSaveable { mutableStateOf(false) }
@@ -210,6 +209,7 @@ private fun CircleAction(icon: List<String>, label: String, onClick: () -> Unit)
 @Composable
 private fun SwipeToCancel(onCancel: () -> Unit) {
     val c = RideTheme.colors
+    val cancelDesc = stringResource(R.string.trip_cancel_desc)
     val scope = rememberCoroutineScope()
     val offset = remember { Animatable(0f) }
     BoxWithConstraints(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(28.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(28.dp))) {
