@@ -2,7 +2,7 @@ package com.ridenow.app.maps
 
 /** Small MapLibre style that fetches map imagery directly from OpenStreetMap's tile service. */
 object OpenStreetMapStyle {
-    const val json = """
+    val json = """
         {
           "version": 8,
           "name": "OpenStreetMap",
