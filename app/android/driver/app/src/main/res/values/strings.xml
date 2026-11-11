@@ -1,0 +1,34 @@
+<resources>
+    <string name="app_name">RideNow Driver</string>
+    <string name="splash_description">RideNow Driver. Drive when you want.</string>
+    <string name="splash_tagline">Drive when you want.</string>
+    <string name="splash_version">Version 2100.1</string>
+    <string name="text_skip">Skip</string>
+    <string name="text_next">Next</string>
+    <string name="intro_get_started">Get started</string>
+    <string name="intro_online_title">Go online in one tap.</string>
+    <string name="intro_online_text">Switch on when you are ready. Requests arrive nearby, with fare and distance up front.</string>
+    <string name="intro_navigate_title">Navigate with ease.</string>
+    <string name="intro_navigate_text">Get guided to the pickup and the drop-off, with live time and distance.</string>
+    <string name="intro_earn_title">Keep what you earn.</string>
+    <string name="intro_earn_text">Track earnings for every trip and collect cash fares directly from riders.</string>
+    <string name="intro_you_are_online">You are online</string>
+    <string name="intro_new_request">NEW REQUEST</string>
+    <string name="intro_request_meta">Orbit · 3 min away</string>
+    <string name="intro_request_fare">$16.80</string>
+    <string name="intro_pickup_name">Helix Garden Plaza</string>
+    <string name="intro_drop_name">Orbit Tower</string>
+    <string name="intro_decline">Decline</string>
+    <string name="intro_accept">Accept</string>
+    <string name="intro_rider_name">Kai Moreno</string>
+    <string name="intro_rider_initials">KM</string>
+    <string name="intro_rider_pickup">Pickup · Helix Garden Plaza</string>
+    <string name="intro_eta">2 min</string>
+    <string name="intro_chip_cash">Cash fares</string>
+    <string name="intro_chip_weekly">Weekly summary</string>
+    <string name="intro_chip_history">Trip history</string>
+    <string name="welcome_placeholder">Welcome screen goes here.</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+</resources>

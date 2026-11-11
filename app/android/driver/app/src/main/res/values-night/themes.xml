@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.RideNowDriver" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+    <style name="Theme.RideNowDriver.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/driver_system_splash_dark</item>
+        <item name="postSplashScreenTheme">@style/Theme.RideNowDriver</item>
+    </style>
+</resources>

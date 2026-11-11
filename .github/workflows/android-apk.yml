@@ -1,4 +1,4 @@
-name: Android APK preview
+name: Android APKs
 
 on:
   push:
@@ -7,13 +7,14 @@ on:
     paths:
       - 'app/android/**'
       - '.github/workflows/android-apk.yml'
+      - 'docs/android-build.md'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-apk-${{ github.ref }}
+  group: android-apks-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -21,7 +22,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment: production
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -33,7 +34,7 @@ jobs:
           packages: 'platform-tools'
           log-accepted-android-sdk-licenses: false
       - name: Install Android SDK 35 and build tools
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'build-tools;34.0.0'
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -41,18 +42,22 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/android-release"
           git ls-files -z -- app/android | xargs -0 sha256sum > "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
-      - name: Generate wrapper outside the supplied project
+      - name: Generate untracked Gradle wrappers in Actions
         run: |
           wrapper_dir="$RUNNER_TEMP/ridenow-wrapper"
           mkdir -p "$wrapper_dir"
           printf 'rootProject.name = "wrapper-bootstrap"\n' > "$wrapper_dir/settings.gradle.kts"
           gradle --no-daemon --project-dir "$wrapper_dir" wrapper --gradle-version 8.9 --distribution-type bin --no-validate-url
-          cp "$wrapper_dir/gradlew" app/android/gradlew
-          cp "$wrapper_dir/gradlew.bat" app/android/gradlew.bat
-          cp "$wrapper_dir/gradle/wrapper/gradle-wrapper.jar" app/android/gradle/wrapper/gradle-wrapper.jar
-          chmod +x app/android/gradlew
+          for project in rider driver; do
+            project_dir="app/android/$project"
+            mkdir -p "$project_dir/gradle/wrapper"
+            cp "$wrapper_dir/gradlew" "$project_dir/gradlew"
+            cp "$wrapper_dir/gradlew.bat" "$project_dir/gradlew.bat"
+            cp "$wrapper_dir/gradle/wrapper/gradle-wrapper.jar" "$project_dir/gradle/wrapper/gradle-wrapper.jar"
+            chmod +x "$project_dir/gradlew"
+          done
       - uses: gradle/actions/wrapper-validation@v4
-      - name: Configure Google Maps API key
+      - name: Configure Rider maps key
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: |
@@ -60,26 +65,35 @@ jobs:
             echo "::error::MAPS_API_KEY secret is missing"
             exit 1
           fi
-          printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > app/android/local.properties
+          printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > app/android/rider/local.properties
           echo "::add-mask::$MAPS_API_KEY"
-      - name: Build the checked-in Android source
+      - name: Build Rider and Driver debug APKs
         run: |
           set -o pipefail
-          app/android/gradlew --no-daemon --stacktrace --project-dir app/android :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
-      - name: Verify APK and preserve original sources
+          app/android/rider/gradlew --no-daemon --stacktrace --project-dir app/android/rider :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
+          app/android/driver/gradlew --no-daemon --stacktrace --project-dir app/android/driver :app:assembleDebug 2>&1 | tee -a "$RUNNER_TEMP/android-build.log"
+      - name: Verify APKs and source archives
         run: |
-          apk="app/android/app/build/outputs/apk/debug/app-debug.apk"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/android-apk-metadata.txt"
-          head -5 "$RUNNER_TEMP/android-apk-metadata.txt"
+          rider_apk=app/android/rider/app/build/outputs/apk/debug/app-debug.apk
+          driver_apk=app/android/driver/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$rider_apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$driver_apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$rider_apk" > "$RUNNER_TEMP/rider-apk-metadata.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$driver_apk" > "$RUNNER_TEMP/driver-apk-metadata.txt"
+          head -5 "$RUNNER_TEMP/rider-apk-metadata.txt"
+          head -5 "$RUNNER_TEMP/driver-apk-metadata.txt"
           sha256sum --check "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
           git diff --exit-code -- app/android
-          cp "$apk" "$RUNNER_TEMP/android-release/RideNow-Android-debug.apk"
+          mkdir -p "$RUNNER_TEMP/android-release"
+          cp "$rider_apk" "$RUNNER_TEMP/android-release/RideNow-Rider-debug.apk"
+          cp "$driver_apk" "$RUNNER_TEMP/android-release/RideNow-Driver-debug.apk"
+          cp app/android/rider/RideNow-Android.zip "$RUNNER_TEMP/android-release/RideNow-Android.zip"
+          cp app/android/driver/RideNowDriver.zip "$RUNNER_TEMP/android-release/RideNowDriver.zip"
           cd "$RUNNER_TEMP/android-release"
-          sha256sum RideNow-Android-debug.apk ANDROID_SOURCE_SHA256SUMS.txt > SHA256SUMS.txt
+          sha256sum RideNow-Rider-debug.apk RideNow-Driver-debug.apk RideNow-Android.zip RideNowDriver.zip ANDROID_SOURCE_SHA256SUMS.txt > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ridenow-android-${{ github.run_id }}
+          name: ridenow-android-apks-${{ github.run_id }}
           path: ${{ runner.temp }}/android-release/
           retention-days: 30
           if-no-files-found: error
@@ -99,20 +113,20 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: ridenow-android-${{ github.run_id }}
+          name: ridenow-android-apks-${{ github.run_id }}
           path: android-release
-      - name: Publish Android preview
+      - name: Publish Rider and Driver APKs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="android-maplibre-${GITHUB_RUN_ID}"
+          tag="android-apps-${GITHUB_RUN_ID}"
           cat > "$RUNNER_TEMP/android-release-notes.md" <<EOF
-          RideNow Android UI preview built from commit ${GITHUB_SHA}.
+          RideNow Rider and Driver Android APKs built from commit ${GITHUB_SHA}.
 
-          - The APK is built from the checked-in Kotlin sources in `app/android/`, including live Mazo Maps MapLibre integration. The APK is built directly from the tracked, unzipped Android project; no source ZIP is used.
-          - All tracked Android source checksums are verified unchanged after the build.
-          - The missing wrapper scripts and JAR are generated in GitHub Actions using Gradle 8.9 and Java 17, without modifying tracked sources.
-          - APK is debug-signed for installation and testing, not a production or Play Store release. Debug signing keys may differ between workflow runs; installing a later preview can require uninstalling the previous one.
+          - Both APKs are debug-signed previews for installation and testing, not production or Play Store releases.
+          - Rider and Driver source files are unchanged; the source archives and checksums are included.
+          - Gradle 8.9 wrappers are generated only in GitHub Actions and are not committed.
+          - Debug signing keys may differ between runs; uninstall an older preview if Android rejects an update.
           - Minimum Android version: Android 8.0 (API 26).
           EOF
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -120,7 +134,7 @@ jobs:
           else
             gh release create "$tag" android-release/* --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --prerelease \
-              --title "RideNow Android MapLibre preview #${GITHUB_RUN_NUMBER}" \
+              --title "RideNow Rider and Driver APKs #${GITHUB_RUN_NUMBER}" \
               --notes-file "$RUNNER_TEMP/android-release-notes.md"
           fi
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,34 @@
+<resources>
+    <string name="app_name">RideNow Driver</string>
+    <string name="splash_description">RideNow Driver. Conduce cuando quieras.</string>
+    <string name="splash_tagline">Conduce cuando quieras.</string>
+    <string name="splash_version">Versión 2100.1</string>
+    <string name="text_skip">Omitir</string>
+    <string name="text_next">Siguiente</string>
+    <string name="intro_get_started">Empezar</string>
+    <string name="intro_online_title">Conéctate con un toque.</string>
+    <string name="intro_online_text">Actívate cuando estés listo. Las solicitudes llegan cerca de ti, con tarifa y distancia a la vista.</string>
+    <string name="intro_navigate_title">Navega sin esfuerzo.</string>
+    <string name="intro_navigate_text">Recibe indicaciones hasta la recogida y el destino, con tiempo y distancia en vivo.</string>
+    <string name="intro_earn_title">Quédate con lo que ganas.</string>
+    <string name="intro_earn_text">Sigue tus ganancias de cada viaje y cobra las tarifas en efectivo directamente a los pasajeros.</string>
+    <string name="intro_you_are_online">Estás en línea</string>
+    <string name="intro_new_request">NUEVA SOLICITUD</string>
+    <string name="intro_request_meta">Orbit · a 3 min</string>
+    <string name="intro_request_fare">$16.80</string>
+    <string name="intro_pickup_name">Helix Garden Plaza</string>
+    <string name="intro_drop_name">Orbit Tower</string>
+    <string name="intro_decline">Rechazar</string>
+    <string name="intro_accept">Aceptar</string>
+    <string name="intro_rider_name">Kai Moreno</string>
+    <string name="intro_rider_initials">KM</string>
+    <string name="intro_rider_pickup">Recogida · Helix Garden Plaza</string>
+    <string name="intro_eta">2 min</string>
+    <string name="intro_chip_cash">Tarifas en efectivo</string>
+    <string name="intro_chip_weekly">Resumen semanal</string>
+    <string name="intro_chip_history">Historial de viajes</string>
+    <string name="welcome_placeholder">Aquí irá la pantalla de bienvenida.</string>
+    <string name="theme_system">Sistema</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
+</resources>
