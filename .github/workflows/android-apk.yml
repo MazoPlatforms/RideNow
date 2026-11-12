@@ -78,11 +78,12 @@ jobs:
 
           icon = Path(os.environ["DRIVER_BUILD"]) / "app/src/main/kotlin/com/ridenow/driver/ui/components/RideIcon.kt"
           source = icon.read_text()
-          declaration = '    val Lock = listOf("M5,9h10v8h-10z", "M7 9V7a3 3 0 0 1 6 0v2")\n'
-          if source.count("val Lock =") != 2 or source.count(declaration) != 1:
-              raise SystemExit("Expected the supplied Driver source's unused duplicate Lock declaration exactly once")
-          icon.write_text(source.replace(declaration, "", 1))
-
+          lines = source.splitlines(keepends=True)
+          lock_declarations = [index for index, line in enumerate(lines) if "val Lock =" in line]
+          if len(lock_declarations) != 2:
+              raise SystemExit(f"Expected two duplicate Lock declarations, found {len(lock_declarations)}")
+          del lines[lock_declarations[0]]
+          icon.write_text("".join(lines))
           gradle_file = Path(os.environ["DRIVER_BUILD"]) / "app/build.gradle.kts"
           gradle_source = gradle_file.read_text()
           auth_dependency = '    implementation("com.google.android.gms:play-services-auth:21.3.0")\n'
