@@ -97,7 +97,12 @@ jobs:
           if hint_source.count(unsupported_client) != 2:
               raise SystemExit("Expected two unsupported phone-hint client calls in the temporary Driver source")
           phone_hints.write_text(hint_source.replace(unsupported_client, "Identity.getSignInClient(context)"))
-          print("Applied build-only duplicate, dependency, and supported phone-hint API fixes to the temporary CI copy.")
+          hint_source = phone_hints.read_text()
+          result_chain = "Identity.getSignInClient(context)\n            .getPhoneNumberFromIntent(data)\n            .addOnSuccessListener { number: String -> onNumber(number) }"
+          if hint_source.count(result_chain) != 1:
+              raise SystemExit("Expected the phone-number hint result to use an unsupported task listener")
+          phone_hints.write_text(hint_source.replace(result_chain, "onNumber(Identity.getSignInClient(context).getPhoneNumberFromIntent(data))", 1))
+          print("Applied build-only duplicate, dependency, and phone-hint API compatibility fixes to the temporary CI copy.")
           PYCODE
       - name: Build Rider and Driver debug APKs
         run: |
