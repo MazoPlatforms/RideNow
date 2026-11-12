@@ -11,6 +11,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -18,7 +21,6 @@ import androidx.compose.ui.unit.dp
 /** Line icons on the 20 px RideNow grid (1.5 stroke, round caps), drawn from SVG path data. */
 object RideIcons {
     val Chart = listOf("M4 17V9m6 8V4m6 13v-5")
-
     val Pin = listOf("M10 18s6-5.2 6-9.5a6 6 0 1 0-12 0C4 12.8 10 18 10 18z", "M8,8.5a2,2 0 1,0 4,0a2,2 0 1,0 -4,0")
     val Flag = listOf("M5 17V3m0 1h10l-2 3.5 2 3.5H5")
     val Back = listOf("M12.5 4L6.5 10l6 6")
@@ -72,9 +74,15 @@ object RideIcons {
 @Composable
 fun RideIcon(paths: List<String>, tint: Color, modifier: Modifier = Modifier, size: Dp = 20.dp) {
     val parsed = remember(paths) { paths.map { PathParser().parsePathString(it).toPath() } }
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val mirror = rtl && (paths == RideIcons.Back || paths == RideIcons.Logout || paths == listOf("M7 4l6 6-6 6"))
     Canvas(modifier.size(size)) {
         val s = this.size.width / 20f
-        scale(s, Offset.Zero) {
+        val center = Offset(this.size.width / 2f, this.size.height / 2f)
+        withTransform({
+            if (mirror) scale(-1f, 1f, center)
+            scale(s, Offset.Zero)
+        }) {
             parsed.forEach { drawPath(it, tint, style = Stroke(1.5f, cap = StrokeCap.Round, join = StrokeJoin.Round)) }
         }
     }

@@ -11,10 +11,10 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-/** RideNow Driver mint, used for fills (buttons, orb) in both themes. */
-val BrandMint = Color(0xFF7CF5D0)
-/** Near-black ink used on top of the mint and as the dark background. */
-val Ink = Color(0xFF07090D)
+/** RideNow brand yellow, sampled from the supplied logo (same as the Rider app). */
+val BrandYellow = Color(0xFFFEC604)
+/** Near-black ink used on top of the brand yellow and as the dark background. */
+val Ink = Color(0xFF0A0C10)
 
 @Immutable
 data class RideColors(
@@ -25,19 +25,19 @@ data class RideColors(
 )
 
 val DarkRideColors = RideColors(
-    bg = Ink, fg = Color(0xFFEEF2F6), muted = Color(0xFF9AA6B2),
-    line = Color(0xFF1E2733), border = Color(0xFF2A3646), accent = BrandMint, onAccent = Color(0xFF04130E),
-    fill = BrandMint, onFill = Color(0xFF04130E),
-    street = Color(0xFF1C2633), street2 = Color(0xFF26334A), ring1 = Color(0xFF1E2733), ring2 = Color(0xFF2A3646),
-    field = Color(0xFF0D1219), danger = Color(0xFFFF9C94), warn = Color(0xFFFFC857), isDark = true,
+    bg = Ink, fg = Color(0xFFF2F4F7), muted = Color(0xFF9AA3AE),
+    line = Color(0xFF1E2430), border = Color(0xFF2C3442), accent = BrandYellow, onAccent = Ink,
+    fill = BrandYellow, onFill = Ink,
+    street = Color(0xFF1A202A), street2 = Color(0xFF252D3A), ring1 = Color(0xFF1E2430), ring2 = Color(0xFF2C3442),
+    field = Color(0xFF11151C), danger = Color(0xFFFF8F8F), warn = Color(0xFFFFB74D), isDark = true,
 )
-/** On light backgrounds the accent is a deeper green so text and icons keep 4.5:1 contrast. Fills stay mint. */
+/** On light backgrounds the accent is a deeper amber so text and icons keep 4.5:1 contrast. Fills stay brand yellow. */
 val LightRideColors = RideColors(
-    bg = Color(0xFFF6F8FA), fg = Color(0xFF0B1117), muted = Color(0xFF4F5B67),
-    line = Color(0xFFDDE3E9), border = Color(0xFFC3CCD6), accent = Color(0xFF0A7A5F), onAccent = Color.White,
-    fill = BrandMint, onFill = Color(0xFF04130E),
+    bg = Color(0xFFF6F8FA), fg = Ink, muted = Color(0xFF4F5B67),
+    line = Color(0xFFDDE3E9), border = Color(0xFFC3CCD6), accent = Color(0xFF8A5A00), onAccent = Color.White,
+    fill = BrandYellow, onFill = Ink,
     street = Color.White, street2 = Color.White, ring1 = Color(0xFFD5DCE3), ring2 = Color(0xFFBFC9D3), field = Color.White,
-    danger = Color(0xFFB3261E), warn = Color(0xFF8A5A00), isDark = false,
+    danger = Color(0xFFB3261E), warn = Color(0xFF8A4B00), isDark = false,
 )
 
 val LocalRideColors = staticCompositionLocalOf { DarkRideColors }

@@ -24,28 +24,28 @@ import com.ridenow.driver.ui.theme.RideTheme
 @Composable
 fun LogoMark(width: Dp, modifier: Modifier = Modifier) =
     Image(
-        painter = painterResource(if (RideTheme.colors.isDark) R.drawable.driver_mark_dark else R.drawable.driver_mark_light),
+        painter = painterResource(if (RideTheme.colors.isDark) R.drawable.ridenow_mark_dark else R.drawable.ridenow_mark_light),
         contentDescription = null,
         contentScale = ContentScale.Fit,
         modifier = modifier.size(width),
     )
 
-/** Horizontal RideNow Driver lockup (symbol, wordmark and DRIVER label). [height] is the lockup height. */
+/** "RideNow" with the DRIVER label, text only (no symbol). [height] is the height of the whole block. */
 @Composable
 fun Wordmark(height: Dp, modifier: Modifier = Modifier) =
     Image(
-        painter = painterResource(if (RideTheme.colors.isDark) R.drawable.driver_wordmark_dark else R.drawable.driver_wordmark_light),
+        painter = painterResource(if (RideTheme.colors.isDark) R.drawable.ridenow_wordmark_dark else R.drawable.ridenow_wordmark_light),
         contentDescription = null,
         contentScale = ContentScale.Fit,
-        modifier = modifier.height(height).aspectRatio(952f / 245f),
+        modifier = modifier.height(height).aspectRatio(771f / 203f),
     )
 
-/** Mint gradient orb that hosts [content]. */
+/** Brand-yellow gradient orb that hosts [content]. */
 @Composable
 fun Orb(size: Dp, modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit = {}) {
     Box(
         modifier.size(size).clip(CircleShape).background(
-            Brush.radialGradient(0f to Color(0xFFB9FFEA), 0.45f to Color(0xFF7CF5D0), 1f to Color(0xFF2E9C80)),
+            Brush.radialGradient(0f to Color(0xFFFFE27A), 0.45f to Color(0xFFFEC604), 1f to Color(0xFFB88A00)),
         ),
         contentAlignment = Alignment.Center,
         content = content,

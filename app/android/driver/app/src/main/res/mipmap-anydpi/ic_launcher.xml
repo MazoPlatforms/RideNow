@@ -1,3 +1,5 @@
-<inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@mipmap/ic_launcher_foreground_legacy"
-    android:inset="18%" />
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ridenow_launcher_background" />
+    <item android:drawable="@drawable/ridenow_launcher_legacy_foreground_inset" />
+</layer-list>
