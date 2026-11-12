@@ -91,7 +91,13 @@ jobs:
               if gradle_source.count("dependencies {") != 1:
                   raise SystemExit("Could not safely add the missing Identity API dependency to the temporary Driver build copy")
               gradle_file.write_text(gradle_source.replace("dependencies {\n", "dependencies {\n" + auth_dependency, 1))
-          print("Applied the duplicate declaration and missing Identity API dependency fixes to the temporary CI build copy only.")
+          phone_hints = Path(os.environ["DRIVER_BUILD"]) / "app/src/main/kotlin/com/ridenow/driver/ui/auth/PhoneHints.kt"
+          hint_source = phone_hints.read_text()
+          unsupported_client = "Identity.getPhoneNumberHintIntentClient(context)"
+          if hint_source.count(unsupported_client) != 2:
+              raise SystemExit("Expected two unsupported phone-hint client calls in the temporary Driver source")
+          phone_hints.write_text(hint_source.replace(unsupported_client, "Identity.getSignInClient(context)"))
+          print("Applied build-only duplicate, dependency, and supported phone-hint API fixes to the temporary CI copy.")
           PYCODE
       - name: Build Rider and Driver debug APKs
         run: |
