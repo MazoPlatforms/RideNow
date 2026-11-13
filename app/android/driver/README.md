@@ -10,6 +10,7 @@ Package: `com.ridenow.driver` · minSdk 26 · targetSdk 35 · same structure and
 - Animated splash (`ui/splash/SplashScreen.kt`): a route draws across a faint city map to the symbol, wordmark and "from Sifric" credit, then the orbit dot, pulse and tagline.
 - Three-slide intro (`ui/intro/IntroScreen.kt`): go online and accept requests, navigate to the pickup, cash fares and earnings.
 - Background location (`ui/registration/BackgroundLocationScreen.kt`) and Personal information (`PersonalInfoScreen.kt`): step 2 and 3 of 11. Colors now follow the Rider app (brand yellow, same dark and light tokens). RTL fixes from the latest Rider build are ported.
+- Trips (`ui/trip`): incoming request with countdown, heading to pickup, arrived, trip in progress, cash collection and rider rating. Finished trips feed Home and Earnings. UI preview settings (auto jump from Submitted to Home, sample requests) are in `ui/preview/PreviewConfig.kt`.
 - Earnings, Inbox and Account tabs (`ui/earnings`, `ui/inbox`, `ui/account`) with a shared bottom bar. Appearance and language switch for real; sign out resets the application.
 - Home (`ui/home/HomeScreen.kt`): map with the driver position, GO and END button (locked until a bank account is added), real time online, and a location status chip.
 - Status screens (`ui/status`): Application submitted and pending, Action required, Not approved, and Approved with Welcome.
@@ -24,5 +25,5 @@ Package: `com.ridenow.driver` · minSdk 26 · targetSdk 35 · same structure and
 - Theme (`ui/theme/Theme.kt`): driver mint palette, dark and light. Strings in English, French and Spanish.
 - Supplied RideNow Driver logos in the same resource layout and names as the Rider app (see `branding/LOGO_ASSET_MANIFEST.md`).
 
-## Next: Trip requests and real data
+## Next: Backend (sign in, requests, earnings)
 Home, Earnings, Inbox and Account tabs are built. Trips, earnings and messages stay empty until a backend exists, and the status outcomes remain a demo (each Check status tap advances) until a backend decides.

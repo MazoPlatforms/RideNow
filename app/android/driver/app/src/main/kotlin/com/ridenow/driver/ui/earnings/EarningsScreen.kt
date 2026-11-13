@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import com.ridenow.driver.ui.trip.CompletedTrip
 import java.text.NumberFormat
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -36,12 +37,13 @@ import java.util.Locale
  * laid out for the real data. [onlineMinutes] is the real time online today.
  */
 @Composable
-fun EarningsScreen(onlineMinutes: Int, onTab: (MainTab) -> Unit, modifier: Modifier = Modifier) {
+fun EarningsScreen(onlineMinutes: Int, earnings: Double, history: List<CompletedTrip>, onTab: (MainTab) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     var period by rememberSaveable { mutableIntStateOf(0) } // 0 today, 1 this week
-    val money = remember { NumberFormat.getCurrencyInstance().format(0) }
-    val week = remember { List(7) { 0f } } // earnings per day, Monday first
+    val format = remember { NumberFormat.getCurrencyInstance() }
+    val money = format.format(earnings)
     val today = remember { LocalDate.now().dayOfWeek.value - 1 }
+    val week = remember(earnings) { List(7) { if (it == today) earnings.toFloat() else 0f } } // earnings per day, Monday first
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
@@ -56,16 +58,29 @@ fun EarningsScreen(onlineMinutes: Int, onTab: (MainTab) -> Unit, modifier: Modif
             }
             WeekChart(week, today, Modifier.padding(top = 16.dp).entrance(120))
             Row(Modifier.padding(top = 16.dp).entrance(180), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard(stringResource(R.string.earn_trips), "0", Modifier.weight(1f))
+                StatCard(stringResource(R.string.earn_trips), history.size.toString(), Modifier.weight(1f))
                 StatCard(stringResource(R.string.earn_online), stringResource(R.string.home_time_fmt, onlineMinutes / 60, onlineMinutes % 60), Modifier.weight(1f))
                 StatCard(stringResource(R.string.earn_cash), money, Modifier.weight(1f))
             }
             SectionLabel(stringResource(R.string.earn_history))
-            GroupCard(Modifier.padding(bottom = 20.dp)) {
-                Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    RideIcon(RideIcons.Receipt, c.muted, size = 28.dp)
-                    Text(stringResource(R.string.earn_empty_title), color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))
-                    Text(stringResource(R.string.earn_empty_text), color = c.muted, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 4.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            if (history.isEmpty()) {
+                GroupCard(Modifier.padding(bottom = 20.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        RideIcon(RideIcons.Receipt, c.muted, size = 28.dp)
+                        Text(stringResource(R.string.earn_empty_title), color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))
+                        Text(stringResource(R.string.earn_empty_text), color = c.muted, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 4.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
+                }
+            } else GroupCard(Modifier.padding(bottom = 20.dp)) {
+                history.forEachIndexed { i, trip ->
+                    if (i > 0) RowDivider()
+                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(trip.rider, color = c.fg, fontSize = 14.sp)
+                            Text(stringResource(R.string.earn_trip_route, trip.pickup, trip.drop), color = c.muted, fontSize = 12.sp, lineHeight = 17.sp)
+                        }
+                        Text(format.format(trip.fare), color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
@@ -110,8 +125,8 @@ private fun WeekChart(values: List<Float>, today: Int, modifier: Modifier = Modi
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun EarningsDarkPreview() = RideNowTheme(darkTheme = true) { EarningsScreen(75, {}) }
+private fun EarningsDarkPreview() = RideNowTheme(darkTheme = true) { EarningsScreen(75, 16.8, emptyList(), {}) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun EarningsLightPreview() = RideNowTheme(darkTheme = false) { EarningsScreen(0, {}) }
+private fun EarningsLightPreview() = RideNowTheme(darkTheme = false) { EarningsScreen(0, 0.0, emptyList(), {}) }

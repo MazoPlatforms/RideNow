@@ -62,6 +62,9 @@ import com.ridenow.driver.ui.components.RideIcons
 import com.ridenow.driver.ui.components.drawCityStreets
 import com.ridenow.driver.ui.theme.RideNowTheme
 import com.ridenow.driver.ui.theme.RideTheme
+import com.ridenow.driver.ui.preview.PreviewConfig
+import com.ridenow.driver.ui.trip.TripRequest
+import com.ridenow.driver.ui.trip.TripRequestOverlay
 import com.ridenow.driver.ui.util.hasBackgroundLocation
 import com.ridenow.driver.ui.util.rememberReducedMotion
 import kotlinx.coroutines.delay
@@ -76,7 +79,8 @@ import kotlinx.coroutines.isActive
 @Composable
 fun HomeScreen(
     online: Boolean, bankSaved: Boolean, driverName: String, onlineSince: Long, bankedMillis: Long,
-    onToggle: () -> Unit, onAddBank: () -> Unit, onTab: (MainTab) -> Unit = {}, modifier: Modifier = Modifier,
+    onToggle: () -> Unit, onAddBank: () -> Unit, onTab: (MainTab) -> Unit = {}, earnings: Double = 0.0, trips: Int = 0,
+    request: TripRequest? = null, onOfferRequest: () -> Unit = {}, onAccept: () -> Unit = {}, onDecline: () -> Unit = {}, modifier: Modifier = Modifier,
 ) {
     val c = RideTheme.colors
     val context = LocalContext.current
@@ -89,8 +93,12 @@ fun HomeScreen(
         while (online && isActive) { now = SystemClock.elapsedRealtime(); delay(15_000) }
         now = SystemClock.elapsedRealtime()
     }
+    // UI preview: a sample request arrives a few seconds after going online. A backend would push real ones.
+    LaunchedEffect(online, request) {
+        if (PreviewConfig.ENABLED && online && request == null) { delay(PreviewConfig.MOCK_REQUEST_DELAY_MS); onOfferRequest() }
+    }
     val totalMinutes = ((bankedMillis + if (online) (now - onlineSince).coerceAtLeast(0) else 0L) / 60_000L).toInt()
-    val money = remember { NumberFormat.getCurrencyInstance().format(0) }
+    val money = remember(earnings) { NumberFormat.getCurrencyInstance().format(earnings) }
 
     val pulse by rememberInfiniteTransition(label = "home").animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearOutSlowInEasing)), label = "pulse")
     val ping = if (reduceMotion) 0f else pulse
@@ -183,13 +191,14 @@ fun HomeScreen(
                 }
                 Row(Modifier.padding(top = 14.dp).fillMaxWidth()) {
                     Stat(money, stringResource(R.string.home_earnings), Modifier.weight(1f))
-                    Stat("0", stringResource(R.string.home_trips), Modifier.weight(1f))
+                    Stat(trips.toString(), stringResource(R.string.home_trips), Modifier.weight(1f))
                     Stat(stringResource(R.string.home_time_fmt, totalMinutes / 60, totalMinutes % 60), stringResource(R.string.home_online_time), Modifier.weight(1f))
                 }
                 MainNavBar(MainTab.Home, onTab, Modifier.padding(top = 6.dp))
             }
             GoButton(online, bankSaved, onToggle, Modifier.align(Alignment.TopCenter).offset(y = (-44).dp))
         }
+        if (request != null) TripRequestOverlay(request, onAccept, onDecline)
     }
 }
 

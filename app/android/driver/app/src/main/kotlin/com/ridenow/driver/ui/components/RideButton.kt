@@ -2,6 +2,7 @@ package com.ridenow.driver.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -28,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ridenow.driver.ui.theme.RideTheme
 
-enum class RideButtonStyle { Primary, Text }
+enum class RideButtonStyle { Primary, Outline, Text }
 
 @Composable
 fun RideButton(
@@ -45,11 +46,13 @@ fun RideButton(
     val scale by animateFloatAsState(if (pressed) 0.97f else 1f, label = "press")
     val haptics = LocalHapticFeedback.current
     val primary = style == RideButtonStyle.Primary
+    val outline = style == RideButtonStyle.Outline
     Box(
-        modifier.fillMaxWidth().height(if (primary) 56.dp else 48.dp)
+        modifier.fillMaxWidth().height(if (primary || outline) 56.dp else 48.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(28.dp))
             .background(if (primary) (if (enabled) c.fill else c.line) else Color.Transparent)
+            .then(if (outline) Modifier.border(1.dp, c.border, RoundedCornerShape(28.dp)) else Modifier)
             .clickable(interactionSource = interaction, indication = null, enabled = enabled && !loading, role = Role.Button) {
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
@@ -62,8 +65,8 @@ fun RideButton(
             Text(
                 text,
                 color = if (primary) (if (enabled) c.onFill else c.muted) else c.fg,
-                fontSize = if (primary) 16.sp else 15.sp,
-                fontWeight = if (primary) FontWeight.SemiBold else FontWeight.Normal,
+                fontSize = if (primary || outline) 16.sp else 15.sp,
+                fontWeight = if (primary || outline) FontWeight.SemiBold else FontWeight.Normal,
             )
         }
     }

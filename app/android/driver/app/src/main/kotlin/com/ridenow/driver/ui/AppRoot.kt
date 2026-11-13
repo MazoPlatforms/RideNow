@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,6 +48,7 @@ import com.ridenow.driver.ui.registration.TermsScreen
 import com.ridenow.driver.ui.registration.VehicleDocsScreen
 import com.ridenow.driver.ui.registration.VehiclePhotosScreen
 import com.ridenow.driver.ui.registration.VehicleScreen
+import com.ridenow.driver.ui.preview.PreviewConfig
 import com.ridenow.driver.ui.splash.SplashScreen
 import com.ridenow.driver.ui.status.ActionRequiredScreen
 import com.ridenow.driver.ui.status.ApprovedScreen
@@ -54,12 +56,16 @@ import com.ridenow.driver.ui.status.RejectedScreen
 import com.ridenow.driver.ui.status.SubmittedScreen
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.theme.ThemeMode
+import com.ridenow.driver.ui.trip.TripCompleteScreen
+import com.ridenow.driver.ui.trip.TripPhase
+import com.ridenow.driver.ui.trip.TripScreen
+import kotlinx.coroutines.delay
 import com.ridenow.driver.ui.welcome.WelcomeScreen
 
 enum class Screen {
     Splash, Intro, Welcome, Phone, Otp, Terms, Background, Personal, Identity, License, Vehicle,
     VehicleDocs, VehiclePhotos, Availability, ServiceArea, Bank, Review, Submitted,
-    ActionRequired, Rejected, Approved, Home, Earnings, Inbox, Account,
+    ActionRequired, Rejected, Approved, Home, Earnings, Inbox, Account, Trip, TripComplete,
 }
 
 /** Survives activity recreation within one app process, so the splash does not replay on rotation or theme changes. */
@@ -212,11 +218,19 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                             onBack = { screen = Screen.Bank },
                         )
                     }
-                    Screen.Submitted -> SubmittedScreen(
-                        name = app.summaries[STEP_PERSONAL].orEmpty().substringBefore(" "), reference = app.reference,
-                        // Demo: each tap moves to the next outcome until a backend decides.
-                        onCheckStatus = { app.checkStatus(); screen = screenFor(app.status) }, onSupport = { },
-                    )
+                    Screen.Submitted -> {
+                        // UI preview: after a few seconds, jump to Home as if the application had been approved.
+                        var secondsLeft by remember { mutableIntStateOf(PreviewConfig.SUBMITTED_TO_HOME_SECONDS) }
+                        if (PreviewConfig.ENABLED) LaunchedEffect(Unit) {
+                            while (secondsLeft > 0) { delay(1000); secondsLeft-- }
+                            app.approveDemo(); screen = Screen.Home
+                        }
+                        SubmittedScreen(
+                            name = app.summaries[STEP_PERSONAL].orEmpty().substringBefore(" "), reference = app.reference,
+                            onCheckStatus = { app.checkStatus(); screen = screenFor(app.status) }, onSupport = { },
+                            previewSecondsLeft = if (PreviewConfig.ENABLED) secondsLeft else null,
+                        )
+                    }
                     Screen.ActionRequired -> ActionRequiredScreen(
                         // Fixing returns to Review, then Submit sends the application again.
                         onFix = { i -> editing = true; screen = if (i == 0) Screen.Identity else Screen.VehicleDocs },
@@ -230,14 +244,35 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                         onToggle = { if (app.online) app.goOffline() else if (app.bankSaved) app.goOnline() else { bankReturn = Screen.Home.name; screen = Screen.Bank } },
                         onAddBank = { bankReturn = Screen.Home.name; screen = Screen.Bank },
                         onTab = { screen = tabScreen(it) },
+                        earnings = app.earnings, trips = app.history.size, request = app.request,
+                        onOfferRequest = { app.offerRequest() }, onDecline = { app.declineRequest() },
+                        onAccept = { app.acceptRequest(); screen = Screen.Trip },
                     )
                     Screen.Earnings -> {
                         BackHandler { screen = Screen.Home }
-                        EarningsScreen(onlineMinutes = app.onlineMinutes(), onTab = { screen = tabScreen(it) })
+                        EarningsScreen(onlineMinutes = app.onlineMinutes(), earnings = app.earnings, history = app.history, onTab = { screen = tabScreen(it) })
                     }
                     Screen.Inbox -> {
                         BackHandler { screen = Screen.Home }
                         InboxScreen(onTab = { screen = tabScreen(it) })
+                    }
+                    Screen.Trip -> {
+                        val trip = app.trip
+                        if (trip == null) LaunchedEffect(Unit) { screen = Screen.Home } else {
+                            BackHandler { }
+                            TripScreen(
+                                trip = trip, phase = app.phase,
+                                onAdvance = { if (app.phase == TripPhase.InTrip) screen = Screen.TripComplete else app.advanceTrip() },
+                                onCancel = { app.cancelTrip(); screen = Screen.Home },
+                            )
+                        }
+                    }
+                    Screen.TripComplete -> {
+                        val trip = app.trip
+                        if (trip == null) LaunchedEffect(Unit) { screen = Screen.Home } else {
+                            BackHandler { }
+                            TripCompleteScreen(trip = trip, onDone = { app.finishTrip(); screen = Screen.Home })
+                        }
                     }
                     Screen.Account -> {
                         BackHandler { screen = Screen.Home }
