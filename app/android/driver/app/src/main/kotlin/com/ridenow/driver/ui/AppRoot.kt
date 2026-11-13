@@ -40,6 +40,8 @@ import com.ridenow.driver.ui.registration.ApplicationViewModel
 import com.ridenow.driver.ui.registration.BackgroundLocationScreen
 import com.ridenow.driver.ui.registration.BankAccountScreen
 import com.ridenow.driver.ui.registration.IdentityScreen
+import com.ridenow.driver.ui.profile.DriverProfileScreen
+import com.ridenow.driver.ui.profile.EditProfileScreen
 import com.ridenow.driver.ui.registration.LicenseScreen
 import com.ridenow.driver.ui.registration.VehicleDocsScreen
 import com.ridenow.driver.ui.registration.VehiclePhotosScreen
@@ -68,7 +70,7 @@ import com.ridenow.driver.ui.welcome.WelcomeScreen
 enum class Screen {
     Splash, Intro, Welcome, Phone, Otp, Terms, Background, Notifications, Personal, Identity, License, Vehicle,
     VehicleDocs, VehiclePhotos, Availability, ServiceArea, Bank, Review, Submitted,
-    ActionRequired, Rejected, Approved, Home, Earnings, Inbox, Account, Trip, TripComplete,
+    ActionRequired, Rejected, Approved, Home, Earnings, Inbox, Account, Trip, TripComplete, DriverProfile, EditProfile,
 }
 
 /** Survives activity recreation within one app process, so the splash does not replay on rotation or theme changes. */
@@ -305,13 +307,33 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                             TripCompleteScreen(trip = trip, onDone = { app.finishTrip(); screen = Screen.Home })
                         }
                     }
+                    Screen.DriverProfile -> {
+                        BackHandler { screen = Screen.Account }
+                        DriverProfileScreen(
+                            name = app.profileName.ifBlank { app.summaries[STEP_PERSONAL].orEmpty() }, phone = shownPhone,
+                            email = app.profileEmail, address = app.profileAddress,
+                            vehicle = app.summaries[STEP_VEHICLE].orEmpty(), availability = app.summaries[STEP_AVAILABILITY].orEmpty(),
+                            active = app.status == ApplicationStatus.Approved,
+                            onBack = { screen = Screen.Account }, onEdit = { screen = Screen.EditProfile },
+                        )
+                    }
+                    Screen.EditProfile -> {
+                        BackHandler { screen = Screen.DriverProfile }
+                        EditProfileScreen(
+                            name = app.profileName.ifBlank { app.summaries[STEP_PERSONAL].orEmpty() }, phone = shownPhone,
+                            email = app.profileEmail, address = app.profileAddress,
+                            onBack = { screen = Screen.DriverProfile },
+                            onSave = { n, e, a -> app.profileName = n; app.profileEmail = e; app.profileAddress = a; screen = Screen.DriverProfile },
+                        )
+                    }
                     Screen.Account -> {
                         BackHandler { screen = Screen.Home }
                         AccountScreen(
-                            name = app.summaries[STEP_PERSONAL].orEmpty(), phone = shownPhone, vehicle = app.summaries[STEP_VEHICLE].orEmpty(),
+                            name = app.profileName.ifBlank { app.summaries[STEP_PERSONAL].orEmpty() }, phone = shownPhone, vehicle = app.summaries[STEP_VEHICLE].orEmpty(),
                             availability = app.summaries[STEP_AVAILABILITY].orEmpty(), bankSaved = app.bankSaved,
                             mode = themeMode, onMode = onThemeMode,
                             onAddBank = { bankReturn = Screen.Account.name; screen = Screen.Bank },
+                            onProfile = { screen = Screen.DriverProfile },
                             onSignOut = {
                                 app.reset(); phone = ""; editing = false; bankReturn = null
                                 prefs.edit().remove("terms_accepted").remove("application_submitted").apply()

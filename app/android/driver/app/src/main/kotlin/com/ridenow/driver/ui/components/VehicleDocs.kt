@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ridenow.driver.R
@@ -71,12 +72,13 @@ fun DocumentCard(
         }
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(title, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Stacked full width so the full expiry date (dd / MM / yyyy) fits on phones.
+            Column(Modifier.padding(top = 10.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SmallButton(
                     if (done) RideIcons.Check else RideIcons.Camera, stringResource(if (done) R.string.doc_added_short else R.string.doc_upload),
-                    done, onUpload, Modifier.weight(1f),
+                    done, onUpload, Modifier.fillMaxWidth(),
                 )
-                SmallButton(RideIcons.Calendar, expiry.ifEmpty { stringResource(R.string.doc_expiry) }, expiry.isNotEmpty(), onExpiry, Modifier.weight(1.2f))
+                SmallButton(RideIcons.Calendar, expiry.ifEmpty { stringResource(R.string.doc_expiry) }, expiry.isNotEmpty(), onExpiry, Modifier.fillMaxWidth())
             }
         }
     }
@@ -92,7 +94,7 @@ private fun SmallButton(icon: List<String>, text: String, active: Boolean, onCli
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
     ) {
         RideIcon(icon, if (active) c.accent else c.muted, size = 18.dp)
-        Text(text, color = if (active) c.accent else c.fg, fontSize = 12.sp, maxLines = 1, modifier = Modifier.padding(start = 6.dp))
+        Text(text, color = if (active) c.accent else c.fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp))
     }
 }
 

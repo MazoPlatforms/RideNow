@@ -35,7 +35,7 @@ import androidx.activity.compose.BackHandler
 fun AccountScreen(
     name: String, phone: String, vehicle: String, availability: String, bankSaved: Boolean,
     mode: ThemeMode, onMode: (ThemeMode) -> Unit, onAddBank: () -> Unit, onSignOut: () -> Unit, onTab: (MainTab) -> Unit,
-    modifier: Modifier = Modifier,
+    onProfile: () -> Unit = {}, modifier: Modifier = Modifier,
 ) {
     val c = RideTheme.colors
     val context = LocalContext.current
@@ -55,7 +55,11 @@ fun AccountScreen(
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             Text(stringResource(R.string.acct_title), color = c.fg, fontSize = 30.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 16.dp).semantics { heading() })
-            Row(Modifier.padding(top = 16.dp).fillMaxWidth().entrance(60), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.padding(top = 16.dp).fillMaxWidth().entrance(60).clip(RoundedCornerShape(20.dp))
+                    .clickable(role = Role.Button, onClick = onProfile).padding(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Box(Modifier.size(64.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)).border(1.5.dp, c.accent, CircleShape), contentAlignment = Alignment.Center) {
                     Text(name.take(1).uppercase().ifEmpty { "?" }, color = c.accent, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                 }

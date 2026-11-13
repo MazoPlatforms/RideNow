@@ -449,4 +449,24 @@
     <string name="vdocs_tag">VEHICLE DOCUMENTS</string>
     <string name="vdocs_title">Vehicle documents.</string>
     <string name="vdocs_subtitle">Add each vehicle document with its expiry date.</string>
+    <string name="profile_title">Profile</string>
+    <string name="profile_status_active">Active</string>
+    <string name="profile_status_pending">Pending review</string>
+    <string name="profile_section_personal">Personal information</string>
+    <string name="profile_section_vehicle">Vehicle</string>
+    <string name="profile_edit">Edit</string>
+    <string name="profile_full_name">Full name</string>
+    <string name="profile_phone">Phone number</string>
+    <string name="profile_email">Email</string>
+    <string name="profile_address">Address</string>
+    <string name="profile_vehicle">Vehicle</string>
+    <string name="profile_availability">Availability</string>
+    <string name="profile_none">Not added yet</string>
+    <string name="profile_edit_title">Edit profile</string>
+    <string name="profile_edit_subtitle">Update your contact details. Phone number and vehicle change through verification.</string>
+    <string name="profile_phone_locked">Phone number is used to sign in and cannot be changed here.</string>
+    <string name="profile_email_error">Enter a valid email address</string>
+    <string name="profile_save">Save changes</string>
+    <string name="profile_email_hint">name@example.com</string>
+    <string name="profile_address_hint">Area, town</string>
 </resources>

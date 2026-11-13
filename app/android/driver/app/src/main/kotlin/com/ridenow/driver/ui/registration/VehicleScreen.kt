@@ -65,7 +65,7 @@ fun VehicleScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifi
     val showPlateError = plate.isNotBlank() && !plateOk && !plateFocused
     val canContinue = type != null && make.trim().length >= 2 && model.trim().isNotEmpty() && yearOk && color != null && plateOk
 
-    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
+    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().formBottomInsets().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             StepHeader(4, 9, stringResource(R.string.veh_tag), stringResource(R.string.veh_title), stringResource(R.string.veh_subtitle), onBack)
             Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(12.dp)) {

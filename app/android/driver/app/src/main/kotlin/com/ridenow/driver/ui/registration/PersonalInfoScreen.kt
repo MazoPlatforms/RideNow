@@ -75,7 +75,7 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
     val canContinue = photo != null && name.trim().length >= 2 && dob != null && gender != null && emailOk
     val dobText = dob?.let { SimpleDateFormat("dd / MM / yyyy", Locale.getDefault()).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(it)) } ?: ""
 
-    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
+    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().formBottomInsets().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             StepHeader(1, 9, stringResource(R.string.personal_tag), stringResource(R.string.personal_title), stringResource(R.string.personal_subtitle), onBack)
 

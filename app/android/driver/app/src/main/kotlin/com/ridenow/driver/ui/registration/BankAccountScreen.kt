@@ -48,7 +48,7 @@ fun BankAccountScreen(onBack: () -> Unit, onSaved: () -> Unit, onSkip: () -> Uni
     val showNumberError = number.isNotEmpty() && !numberOk && !numberFocused
     val showConfirmError = confirm.isNotEmpty() && !confirmOk && !confirmFocused
 
-    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
+    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().formBottomInsets().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             StepHeader(9, 9, stringResource(R.string.bank_tag), stringResource(R.string.bank_title), stringResource(R.string.bank_subtitle), onBack)
             Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(12.dp)) {

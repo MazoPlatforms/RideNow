@@ -24,6 +24,10 @@ enum class ApplicationStatus { Pending, ActionRequired, Rejected, Approved }
 class ApplicationViewModel : ViewModel() {
     val summaries = mutableStateMapOf<Int, String>()
     var bankSaved by mutableStateOf(false)
+    /** Edited on the Edit profile screen. Blank means fall back to the registration answers. */
+    var profileName by mutableStateOf("")
+    var profileEmail by mutableStateOf("")
+    var profileAddress by mutableStateOf("")
 
     val reference: String = "DRV-2100-" + (1000 + Random.nextInt(9000))
 
@@ -82,7 +86,7 @@ class ApplicationViewModel : ViewModel() {
 
     /** Clears the application and online state after sign out. */
     fun reset() {
-        summaries.clear(); bankSaved = false; checks = 0; online = false; onlineSince = 0L; bankedMillis = 0L
+        summaries.clear(); bankSaved = false; profileName = ""; profileEmail = ""; profileAddress = ""; checks = 0; online = false; onlineSince = 0L; bankedMillis = 0L
         request = null; trip = null; history.clear(); inboxUnread = true
     }
 }
