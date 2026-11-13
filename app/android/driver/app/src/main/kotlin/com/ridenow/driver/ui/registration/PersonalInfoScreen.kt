@@ -53,7 +53,7 @@ private val EmailRegex = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$")
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PersonalInfoScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier = Modifier) {
+fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val context = LocalContext.current
     val focus = LocalFocusManager.current
@@ -121,7 +121,7 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifie
             }
             Spacer(Modifier.height(12.dp))
         }
-        RideButton(stringResource(R.string.personal_continue), onClick = onDone, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
+        RideButton(stringResource(R.string.personal_continue), onClick = { onDone(name.trim()) }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
     }
 
     if (showSheet) {

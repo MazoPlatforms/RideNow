@@ -32,7 +32,7 @@ private val Classes = listOf("A1" to R.string.class_a1, "A" to R.string.class_a,
 /** Step 5 of 11: license number, class picker, expiry date and photos of both sides. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LicenseScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier = Modifier) {
+fun LicenseScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     var number by rememberSaveable { mutableStateOf("") }
@@ -71,7 +71,7 @@ fun LicenseScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier = M
             }
             Spacer(Modifier.height(12.dp))
         }
-        RideButton(stringResource(R.string.id_continue), onClick = onDone, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
+        RideButton(stringResource(R.string.id_continue), onClick = { onDone(classText) }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
     }
 
     if (showDate) RideDatePickerDialog(expiry, today, null, { showDate = false }, { expiry = it; showDate = false })

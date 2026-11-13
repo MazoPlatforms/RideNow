@@ -30,14 +30,14 @@ fun LogoMark(width: Dp, modifier: Modifier = Modifier) =
         modifier = modifier.size(width),
     )
 
-/** "RideNow" with the DRIVER label, text only (no symbol). [height] is the height of the whole block. */
+/** "RideNow Driver" wordmark, text only (no symbol). [height] is the height of the whole block. */
 @Composable
 fun Wordmark(height: Dp, modifier: Modifier = Modifier) =
     Image(
         painter = painterResource(if (RideTheme.colors.isDark) R.drawable.ridenow_wordmark_dark else R.drawable.ridenow_wordmark_light),
         contentDescription = null,
         contentScale = ContentScale.Fit,
-        modifier = modifier.height(height).aspectRatio(771f / 203f),
+        modifier = modifier.height(height).aspectRatio(1016f / 296f),
     )
 
 /** Brand-yellow gradient orb that hosts [content]. */

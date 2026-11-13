@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -153,4 +154,28 @@ fun DocPhotoPair(
             onDismiss = { sheet = false },
         )
     }
+}
+
+/**
+ * Camera and gallery picker shared by screens with several photo slots. Returns a function that opens the
+ * source sheet for slot [index]; the chosen photo (or null for remove) arrives in [onPhoto] with the same index.
+ */
+@Composable
+fun rememberPhotoPicker(title: String, onPhoto: (index: Int, photo: Bitmap?) -> Unit): (index: Int, hasPhoto: Boolean) -> Unit {
+    val context = LocalContext.current
+    var index by remember { mutableIntStateOf(0) }
+    var hasPhoto by remember { mutableStateOf(false) }
+    var sheet by remember { mutableStateOf(false) }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { if (it != null) onPhoto(index, it) }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> if (uri != null) decodeSampled(context, uri)?.let { onPhoto(index, it) } }
+    if (sheet) {
+        PhotoSheet(
+            title = title, hasPhoto = hasPhoto,
+            onCamera = { camera.launch(null) },
+            onGallery = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            onRemove = { onPhoto(index, null) },
+            onDismiss = { sheet = false },
+        )
+    }
+    return { i, has -> index = i; hasPhoto = has; sheet = true }
 }

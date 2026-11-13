@@ -27,3 +27,8 @@ suspend fun currentCity(context: Context): String? = withContext(Dispatchers.IO)
         listOfNotNull(a.locality ?: a.subAdminArea, a.countryName).joinToString(", ").ifBlank { null }
     }.getOrNull()
 }
+
+/** True when the driver allowed location "all the time" (always true below Android 10, where it is one permission). */
+fun hasBackgroundLocation(context: Context): Boolean =
+    hasLocationPermission(context) && (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED)

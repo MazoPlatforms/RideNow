@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 
 /** Line icons on the 20 px RideNow grid (1.5 stroke, round caps), drawn from SVG path data. */
 object RideIcons {
+    val Msg = listOf("M3 5h14v9H8l-4 3v-3H3z")
     val Chart = listOf("M4 17V9m6 8V4m6 13v-5")
     val Pin = listOf("M10 18s6-5.2 6-9.5a6 6 0 1 0-12 0C4 12.8 10 18 10 18z", "M8,8.5a2,2 0 1,0 4,0a2,2 0 1,0 -4,0")
     val Flag = listOf("M5 17V3m0 1h10l-2 3.5 2 3.5H5")

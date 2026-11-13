@@ -8,11 +8,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -20,38 +16,119 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ridenow.driver.ui.auth.OtpScreen
 import com.ridenow.driver.ui.auth.PhoneScreen
 import com.ridenow.driver.ui.auth.formatPhoneForDisplay
+import com.ridenow.driver.ui.account.AccountScreen
+import com.ridenow.driver.ui.earnings.EarningsScreen
+import com.ridenow.driver.ui.home.HomeScreen
+import com.ridenow.driver.ui.home.MainTab
+import com.ridenow.driver.ui.inbox.InboxScreen
 import com.ridenow.driver.ui.intro.IntroScreen
+import com.ridenow.driver.ui.registration.ApplicationStatus
+import com.ridenow.driver.ui.registration.ApplicationViewModel
+import com.ridenow.driver.ui.registration.AvailabilityScreen
 import com.ridenow.driver.ui.registration.BackgroundLocationScreen
+import com.ridenow.driver.ui.registration.BankAccountScreen
 import com.ridenow.driver.ui.registration.IdentityScreen
 import com.ridenow.driver.ui.registration.LicenseScreen
 import com.ridenow.driver.ui.registration.PersonalInfoScreen
-import com.ridenow.driver.ui.splash.SplashScreen
+import com.ridenow.driver.ui.registration.ReviewItem
+import com.ridenow.driver.ui.registration.ReviewScreen
+import com.ridenow.driver.ui.registration.ServiceAreaScreen
 import com.ridenow.driver.ui.registration.TermsScreen
-import com.ridenow.driver.ui.welcome.WelcomeScreen
+import com.ridenow.driver.ui.registration.VehicleDocsScreen
+import com.ridenow.driver.ui.registration.VehiclePhotosScreen
+import com.ridenow.driver.ui.registration.VehicleScreen
+import com.ridenow.driver.ui.splash.SplashScreen
+import com.ridenow.driver.ui.status.ActionRequiredScreen
+import com.ridenow.driver.ui.status.ApprovedScreen
+import com.ridenow.driver.ui.status.RejectedScreen
+import com.ridenow.driver.ui.status.SubmittedScreen
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.theme.ThemeMode
+import com.ridenow.driver.ui.welcome.WelcomeScreen
 
-enum class Screen { Splash, Intro, Welcome, Phone, Otp, Terms, Background, Personal, Identity, License, Vehicle }
+enum class Screen {
+    Splash, Intro, Welcome, Phone, Otp, Terms, Background, Personal, Identity, License, Vehicle,
+    VehicleDocs, VehiclePhotos, Availability, ServiceArea, Bank, Review, Submitted,
+    ActionRequired, Rejected, Approved, Home, Earnings, Inbox, Account,
+}
 
 /** Survives activity recreation within one app process, so the splash does not replay on rotation or theme changes. */
 private object SessionFlags { var splashDone = false }
+
+// Step numbers used as keys for the Review summaries.
+private const val STEP_TERMS = 1
+private const val STEP_BACKGROUND = 2
+private const val STEP_PERSONAL = 3
+private const val STEP_LICENSE = 5
+private const val STEP_VEHICLE = 6
+private const val STEP_PHOTOS = 8
+private const val STEP_AVAILABILITY = 9
+private const val STEP_AREA = 10
 
 @Composable
 fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var screen by rememberSaveable { mutableStateOf(Screen.Splash) }
     var phone by rememberSaveable { mutableStateOf("") }
+    // True while the driver is fixing one section from the Review screen: finishing it returns to Review.
+    var editing by rememberSaveable { mutableStateOf(false) }
+    // Set when Bank account was opened from Home or Account (name of that screen): finishing returns there.
+    var bankReturn by rememberSaveable { mutableStateOf<String?>(null) }
+    val app: ApplicationViewModel = viewModel()
+    val saveable = rememberSaveableStateHolder()
     val shownPhone = formatPhoneForDisplay(phone.ifBlank { "+1 555 012 3456" })
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("ridenowdriver", 0) }
+
+    // Text for the Review rows that do not come from a screen.
+    val accepted = stringResource(R.string.review_accepted)
+    val bgOn = stringResource(R.string.review_bg_on)
+    val bgOff = stringResource(R.string.review_bg_off)
+    val bothSides = stringResource(R.string.review_both_sides)
+    val docsDone = stringResource(R.string.review_docs)
+    val bankAdded = stringResource(R.string.review_bank_added)
+    val bankSkipped = stringResource(R.string.review_bank_skipped)
+    val dash = "\u2014"
+    val reviewItems = listOf(
+        ReviewItem(stringResource(R.string.review_row_terms), "$accepted \u00b7 ${app.summaries[STEP_BACKGROUND] ?: bgOff}"),
+        ReviewItem(stringResource(R.string.review_row_personal), app.summaries[STEP_PERSONAL] ?: dash),
+        ReviewItem(stringResource(R.string.review_row_identity), bothSides),
+        ReviewItem(stringResource(R.string.review_row_license), app.summaries[STEP_LICENSE] ?: dash),
+        ReviewItem(stringResource(R.string.review_row_vehicle), app.summaries[STEP_VEHICLE] ?: dash),
+        ReviewItem(stringResource(R.string.review_row_docs), docsDone),
+        ReviewItem(stringResource(R.string.review_row_photos), app.summaries[STEP_PHOTOS] ?: dash),
+        ReviewItem(stringResource(R.string.review_row_avail), "${app.summaries[STEP_AVAILABILITY] ?: dash} \u00b7 ${app.summaries[STEP_AREA] ?: dash}"),
+        ReviewItem(stringResource(R.string.review_row_bank), if (app.bankSaved) bankAdded else bankSkipped, warn = !app.bankSaved, add = !app.bankSaved),
+    )
+    val editTargets = listOf(
+        Screen.Terms, Screen.Personal, Screen.Identity, Screen.License, Screen.Vehicle,
+        Screen.VehicleDocs, Screen.VehiclePhotos, Screen.Availability, Screen.Bank,
+    )
+
+    /** Goes to [target], or back to Review when a section was opened for editing. */
+    fun advance(target: Screen) {
+        if (editing) { editing = false; screen = Screen.Review } else screen = target
+    }
+
+    fun finishBank(saved: Boolean) {
+        if (saved) app.bankSaved = true else if (bankReturn == null) app.bankSaved = false
+        val back = bankReturn
+        if (back != null) { bankReturn = null; screen = Screen.valueOf(back) } else advance(Screen.Review)
+    }
+    fun backFromBank() {
+        val back = bankReturn
+        if (back != null) { bankReturn = null; screen = Screen.valueOf(back) } else advance(Screen.ServiceArea)
+    }
+
     LaunchedEffect(Unit) {
         if (SessionFlags.splashDone && screen == Screen.Splash) {
             screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro
@@ -59,51 +136,140 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     }
     Box(Modifier.fillMaxSize()) {
         Crossfade(targetState = screen, animationSpec = tween(400), label = "root") { current ->
-            when (current) {
-                Screen.Splash -> SplashScreen(onFinished = { SessionFlags.splashDone = true; screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro })
-                Screen.Intro -> IntroScreen(onDone = { prefs.edit().putBoolean("intro_seen", true).commit(); screen = Screen.Welcome })
-                Screen.Welcome -> WelcomeScreen(onGetStarted = { screen = Screen.Phone }, onHaveAccount = { screen = Screen.Phone }, onHelp = { })
-                Screen.Phone -> {
-                    BackHandler { screen = Screen.Welcome }
-                    PhoneScreen(onBack = { screen = Screen.Welcome }, onCodeSent = { phone = it; screen = Screen.Otp })
-                }
-                Screen.Otp -> {
-                    BackHandler { screen = Screen.Phone }
-                    OtpScreen(phone = shownPhone, onBack = { screen = Screen.Phone }, onVerified = { screen = Screen.Terms })
-                }
-                Screen.Terms -> {
-                    BackHandler { screen = Screen.Otp }
-                    TermsScreen(
-                        onBack = { screen = Screen.Otp },
-                        onAccept = { prefs.edit().putBoolean("terms_accepted", true).apply(); screen = Screen.Background },
-                        onDecline = { screen = Screen.Welcome },
+            // Keeps typed text, dates and choices when the driver goes back to a screen.
+            saveable.SaveableStateProvider(current.name) {
+                when (current) {
+                    Screen.Splash -> SplashScreen(onFinished = { SessionFlags.splashDone = true; screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro })
+                    Screen.Intro -> IntroScreen(onDone = { prefs.edit().putBoolean("intro_seen", true).commit(); screen = Screen.Welcome })
+                    Screen.Welcome -> WelcomeScreen(onGetStarted = { screen = Screen.Phone }, onHaveAccount = { screen = Screen.Phone }, onHelp = { })
+                    Screen.Phone -> {
+                        BackHandler { screen = Screen.Welcome }
+                        PhoneScreen(onBack = { screen = Screen.Welcome }, onCodeSent = { phone = it; screen = Screen.Otp })
+                    }
+                    Screen.Otp -> {
+                        BackHandler { screen = Screen.Phone }
+                        OtpScreen(phone = shownPhone, onBack = { screen = Screen.Phone }, onVerified = { screen = Screen.Terms })
+                    }
+                    Screen.Terms -> {
+                        BackHandler { advance(Screen.Otp) }
+                        TermsScreen(
+                            onBack = { advance(Screen.Otp) },
+                            onAccept = { prefs.edit().putBoolean("terms_accepted", true).apply(); app.summaries[STEP_TERMS] = accepted; screen = Screen.Background },
+                            onDecline = { editing = false; screen = Screen.Welcome },
+                        )
+                    }
+                    Screen.Background -> {
+                        BackHandler { screen = Screen.Terms }
+                        BackgroundLocationScreen(
+                            onBack = { screen = Screen.Terms },
+                            onAllowed = { app.summaries[STEP_BACKGROUND] = bgOn; advance(Screen.Personal) },
+                            onSkip = { app.summaries[STEP_BACKGROUND] = bgOff; advance(Screen.Personal) },
+                        )
+                    }
+                    Screen.Personal -> {
+                        BackHandler { advance(Screen.Background) }
+                        PersonalInfoScreen(onBack = { advance(Screen.Background) }, onDone = { app.summaries[STEP_PERSONAL] = it; advance(Screen.Identity) })
+                    }
+                    Screen.Identity -> {
+                        BackHandler { advance(Screen.Personal) }
+                        IdentityScreen(onBack = { advance(Screen.Personal) }, onDone = { advance(Screen.License) })
+                    }
+                    Screen.License -> {
+                        BackHandler { advance(Screen.Identity) }
+                        LicenseScreen(onBack = { advance(Screen.Identity) }, onDone = { app.summaries[STEP_LICENSE] = it; advance(Screen.Vehicle) })
+                    }
+                    Screen.Vehicle -> {
+                        BackHandler { advance(Screen.License) }
+                        VehicleScreen(onBack = { advance(Screen.License) }, onDone = { app.summaries[STEP_VEHICLE] = it; advance(Screen.VehicleDocs) })
+                    }
+                    Screen.VehicleDocs -> {
+                        BackHandler { advance(Screen.Vehicle) }
+                        VehicleDocsScreen(onBack = { advance(Screen.Vehicle) }, onDone = { advance(Screen.VehiclePhotos) })
+                    }
+                    Screen.VehiclePhotos -> {
+                        BackHandler { advance(Screen.VehicleDocs) }
+                        VehiclePhotosScreen(onBack = { advance(Screen.VehicleDocs) }, onDone = { app.summaries[STEP_PHOTOS] = it; advance(Screen.Availability) })
+                    }
+                    Screen.Availability -> {
+                        BackHandler { advance(Screen.VehiclePhotos) }
+                        // Editing availability also walks through the service area, which belongs to the same Review row.
+                        AvailabilityScreen(onBack = { advance(Screen.VehiclePhotos) }, onDone = { app.summaries[STEP_AVAILABILITY] = it; screen = Screen.ServiceArea })
+                    }
+                    Screen.ServiceArea -> {
+                        BackHandler { screen = Screen.Availability }
+                        ServiceAreaScreen(onBack = { screen = Screen.Availability }, onDone = { app.summaries[STEP_AREA] = it; advance(Screen.Bank) })
+                    }
+                    Screen.Bank -> {
+                        BackHandler { backFromBank() }
+                        BankAccountScreen(onBack = { backFromBank() }, onSaved = { finishBank(true) }, onSkip = { finishBank(false) })
+                    }
+                    Screen.Review -> {
+                        BackHandler { screen = Screen.Bank }
+                        ReviewScreen(
+                            items = reviewItems,
+                            onEdit = { i -> editing = true; screen = editTargets[i] },
+                            onSubmit = { prefs.edit().putBoolean("application_submitted", true).apply(); screen = Screen.Submitted },
+                            onBack = { screen = Screen.Bank },
+                        )
+                    }
+                    Screen.Submitted -> SubmittedScreen(
+                        name = app.summaries[STEP_PERSONAL].orEmpty().substringBefore(" "), reference = app.reference,
+                        // Demo: each tap moves to the next outcome until a backend decides.
+                        onCheckStatus = { app.checkStatus(); screen = screenFor(app.status) }, onSupport = { },
                     )
-                }
-                Screen.Background -> {
-                    BackHandler { screen = Screen.Terms }
-                    BackgroundLocationScreen(onBack = { screen = Screen.Terms }, onAllowed = { screen = Screen.Personal }, onSkip = { screen = Screen.Personal })
-                }
-                Screen.Personal -> {
-                    BackHandler { screen = Screen.Background }
-                    PersonalInfoScreen(onBack = { screen = Screen.Background }, onDone = { screen = Screen.Identity })
-                }
-                Screen.Identity -> {
-                    BackHandler { screen = Screen.Personal }
-                    IdentityScreen(onBack = { screen = Screen.Personal }, onDone = { screen = Screen.License })
-                }
-                Screen.License -> {
-                    BackHandler { screen = Screen.Identity }
-                    LicenseScreen(onBack = { screen = Screen.Identity }, onDone = { screen = Screen.Vehicle })
-                }
-                Screen.Vehicle -> {
-                    // Placeholder until the Vehicle details screen is built.
-                    BackHandler { screen = Screen.License }
-                    val c = RideTheme.colors
-                    Box(Modifier.fillMaxSize().background(c.bg), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.next_placeholder), color = c.muted, fontSize = 14.sp)
+                    Screen.ActionRequired -> ActionRequiredScreen(
+                        // Fixing returns to Review, then Submit sends the application again.
+                        onFix = { i -> editing = true; screen = if (i == 0) Screen.Identity else Screen.VehicleDocs },
+                        onUpdate = { editing = true; screen = Screen.Identity }, onSupport = { },
+                    )
+                    Screen.Rejected -> RejectedScreen(onReapply = { editing = false; screen = Screen.Terms }, onSupport = { })
+                    Screen.Approved -> ApprovedScreen(onOpenHome = { screen = Screen.Home }, onExplore = { screen = Screen.Home })
+                    Screen.Home -> HomeScreen(
+                        online = app.online, bankSaved = app.bankSaved, driverName = app.summaries[STEP_PERSONAL].orEmpty(),
+                        onlineSince = app.onlineSince, bankedMillis = app.bankedMillis,
+                        onToggle = { if (app.online) app.goOffline() else if (app.bankSaved) app.goOnline() else { bankReturn = Screen.Home.name; screen = Screen.Bank } },
+                        onAddBank = { bankReturn = Screen.Home.name; screen = Screen.Bank },
+                        onTab = { screen = tabScreen(it) },
+                    )
+                    Screen.Earnings -> {
+                        BackHandler { screen = Screen.Home }
+                        EarningsScreen(onlineMinutes = app.onlineMinutes(), onTab = { screen = tabScreen(it) })
+                    }
+                    Screen.Inbox -> {
+                        BackHandler { screen = Screen.Home }
+                        InboxScreen(onTab = { screen = tabScreen(it) })
+                    }
+                    Screen.Account -> {
+                        BackHandler { screen = Screen.Home }
+                        AccountScreen(
+                            name = app.summaries[STEP_PERSONAL].orEmpty(), phone = shownPhone, vehicle = app.summaries[STEP_VEHICLE].orEmpty(),
+                            availability = app.summaries[STEP_AVAILABILITY].orEmpty(), bankSaved = app.bankSaved,
+                            mode = themeMode, onMode = onThemeMode,
+                            onAddBank = { bankReturn = Screen.Account.name; screen = Screen.Bank },
+                            onSignOut = {
+                                app.reset(); phone = ""; editing = false; bankReturn = null
+                                prefs.edit().remove("terms_accepted").remove("application_submitted").apply()
+                                screen = Screen.Welcome
+                            },
+                            onTab = { screen = tabScreen(it) },
+                        )
                     }
                 }
             }
         }
     }
+}
+
+private fun tabScreen(tab: MainTab): Screen = when (tab) {
+    MainTab.Home -> Screen.Home
+    MainTab.Earnings -> Screen.Earnings
+    MainTab.Inbox -> Screen.Inbox
+    MainTab.Account -> Screen.Account
+}
+
+private fun screenFor(status: ApplicationStatus): Screen = when (status) {
+    ApplicationStatus.Pending -> Screen.Submitted
+    ApplicationStatus.ActionRequired -> Screen.ActionRequired
+    ApplicationStatus.Rejected -> Screen.Rejected
+    ApplicationStatus.Approved -> Screen.Approved
 }
