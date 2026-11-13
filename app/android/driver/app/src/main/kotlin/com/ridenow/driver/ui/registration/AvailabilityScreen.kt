@@ -24,9 +24,9 @@ import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** Step 9 of 11: full or part time, days of the week, usual hours and a shift reminder. */
+/** Form section of the merged step: 7 of 9: full or part time, days of the week, usual hours and a shift reminder. */
 @Composable
-fun AvailabilityScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifier = Modifier) {
+fun AvailabilityContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val context = LocalContext.current
     var workType by rememberSaveable { mutableIntStateOf(0) } // 0 full time, 1 part time
@@ -40,10 +40,10 @@ fun AvailabilityScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
     val canContinue = days != 0 && !sameTime
 
     val summary = stringResource(R.string.review_avail, stringResource(if (workType == 0) R.string.avail_full else R.string.avail_part), Integer.bitCount(days), formatMinutes(context, start), formatMinutes(context, end))
-    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(9, 11, stringResource(R.string.avail_tag), stringResource(R.string.avail_title), stringResource(R.string.avail_subtitle), onBack)
-            Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LaunchedEffect(canContinue) { onValid(canContinue) }
+    LaunchedEffect(summary) { onSummary(summary) }
+    Column(modifier) {
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column {
                     Label(R.string.avail_work_type)
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -73,9 +73,6 @@ fun AvailabilityScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
                 }
                 RideSwitchRow(stringResource(R.string.avail_remind), remind, { remind = it })
             }
-            Spacer(Modifier.height(12.dp))
-        }
-        RideButton(stringResource(R.string.id_continue), onClick = { onDone(summary) }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
     }
 
     when (picking) {
@@ -114,11 +111,3 @@ private fun DayChip(letter: String, fullName: String, selected: Boolean, onClick
         contentAlignment = Alignment.Center,
     ) { Text(letter, color = if (selected) c.accent else c.fg, fontSize = 14.sp) }
 }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun AvailabilityDarkPreview() = RideNowTheme(darkTheme = true) { AvailabilityScreen({}, {}) }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun AvailabilityLightPreview() = RideNowTheme(darkTheme = false) { AvailabilityScreen({}, {}) }

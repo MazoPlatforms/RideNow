@@ -35,7 +35,8 @@ import com.ridenow.driver.ui.util.entrance
 
 /**
  * Header shared by the registration steps: back button, logo, segmented progress bar,
- * "STEP n OF total" label, title and subtitle.
+ * "STEP n OF total" label, title and subtitle. Pass step = 0 for standalone screens (terms and permissions),
+ * which show only the back button, logo, title and subtitle.
  */
 @Composable
 fun StepHeader(
@@ -57,6 +58,7 @@ fun StepHeader(
             Spacer(Modifier.weight(1f))
             Spacer(Modifier.width(36.dp))
         }
+        if (step > 0) {
         Row(Modifier.padding(top = 10.dp).fillMaxWidth().entrance(60), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(total) { i ->
                 Box(Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(if (i < step) c.fill else c.line))
@@ -66,7 +68,8 @@ fun StepHeader(
             stringResource(R.string.step_tag, step, total, section), color = c.muted, fontSize = 12.sp, letterSpacing = 1.sp,
             modifier = Modifier.padding(top = 14.dp).entrance(100),
         )
-        Column(Modifier.padding(top = 12.dp).entrance(140)) {
+        }
+        Column(Modifier.padding(top = if (step > 0) 12.dp else 20.dp).entrance(140)) {
             Text(title, color = c.fg, fontSize = 28.sp, fontWeight = FontWeight.Light, lineHeight = 33.sp, modifier = Modifier.semantics { heading() })
             Text(subtitle, color = c.muted, fontSize = 14.sp, lineHeight = 21.sp, modifier = Modifier.padding(top = 8.dp))
         }

@@ -1,22 +1,33 @@
 package com.ridenow.driver.ui.home
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,33 +43,52 @@ enum class MainTab(val icon: List<String>, val labelRes: Int) {
     Account(RideIcons.Person, R.string.nav_account),
 }
 
-/** The four tabs. Used inside the Home sheet and, wrapped by [MainBottomBar], under the other tabs. */
+/** Tabs that show an unread dot. Provided once at the app root so every bar reads the same state. */
+val LocalNavBadges = staticCompositionLocalOf<Set<MainTab>> { emptySet() }
+
+/**
+ * The four tabs. The selected tab gets a tinted pill behind its icon, bold accent label, and an unread
+ * dot appears on tabs in [LocalNavBadges]. The same bar is used on Home and on every other tab.
+ */
 @Composable
 fun MainNavBar(selected: MainTab, onTab: (MainTab) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
+    val badges = LocalNavBadges.current
+    val unread = stringResource(R.string.nav_unread_desc)
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
         MainTab.entries.forEach { tab ->
             val active = tab == selected
+            val pill by animateColorAsState(if (active) c.accent.copy(alpha = 0.16f) else Color.Transparent, label = "pill")
+            val hasBadge = tab in badges
             Column(
-                Modifier.weight(1f).heightIn(min = 56.dp).selectable(active, role = Role.Tab) { onTab(tab) },
-                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                Modifier.weight(1f).heightIn(min = 64.dp).selectable(active, role = Role.Tab) { onTab(tab) }
+                    .semantics { if (hasBadge) stateDescription = unread }.padding(top = 8.dp, bottom = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                RideIcon(tab.icon, if (active) c.accent else c.muted, size = 22.dp)
+                Box(contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(width = 60.dp, height = 32.dp).clip(RoundedCornerShape(16.dp)).background(pill), contentAlignment = Alignment.Center) {
+                        RideIcon(tab.icon, if (active) c.accent else c.muted, size = 22.dp)
+                    }
+                    if (hasBadge) Box(
+                        Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 12.dp).size(10.dp).clip(CircleShape)
+                            .background(c.danger).border(1.5.dp, c.field, CircleShape),
+                    )
+                }
                 Text(
                     stringResource(tab.labelRes), color = if (active) c.accent else c.muted, fontSize = 11.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.padding(top = 2.dp),
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.padding(top = 4.dp),
                 )
             }
         }
     }
 }
 
-/** Bar with a top divider for Earnings, Inbox and Account. */
+/** Bar with a top divider and the system inset. Used under every tab, including inside the Home sheet. */
 @Composable
 fun MainBottomBar(selected: MainTab, onTab: (MainTab) -> Unit) {
     val c = RideTheme.colors
     Column(Modifier.fillMaxWidth().background(c.field)) {
         HorizontalDivider(color = c.line)
-        MainNavBar(selected, onTab, Modifier.navigationBarsPadding().padding(horizontal = 12.dp))
+        MainNavBar(selected, onTab, Modifier.navigationBarsPadding().padding(horizontal = 8.dp))
     }
 }

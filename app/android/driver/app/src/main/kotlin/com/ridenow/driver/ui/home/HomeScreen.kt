@@ -164,8 +164,12 @@ fun HomeScreen(
 
         // Bottom sheet
         val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(c.field, sheetShape).border(1.dp, c.border, sheetShape)) {
-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 20.dp, end = 20.dp, top = 56.dp)) {
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(c.field, sheetShape)) {
+            // The outline is its own layer under the content: Modifier.border draws on top of children,
+            // which put a line through the GO and END button that overlaps the sheet edge.
+            Box(Modifier.matchParentSize().border(1.dp, c.border, sheetShape))
+            Column(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 56.dp)) {
                 Text(
                     stringResource(if (online) R.string.home_online else R.string.home_offline), color = c.fg, fontSize = 22.sp, fontWeight = FontWeight.Light,
                     modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -194,7 +198,9 @@ fun HomeScreen(
                     Stat(trips.toString(), stringResource(R.string.home_trips), Modifier.weight(1f))
                     Stat(stringResource(R.string.home_time_fmt, totalMinutes / 60, totalMinutes % 60), stringResource(R.string.home_online_time), Modifier.weight(1f))
                 }
-                MainNavBar(MainTab.Home, onTab, Modifier.padding(top = 6.dp))
+            }
+            // Same bar as the other tabs (divider, padding, system inset) so it looks identical on every page.
+            MainBottomBar(MainTab.Home, onTab)
             }
             GoButton(online, bankSaved, onToggle, Modifier.align(Alignment.TopCenter).offset(y = (-44).dp))
         }

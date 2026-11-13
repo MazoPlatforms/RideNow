@@ -29,11 +29,11 @@ import kotlinx.coroutines.launch
 private val NicRegex = Regex("^(\\d{9}[VvXx]|\\d{12})$")
 
 /**
- * Step 4 of 11: NIC number, optional issue and expiry dates, and photos of both sides.
+ * Step 2 of 9: NIC number, optional issue and expiry dates, and photos of both sides.
  * Accepts the old 9-digit + V/X format and the new 12-digit format.
  */
 @Composable
-fun IdentityScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier = Modifier) {
+fun IdentityContent(onValid: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     var nic by rememberSaveable { mutableStateOf("") }
@@ -50,10 +50,9 @@ fun IdentityScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier = 
     val canContinue = nicOk && orderOk && front != null && back != null
     val today = remember { todayUtcMillis() }
 
-    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(4, 11, stringResource(R.string.id_tag), stringResource(R.string.id_title), stringResource(R.string.id_subtitle), onBack)
-            Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LaunchedEffect(canContinue) { onValid(canContinue) }
+    Column(modifier) {
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 RideTextField(
                     nic, { nic = it.filter { ch -> ch.isLetterOrDigit() }.take(12) }, stringResource(R.string.id_nic), RideIcons.Card,
                     isError = showNicError,
@@ -79,9 +78,6 @@ fun IdentityScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier = 
                 )
                 Text(stringResource(R.string.id_tip), color = c.muted, fontSize = 12.sp, lineHeight = 18.sp)
             }
-            Spacer(Modifier.height(12.dp))
-        }
-        RideButton(stringResource(R.string.id_continue), onClick = onDone, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
     }
 
     when (picking) {
@@ -89,11 +85,3 @@ fun IdentityScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier = 
         2 -> RideDatePickerDialog(expiry, today, null, { picking = 0 }, { expiry = it; picking = 0 }, onClear = { expiry = null; picking = 0 })
     }
 }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun IdentityDarkPreview() = RideNowTheme(darkTheme = true) { IdentityScreen({}, {}) }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun IdentityLightPreview() = RideNowTheme(darkTheme = false) { IdentityScreen({}, {}) }

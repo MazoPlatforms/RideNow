@@ -29,10 +29,10 @@ import kotlinx.coroutines.launch
 private val LicenseRegex = Regex("^[A-Za-z0-9]{6,12}$")
 private val Classes = listOf("A1" to R.string.class_a1, "A" to R.string.class_a, "B1" to R.string.class_b1, "B" to R.string.class_b, "C1" to R.string.class_c1, "D1" to R.string.class_d1)
 
-/** Step 5 of 11: license number, class picker, expiry date and photos of both sides. */
+/** Form section of the merged step: 3 of 9: license number, class picker, expiry date and photos of both sides. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LicenseScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifier = Modifier) {
+fun LicenseContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     var number by rememberSaveable { mutableStateOf("") }
@@ -50,10 +50,10 @@ fun LicenseScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifi
     val today = remember { todayUtcMillis() }
     val classText = Classes.firstOrNull { it.first == cls }?.let { it.first + " \u00b7 " + stringResource(it.second) }.orEmpty()
 
-    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(5, 11, stringResource(R.string.lic_tag), stringResource(R.string.lic_title), stringResource(R.string.lic_subtitle), onBack)
-            Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LaunchedEffect(canContinue) { onValid(canContinue) }
+    LaunchedEffect(classText) { onSummary(classText) }
+    Column(modifier) {
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 RideTextField(
                     number, { number = it.filter { ch -> ch.isLetterOrDigit() }.take(12) }, stringResource(R.string.lic_number), RideIcons.Card,
                     isError = showNumberError,
@@ -69,9 +69,6 @@ fun LicenseScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifi
                     front, back, { front = it }, { back = it }, Modifier.padding(top = 4.dp),
                 )
             }
-            Spacer(Modifier.height(12.dp))
-        }
-        RideButton(stringResource(R.string.id_continue), onClick = { onDone(classText) }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
     }
 
     if (showDate) RideDatePickerDialog(expiry, today, null, { showDate = false }, { expiry = it; showDate = false })
@@ -107,11 +104,3 @@ private fun ClassSheet(selected: String?, onSelect: (String) -> Unit, onDismiss:
         }
     }
 }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun LicenseDarkPreview() = RideNowTheme(darkTheme = true) { LicenseScreen({}, {}) }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun LicenseLightPreview() = RideNowTheme(darkTheme = false) { LicenseScreen({}, {}) }

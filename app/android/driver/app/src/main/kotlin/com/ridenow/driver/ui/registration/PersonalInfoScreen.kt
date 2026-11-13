@@ -48,7 +48,7 @@ import java.util.TimeZone
 private val EmailRegex = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$")
 
 /**
- * Step 3 of 11: face photo, full name, date of birth (18+), gender, optional email and detected location.
+ * Step 1 of 6: face photo, full name, date of birth (18+), gender, optional email and detected location.
  * Continue unlocks when the photo, name, date of birth and gender are set.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,7 +77,7 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(3, 11, stringResource(R.string.personal_tag), stringResource(R.string.personal_title), stringResource(R.string.personal_subtitle), onBack)
+            StepHeader(1, 6, stringResource(R.string.personal_tag), stringResource(R.string.personal_title), stringResource(R.string.personal_subtitle), onBack)
 
             Row(Modifier.padding(top = 20.dp).fillMaxWidth().entrance(200), verticalAlignment = Alignment.CenterVertically) {
                 Avatar(photo) { showSheet = true }

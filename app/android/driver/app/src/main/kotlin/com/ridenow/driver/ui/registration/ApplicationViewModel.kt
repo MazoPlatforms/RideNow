@@ -48,6 +48,11 @@ class ApplicationViewModel : ViewModel() {
     /** Minutes spent online today, including the current session. */
     fun onlineMinutes(): Int = ((bankedMillis + if (online) SystemClock.elapsedRealtime() - onlineSince else 0L) / 60_000L).toInt()
 
+    /** True until the driver opens the Inbox; drives the unread dot on the Inbox tab. */
+    var inboxUnread by mutableStateOf(true)
+        private set
+    fun markInboxRead() { inboxUnread = false }
+
     /** UI preview: treat the application as approved. */
     fun approveDemo() { checks = 3 }
 
@@ -78,6 +83,6 @@ class ApplicationViewModel : ViewModel() {
     /** Clears the application and online state after sign out. */
     fun reset() {
         summaries.clear(); bankSaved = false; checks = 0; online = false; onlineSince = 0L; bankedMillis = 0L
-        request = null; trip = null; history.clear()
+        request = null; trip = null; history.clear(); inboxUnread = true
     }
 }

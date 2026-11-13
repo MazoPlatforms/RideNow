@@ -58,7 +58,7 @@ import com.ridenow.driver.ui.util.entrance
 import com.ridenow.driver.ui.util.hasLocationPermission
 
 /**
- * Step 2 of 11: ask for location "all the time" so requests and trip safety work in the background.
+ * Standalone screen: ask for location "all the time" so requests and trip safety work in the background.
  * Android needs two asks: foreground location first, then background. On Android 11+ the second
  * ask opens the app's location settings, where the driver picks "Allow all the time".
  */
@@ -87,7 +87,7 @@ fun BackgroundLocationScreen(onBack: () -> Unit, onAllowed: () -> Unit, onSkip: 
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(2, 11, stringResource(R.string.bg_tag), stringResource(R.string.bg_title), stringResource(R.string.bg_subtitle), onBack)
+            StepHeader(0, 0, stringResource(R.string.bg_tag), stringResource(R.string.bg_title), stringResource(R.string.bg_subtitle), onBack)
 
             Box(Modifier.fillMaxWidth().padding(top = 20.dp).entrance(200), contentAlignment = Alignment.Center) {
                 Box(Modifier.size(124.dp), contentAlignment = Alignment.Center) {

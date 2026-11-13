@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -30,23 +31,22 @@ import com.ridenow.driver.ui.auth.formatPhoneForDisplay
 import com.ridenow.driver.ui.account.AccountScreen
 import com.ridenow.driver.ui.earnings.EarningsScreen
 import com.ridenow.driver.ui.home.HomeScreen
+import com.ridenow.driver.ui.home.LocalNavBadges
 import com.ridenow.driver.ui.home.MainTab
 import com.ridenow.driver.ui.inbox.InboxScreen
 import com.ridenow.driver.ui.intro.IntroScreen
 import com.ridenow.driver.ui.registration.ApplicationStatus
 import com.ridenow.driver.ui.registration.ApplicationViewModel
-import com.ridenow.driver.ui.registration.AvailabilityScreen
 import com.ridenow.driver.ui.registration.BackgroundLocationScreen
 import com.ridenow.driver.ui.registration.BankAccountScreen
-import com.ridenow.driver.ui.registration.IdentityScreen
-import com.ridenow.driver.ui.registration.LicenseScreen
+import com.ridenow.driver.ui.registration.IdentityLicenseScreen
+import com.ridenow.driver.ui.registration.NotificationPermissionScreen
+import com.ridenow.driver.ui.registration.VehicleMediaScreen
+import com.ridenow.driver.ui.registration.WorkPlanScreen
 import com.ridenow.driver.ui.registration.PersonalInfoScreen
 import com.ridenow.driver.ui.registration.ReviewItem
 import com.ridenow.driver.ui.registration.ReviewScreen
-import com.ridenow.driver.ui.registration.ServiceAreaScreen
 import com.ridenow.driver.ui.registration.TermsScreen
-import com.ridenow.driver.ui.registration.VehicleDocsScreen
-import com.ridenow.driver.ui.registration.VehiclePhotosScreen
 import com.ridenow.driver.ui.registration.VehicleScreen
 import com.ridenow.driver.ui.preview.PreviewConfig
 import com.ridenow.driver.ui.splash.SplashScreen
@@ -63,8 +63,8 @@ import kotlinx.coroutines.delay
 import com.ridenow.driver.ui.welcome.WelcomeScreen
 
 enum class Screen {
-    Splash, Intro, Welcome, Phone, Otp, Terms, Background, Personal, Identity, License, Vehicle,
-    VehicleDocs, VehiclePhotos, Availability, ServiceArea, Bank, Review, Submitted,
+    Splash, Intro, Welcome, Phone, Otp, Terms, Background, Notifications, Personal, IdentityLicense, Vehicle,
+    VehicleMedia, WorkPlan, Bank, Review, Submitted,
     ActionRequired, Rejected, Approved, Home, Earnings, Inbox, Account, Trip, TripComplete,
 }
 
@@ -74,6 +74,7 @@ private object SessionFlags { var splashDone = false }
 // Step numbers used as keys for the Review summaries.
 private const val STEP_TERMS = 1
 private const val STEP_BACKGROUND = 2
+private const val STEP_NOTIFICATIONS = 12
 private const val STEP_PERSONAL = 3
 private const val STEP_LICENSE = 5
 private const val STEP_VEHICLE = 6
@@ -99,13 +100,15 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     val accepted = stringResource(R.string.review_accepted)
     val bgOn = stringResource(R.string.review_bg_on)
     val bgOff = stringResource(R.string.review_bg_off)
+    val notifOn = stringResource(R.string.review_notif_on)
+    val notifOff = stringResource(R.string.review_notif_off)
     val bothSides = stringResource(R.string.review_both_sides)
     val docsDone = stringResource(R.string.review_docs)
     val bankAdded = stringResource(R.string.review_bank_added)
     val bankSkipped = stringResource(R.string.review_bank_skipped)
     val dash = "\u2014"
     val reviewItems = listOf(
-        ReviewItem(stringResource(R.string.review_row_terms), "$accepted \u00b7 ${app.summaries[STEP_BACKGROUND] ?: bgOff}"),
+        ReviewItem(stringResource(R.string.review_row_terms), "$accepted \u00b7 ${app.summaries[STEP_BACKGROUND] ?: bgOff} \u00b7 ${app.summaries[STEP_NOTIFICATIONS] ?: notifOff}"),
         ReviewItem(stringResource(R.string.review_row_personal), app.summaries[STEP_PERSONAL] ?: dash),
         ReviewItem(stringResource(R.string.review_row_identity), bothSides),
         ReviewItem(stringResource(R.string.review_row_license), app.summaries[STEP_LICENSE] ?: dash),
@@ -116,8 +119,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         ReviewItem(stringResource(R.string.review_row_bank), if (app.bankSaved) bankAdded else bankSkipped, warn = !app.bankSaved, add = !app.bankSaved),
     )
     val editTargets = listOf(
-        Screen.Terms, Screen.Personal, Screen.Identity, Screen.License, Screen.Vehicle,
-        Screen.VehicleDocs, Screen.VehiclePhotos, Screen.Availability, Screen.Bank,
+        Screen.Terms, Screen.Personal, Screen.IdentityLicense, Screen.IdentityLicense, Screen.Vehicle,
+        Screen.VehicleMedia, Screen.VehicleMedia, Screen.WorkPlan, Screen.Bank,
     )
 
     /** Goes to [target], or back to Review when a section was opened for editing. */
@@ -132,7 +135,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     }
     fun backFromBank() {
         val back = bankReturn
-        if (back != null) { bankReturn = null; screen = Screen.valueOf(back) } else advance(Screen.ServiceArea)
+        if (back != null) { bankReturn = null; screen = Screen.valueOf(back) } else advance(Screen.WorkPlan)
     }
 
     LaunchedEffect(Unit) {
@@ -141,6 +144,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         }
     }
     Box(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(LocalNavBadges provides (if (app.inboxUnread) setOf(MainTab.Inbox) else emptySet())) {
         Crossfade(targetState = screen, animationSpec = tween(400), label = "root") { current ->
             // Keeps typed text, dates and choices when the driver goes back to a screen.
             saveable.SaveableStateProvider(current.name) {
@@ -168,42 +172,39 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                         BackHandler { screen = Screen.Terms }
                         BackgroundLocationScreen(
                             onBack = { screen = Screen.Terms },
-                            onAllowed = { app.summaries[STEP_BACKGROUND] = bgOn; advance(Screen.Personal) },
-                            onSkip = { app.summaries[STEP_BACKGROUND] = bgOff; advance(Screen.Personal) },
+                            onAllowed = { app.summaries[STEP_BACKGROUND] = bgOn; screen = Screen.Notifications },
+                            onSkip = { app.summaries[STEP_BACKGROUND] = bgOff; screen = Screen.Notifications },
+                        )
+                    }
+                    Screen.Notifications -> {
+                        BackHandler { screen = Screen.Background }
+                        NotificationPermissionScreen(
+                            onBack = { screen = Screen.Background },
+                            onDone = { on -> app.summaries[STEP_NOTIFICATIONS] = if (on) notifOn else notifOff; advance(Screen.Personal) },
                         )
                     }
                     Screen.Personal -> {
-                        BackHandler { advance(Screen.Background) }
-                        PersonalInfoScreen(onBack = { advance(Screen.Background) }, onDone = { app.summaries[STEP_PERSONAL] = it; advance(Screen.Identity) })
+                        BackHandler { advance(Screen.Notifications) }
+                        PersonalInfoScreen(onBack = { advance(Screen.Notifications) }, onDone = { app.summaries[STEP_PERSONAL] = it; advance(Screen.IdentityLicense) })
                     }
-                    Screen.Identity -> {
+                    Screen.IdentityLicense -> {
                         BackHandler { advance(Screen.Personal) }
-                        IdentityScreen(onBack = { advance(Screen.Personal) }, onDone = { advance(Screen.License) })
-                    }
-                    Screen.License -> {
-                        BackHandler { advance(Screen.Identity) }
-                        LicenseScreen(onBack = { advance(Screen.Identity) }, onDone = { app.summaries[STEP_LICENSE] = it; advance(Screen.Vehicle) })
+                        IdentityLicenseScreen(onBack = { advance(Screen.Personal) }, onDone = { app.summaries[STEP_LICENSE] = it; advance(Screen.Vehicle) })
                     }
                     Screen.Vehicle -> {
-                        BackHandler { advance(Screen.License) }
-                        VehicleScreen(onBack = { advance(Screen.License) }, onDone = { app.summaries[STEP_VEHICLE] = it; advance(Screen.VehicleDocs) })
+                        BackHandler { advance(Screen.IdentityLicense) }
+                        VehicleScreen(onBack = { advance(Screen.IdentityLicense) }, onDone = { app.summaries[STEP_VEHICLE] = it; advance(Screen.VehicleMedia) })
                     }
-                    Screen.VehicleDocs -> {
+                    Screen.VehicleMedia -> {
                         BackHandler { advance(Screen.Vehicle) }
-                        VehicleDocsScreen(onBack = { advance(Screen.Vehicle) }, onDone = { advance(Screen.VehiclePhotos) })
+                        VehicleMediaScreen(onBack = { advance(Screen.Vehicle) }, onDone = { app.summaries[STEP_PHOTOS] = it; advance(Screen.WorkPlan) })
                     }
-                    Screen.VehiclePhotos -> {
-                        BackHandler { advance(Screen.VehicleDocs) }
-                        VehiclePhotosScreen(onBack = { advance(Screen.VehicleDocs) }, onDone = { app.summaries[STEP_PHOTOS] = it; advance(Screen.Availability) })
-                    }
-                    Screen.Availability -> {
-                        BackHandler { advance(Screen.VehiclePhotos) }
-                        // Editing availability also walks through the service area, which belongs to the same Review row.
-                        AvailabilityScreen(onBack = { advance(Screen.VehiclePhotos) }, onDone = { app.summaries[STEP_AVAILABILITY] = it; screen = Screen.ServiceArea })
-                    }
-                    Screen.ServiceArea -> {
-                        BackHandler { screen = Screen.Availability }
-                        ServiceAreaScreen(onBack = { screen = Screen.Availability }, onDone = { app.summaries[STEP_AREA] = it; advance(Screen.Bank) })
+                    Screen.WorkPlan -> {
+                        BackHandler { advance(Screen.VehicleMedia) }
+                        WorkPlanScreen(
+                            onBack = { advance(Screen.VehicleMedia) },
+                            onDone = { availability, area -> app.summaries[STEP_AVAILABILITY] = availability; app.summaries[STEP_AREA] = area; advance(Screen.Bank) },
+                        )
                     }
                     Screen.Bank -> {
                         BackHandler { backFromBank() }
@@ -233,8 +234,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     }
                     Screen.ActionRequired -> ActionRequiredScreen(
                         // Fixing returns to Review, then Submit sends the application again.
-                        onFix = { i -> editing = true; screen = if (i == 0) Screen.Identity else Screen.VehicleDocs },
-                        onUpdate = { editing = true; screen = Screen.Identity }, onSupport = { },
+                        onFix = { i -> editing = true; screen = if (i == 0) Screen.IdentityLicense else Screen.VehicleMedia },
+                        onUpdate = { editing = true; screen = Screen.IdentityLicense }, onSupport = { },
                     )
                     Screen.Rejected -> RejectedScreen(onReapply = { editing = false; screen = Screen.Terms }, onSupport = { })
                     Screen.Approved -> ApprovedScreen(onOpenHome = { screen = Screen.Home }, onExplore = { screen = Screen.Home })
@@ -254,6 +255,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     }
                     Screen.Inbox -> {
                         BackHandler { screen = Screen.Home }
+                        LaunchedEffect(Unit) { app.markInboxRead() }
                         InboxScreen(onTab = { screen = tabScreen(it) })
                     }
                     Screen.Trip -> {
@@ -291,6 +293,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     }
                 }
             }
+        }
         }
     }
 }

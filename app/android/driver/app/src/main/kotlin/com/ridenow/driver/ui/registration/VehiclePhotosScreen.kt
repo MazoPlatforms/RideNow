@@ -23,19 +23,19 @@ private val Slots = listOf(
     PhotoSlot(R.string.vphoto_interior, VehiclePhotoKind.Interior, true), PhotoSlot(R.string.vphoto_extra, VehiclePhotoKind.Extra, true),
 )
 
-/** Step 8 of 11: front, rear, left and right photos are required; interior and additional are optional. */
+/** Form section of the merged step: 6 of 9: front, rear, left and right photos are required; interior and additional are optional. */
 @Composable
-fun VehiclePhotosScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifier = Modifier) {
+fun VehiclePhotosContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val photos = remember { mutableStateListOf<Bitmap?>(null, null, null, null, null, null) }
     val openPicker = rememberPhotoPicker(stringResource(R.string.vphoto_sheet_title)) { i, b -> photos[i] = b }
     val canContinue = Slots.indices.all { Slots[it].optional || photos[it] != null }
 
     val summary = stringResource(R.string.review_photos, photos.count { it != null })
-    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(8, 11, stringResource(R.string.vphoto_tag), stringResource(R.string.vphoto_title), stringResource(R.string.vphoto_subtitle), onBack)
-            Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LaunchedEffect(canContinue) { onValid(canContinue) }
+    LaunchedEffect(summary) { onSummary(summary) }
+    Column(modifier) {
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Slots.withIndex().chunked(2).forEach { pair ->
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         pair.forEach { (i, slot) ->
@@ -45,16 +45,5 @@ fun VehiclePhotosScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: 
                 }
                 Text(stringResource(R.string.vphoto_tip), color = c.muted, fontSize = 12.sp, lineHeight = 18.sp)
             }
-            Spacer(Modifier.height(12.dp))
-        }
-        RideButton(stringResource(R.string.id_continue), onClick = { onDone(summary) }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
     }
 }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun VehiclePhotosDarkPreview() = RideNowTheme(darkTheme = true) { VehiclePhotosScreen({}, {}) }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun VehiclePhotosLightPreview() = RideNowTheme(darkTheme = false) { VehiclePhotosScreen({}, {}) }

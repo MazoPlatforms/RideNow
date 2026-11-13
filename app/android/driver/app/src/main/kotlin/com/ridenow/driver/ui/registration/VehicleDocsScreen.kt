@@ -16,9 +16,9 @@ import com.ridenow.driver.ui.theme.RideNowTheme
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.util.entrance
 
-/** Step 7 of 11: photo and expiry date for the registration certificate, revenue license and insurance. */
+/** Form section of the merged step: 5 of 9: photo and expiry date for the registration certificate, revenue license and insurance. */
 @Composable
-fun VehicleDocsScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier = Modifier) {
+fun VehicleDocsContent(onValid: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val photos = remember { mutableStateListOf<Bitmap?>(null, null, null) }
     var e0 by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -32,10 +32,9 @@ fun VehicleDocsScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier
     val titles = listOf(R.string.vdoc_registration, R.string.vdoc_revenue, R.string.vdoc_insurance)
     val kinds = listOf(PaperKind.Certificate, PaperKind.Revenue, PaperKind.Insurance)
 
-    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(7, 11, stringResource(R.string.vdoc_tag), stringResource(R.string.vdoc_title), stringResource(R.string.vdoc_subtitle), onBack)
-            Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LaunchedEffect(canContinue) { onValid(canContinue) }
+    Column(modifier) {
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 titles.forEachIndexed { i, res ->
                     DocumentCard(
                         stringResource(res), kinds[i], photos[i], expiries[i]?.let { formatPickedDate(it) }.orEmpty(),
@@ -44,9 +43,6 @@ fun VehicleDocsScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier
                 }
                 Text(stringResource(R.string.vdoc_tip), color = c.muted, fontSize = 12.sp, lineHeight = 18.sp)
             }
-            Spacer(Modifier.height(12.dp))
-        }
-        RideButton(stringResource(R.string.id_continue), onClick = onDone, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
     }
 
     if (picking >= 0) {
@@ -57,11 +53,3 @@ fun VehicleDocsScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier
         })
     }
 }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun VehicleDocsDarkPreview() = RideNowTheme(darkTheme = true) { VehicleDocsScreen({}, {}) }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun VehicleDocsLightPreview() = RideNowTheme(darkTheme = false) { VehicleDocsScreen({}, {}) }

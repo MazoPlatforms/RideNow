@@ -30,9 +30,9 @@ import com.ridenow.driver.ui.util.currentCity
 
 private val Zones = listOf(R.string.zone_centre, R.string.zone_airport, R.string.zone_harbour, R.string.zone_university, R.string.zone_station, R.string.zone_suburbs)
 
-/** Step 10 of 11: service city, radius, zones and whether trips outside the area are accepted. */
+/** Form section of the merged step: 8 of 9: service city, radius, zones and whether trips outside the area are accepted. */
 @Composable
-fun ServiceAreaScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifier = Modifier) {
+fun ServiceAreaContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val context = LocalContext.current
     var city by rememberSaveable { mutableStateOf("") }
@@ -45,10 +45,10 @@ fun ServiceAreaScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Mo
     val canContinue = city.isNotBlank() && zones != 0
 
     val summary = stringResource(R.string.review_area, city.trim(), km, Integer.bitCount(zones))
-    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(10, 11, stringResource(R.string.area_tag), stringResource(R.string.area_title), stringResource(R.string.area_subtitle), onBack)
-            Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    LaunchedEffect(canContinue) { onValid(canContinue) }
+    LaunchedEffect(summary) { onSummary(summary) }
+    Column(modifier) {
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 AreaPreview(city, km)
                 RideTextField(
                     city, { city = it.take(40) }, stringResource(R.string.area_city), RideIcons.Pin,
@@ -75,9 +75,6 @@ fun ServiceAreaScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Mo
                 }
                 RideSwitchRow(stringResource(R.string.area_outside), outside, { outside = it })
             }
-            Spacer(Modifier.height(12.dp))
-        }
-        RideButton(stringResource(R.string.id_continue), onClick = { onDone(summary) }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
     }
 }
 
@@ -112,11 +109,3 @@ private fun ZoneChip(text: String, selected: Boolean, onClick: () -> Unit, modif
         contentAlignment = Alignment.Center,
     ) { Text(text, color = if (selected) c.accent else c.fg, fontSize = 14.sp, maxLines = 1) }
 }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun ServiceAreaDarkPreview() = RideNowTheme(darkTheme = true) { ServiceAreaScreen({}, {}) }
-
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
-@Composable
-private fun ServiceAreaLightPreview() = RideNowTheme(darkTheme = false) { ServiceAreaScreen({}, {}) }

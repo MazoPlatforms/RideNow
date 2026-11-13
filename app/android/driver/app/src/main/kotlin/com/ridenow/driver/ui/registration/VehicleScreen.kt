@@ -39,7 +39,7 @@ private val Swatches = listOf(
     R.string.color_brown to Color(0xFF6D4C41), R.string.color_other to Color.Transparent,
 )
 
-/** Step 6 of 11: vehicle type, make, model, year, color and registration number. */
+/** Step 3 of 6: vehicle type, make, model, year, color and registration number. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VehicleScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifier = Modifier) {
@@ -67,7 +67,7 @@ fun VehicleScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifi
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(6, 11, stringResource(R.string.veh_tag), stringResource(R.string.veh_title), stringResource(R.string.veh_subtitle), onBack)
+            StepHeader(3, 6, stringResource(R.string.veh_tag), stringResource(R.string.veh_title), stringResource(R.string.veh_subtitle), onBack)
             Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column {
                     Text(stringResource(R.string.veh_type), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))

@@ -41,7 +41,7 @@ import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.util.entrance
 
 /**
- * Step 1 of 11: accept the terms and agree to continuous location verification.
+ * Standalone screen: accept the terms and agree to continuous location verification.
  * Continue stays disabled until both boxes are ticked.
  */
 @Composable
@@ -53,7 +53,7 @@ fun TermsScreen(
     var terms by rememberSaveable { mutableStateOf(false) }
     var location by rememberSaveable { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
-        StepHeader(1, 11, stringResource(R.string.terms_tag), stringResource(R.string.terms_title), stringResource(R.string.terms_subtitle), onBack)
+        StepHeader(0, 0, stringResource(R.string.terms_tag), stringResource(R.string.terms_title), stringResource(R.string.terms_subtitle), onBack)
 
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 18.dp).entrance(200)) {
             HorizontalDivider(color = c.line)

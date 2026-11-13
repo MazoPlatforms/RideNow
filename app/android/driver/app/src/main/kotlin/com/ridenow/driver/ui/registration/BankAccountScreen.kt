@@ -27,7 +27,7 @@ import com.ridenow.driver.ui.util.entrance
 private val DigitsRegex = Regex("^\\d{6,20}$")
 
 /**
- * Step 11 of 11: bank account for payouts. Can be skipped, but the driver cannot go online without it.
+ * Step 6 of 6: bank account for payouts. Can be skipped, but the driver cannot go online without it.
  * [onSaved] runs with valid details, [onSkip] when the driver chooses to add it later.
  */
 @Composable
@@ -50,7 +50,7 @@ fun BankAccountScreen(onBack: () -> Unit, onSaved: () -> Unit, onSkip: () -> Uni
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(11, 11, stringResource(R.string.bank_tag), stringResource(R.string.bank_title), stringResource(R.string.bank_subtitle), onBack)
+            StepHeader(6, 6, stringResource(R.string.bank_tag), stringResource(R.string.bank_title), stringResource(R.string.bank_subtitle), onBack)
             Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.warn.copy(alpha = 0.12f)).border(1.dp, c.warn, RoundedCornerShape(14.dp)).padding(12.dp),
