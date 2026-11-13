@@ -110,7 +110,7 @@ jobs:
               package_index = next((i for i, line in enumerate(account_lines) if line.startswith("package ")), None)
               if package_index is None:
                   raise SystemExit("Could not safely add the missing selectable import to the temporary Driver source")
-              account_lines.insert(package_index + 1, nl + selectable_import + nl)
+              account_lines.insert(package_index + 1, chr(10) + selectable_import + chr(10))
               account_screen.write_text("".join(account_lines))
           print("Applied build-only duplicate, dependency, phone-hint, and selectable import fixes to the temporary CI copy.")
           PYCODE
