@@ -23,12 +23,11 @@ import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.util.entrance
 import androidx.compose.foundation.layout.Arrangement
 import com.ridenow.driver.getAppLanguage
-import com.ridenow.driver.setAppLanguage
+import com.ridenow.driver.ui.more.LanguageScreen
 import com.ridenow.driver.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
 import java.util.Locale
-
-private val Languages = listOf("en", "es", "fr")
+import androidx.activity.compose.BackHandler
 
 /** Account tab: profile, vehicle, payout, appearance, language, help and sign out. Appearance and language really switch. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,6 +45,12 @@ fun AccountScreen(
     val dash = "\u2014"
     val langCode = getAppLanguage(context)
     val langName = Locale.forLanguageTag(langCode).let { loc -> loc.getDisplayLanguage(loc).replaceFirstChar { it.titlecaseChar() } }
+
+    if (language) {
+        BackHandler { language = false }
+        LanguageScreen(onBack = { language = false })
+        return
+    }
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
@@ -88,13 +93,6 @@ fun AccountScreen(
         stringResource(R.string.acct_appearance), stringResource(R.string.acct_appearance_sub),
         ThemeMode.entries.map { stringResource(it.labelRes) }, ThemeMode.entries.indexOf(mode), { onMode(ThemeMode.entries[it]) }, { appearance = false },
     )
-    if (language) {
-        val names = Languages.map { code -> Locale.forLanguageTag(code).let { loc -> loc.getDisplayLanguage(loc).replaceFirstChar { it.titlecaseChar() } } }
-        PickerSheet(
-            stringResource(R.string.acct_language), stringResource(R.string.acct_language_sub), names, Languages.indexOf(langCode),
-            { if (Languages[it] != langCode) setAppLanguage(context, Languages[it]) }, { language = false },
-        )
-    }
     if (confirmSignOut) AlertDialog(
         onDismissRequest = { confirmSignOut = false }, containerColor = c.bg,
         title = { Text(stringResource(R.string.acct_signout_title), color = c.fg) },

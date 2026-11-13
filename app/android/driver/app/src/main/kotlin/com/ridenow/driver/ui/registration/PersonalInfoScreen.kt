@@ -77,7 +77,7 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(1, 6, stringResource(R.string.personal_tag), stringResource(R.string.personal_title), stringResource(R.string.personal_subtitle), onBack)
+            StepHeader(1, 9, stringResource(R.string.personal_tag), stringResource(R.string.personal_title), stringResource(R.string.personal_subtitle), onBack)
 
             Row(Modifier.padding(top = 20.dp).fillMaxWidth().entrance(200), verticalAlignment = Alignment.CenterVertically) {
                 Avatar(photo) { showSheet = true }

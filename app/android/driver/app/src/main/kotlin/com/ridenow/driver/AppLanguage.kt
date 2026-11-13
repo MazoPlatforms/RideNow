@@ -11,7 +11,7 @@ import java.util.Locale
 private const val LANGUAGE_PREFS = "ridenowdriver"
 private const val LANGUAGE_KEY = "lang"
 private const val FRAMEWORK_LANGUAGE_MIGRATED = "framework_language_migrated"
-private val translatedLanguages = setOf("en", "es", "fr")
+private val translatedLanguages = setOf("en", "es", "fr", "de", "ja", "hi", "ar", "ta", "si")
 
 /** Android 13+ applies the system app-language setting; older versions use the saved preference. */
 fun applyAppLanguage(base: Context): Context {

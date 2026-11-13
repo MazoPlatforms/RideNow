@@ -85,3 +85,13 @@ fun IdentityContent(onValid: (Boolean) -> Unit, modifier: Modifier = Modifier) {
         2 -> RideDatePickerDialog(expiry, today, null, { picking = 0 }, { expiry = it; picking = 0 }, onClear = { expiry = null; picking = 0 })
     }
 }
+
+
+/** Step 2 of 9: National Identity Card, front and back. */
+@Composable
+fun IdentityScreen(onBack: () -> Unit, onDone: () -> Unit) {
+    var ok by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    StepScreen(2, 9, stringResource(R.string.id_tag), stringResource(R.string.id_title), stringResource(R.string.id_subtitle), onBack, ok, onDone) {
+        IdentityContent(onValid = { ok = it })
+    }
+}

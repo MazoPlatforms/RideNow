@@ -50,7 +50,7 @@ fun BankAccountScreen(onBack: () -> Unit, onSaved: () -> Unit, onSkip: () -> Uni
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(6, 6, stringResource(R.string.bank_tag), stringResource(R.string.bank_title), stringResource(R.string.bank_subtitle), onBack)
+            StepHeader(9, 9, stringResource(R.string.bank_tag), stringResource(R.string.bank_title), stringResource(R.string.bank_subtitle), onBack)
             Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.warn.copy(alpha = 0.12f)).border(1.dp, c.warn, RoundedCornerShape(14.dp)).padding(12.dp),

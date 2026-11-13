@@ -111,3 +111,14 @@ private fun DayChip(letter: String, fullName: String, selected: Boolean, onClick
         contentAlignment = Alignment.Center,
     ) { Text(letter, color = if (selected) c.accent else c.fg, fontSize = 14.sp) }
 }
+
+
+/** Step 7 of 9: work type, days and hours. [onDone] gets the availability summary. */
+@Composable
+fun AvailabilityScreen(onBack: () -> Unit, onDone: (String) -> Unit) {
+    var ok by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var summary by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    StepScreen(7, 9, stringResource(R.string.avail_tag), stringResource(R.string.avail_title), stringResource(R.string.avail_subtitle), onBack, ok, { onDone(summary) }) {
+        AvailabilityContent(onValid = { ok = it }, onSummary = { summary = it })
+    }
+}

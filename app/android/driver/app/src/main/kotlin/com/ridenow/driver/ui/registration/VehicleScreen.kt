@@ -67,7 +67,7 @@ fun VehicleScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifi
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(3, 6, stringResource(R.string.veh_tag), stringResource(R.string.veh_title), stringResource(R.string.veh_subtitle), onBack)
+            StepHeader(4, 9, stringResource(R.string.veh_tag), stringResource(R.string.veh_title), stringResource(R.string.veh_subtitle), onBack)
             Column(Modifier.padding(top = 20.dp).entrance(200), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column {
                     Text(stringResource(R.string.veh_type), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))

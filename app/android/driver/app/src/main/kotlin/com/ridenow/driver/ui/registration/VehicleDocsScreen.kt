@@ -53,3 +53,13 @@ fun VehicleDocsContent(onValid: (Boolean) -> Unit, modifier: Modifier = Modifier
         })
     }
 }
+
+
+/** Step 5 of 9: vehicle documents with expiry dates. */
+@Composable
+fun VehicleDocsScreen(onBack: () -> Unit, onDone: () -> Unit) {
+    var ok by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    StepScreen(5, 9, stringResource(R.string.vdocs_tag), stringResource(R.string.vdocs_title), stringResource(R.string.vdocs_subtitle), onBack, ok, onDone) {
+        VehicleDocsContent(onValid = { ok = it })
+    }
+}

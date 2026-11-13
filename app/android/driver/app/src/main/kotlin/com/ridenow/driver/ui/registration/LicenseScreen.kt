@@ -104,3 +104,14 @@ private fun ClassSheet(selected: String?, onSelect: (String) -> Unit, onDismiss:
         }
     }
 }
+
+
+/** Step 3 of 9: driving license. [onDone] gets the license summary. */
+@Composable
+fun LicenseScreen(onBack: () -> Unit, onDone: (String) -> Unit) {
+    var ok by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var summary by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    StepScreen(3, 9, stringResource(R.string.lic_tag), stringResource(R.string.lic_title), stringResource(R.string.lic_subtitle), onBack, ok, { onDone(summary) }) {
+        LicenseContent(onValid = { ok = it }, onSummary = { summary = it })
+    }
+}

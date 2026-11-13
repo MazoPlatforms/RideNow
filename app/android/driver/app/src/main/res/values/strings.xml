@@ -426,4 +426,27 @@
     <string name="plan_subtitle">Set your schedule and choose your service area. You can change both later.</string>
     <string name="plan_section_availability">AVAILABILITY</string>
     <string name="plan_section_area">SERVICE AREA</string>
+    <string name="language_native_english" translatable="false">"English"</string>
+    <string name="language_native_spanish" translatable="false">"Español"</string>
+    <string name="language_native_french" translatable="false">"Français"</string>
+    <string name="language_native_german" translatable="false">"Deutsch"</string>
+    <string name="language_native_japanese" translatable="false">"日本語"</string>
+    <string name="language_native_arabic" translatable="false">"العربية"</string>
+    <string name="language_native_hindi" translatable="false">"हिन्दी"</string>
+    <string name="language_native_tamil" translatable="false">தமிழ்</string>
+    <string name="language_native_sinhala" translatable="false">සිංහල</string>
+    <string name="text_spanish">"Spanish"</string>
+    <string name="text_french">"French"</string>
+    <string name="text_german">"German"</string>
+    <string name="text_japanese">"Japanese"</string>
+    <string name="text_arabic">"Arabic"</string>
+    <string name="text_hindi">"Hindi"</string>
+    <string name="text_tamil">"Tamil"</string>
+    <string name="text_sinhala">"Sinhala"</string>
+    <string name="settings_language">Language</string>
+    <string name="text_choose_the_language_for_ridenow">"Choose the language for RideNow."</string>
+    <string name="text_save">"Save"</string>
+    <string name="vdocs_tag">VEHICLE DOCUMENTS</string>
+    <string name="vdocs_title">Vehicle documents.</string>
+    <string name="vdocs_subtitle">Add each vehicle document with its expiry date.</string>
 </resources>

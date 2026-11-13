@@ -109,3 +109,14 @@ private fun ZoneChip(text: String, selected: Boolean, onClick: () -> Unit, modif
         contentAlignment = Alignment.Center,
     ) { Text(text, color = if (selected) c.accent else c.fg, fontSize = 14.sp, maxLines = 1) }
 }
+
+
+/** Step 8 of 9: service city, radius and zones. [onDone] gets the area summary. */
+@Composable
+fun ServiceAreaScreen(onBack: () -> Unit, onDone: (String) -> Unit) {
+    var ok by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var summary by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    StepScreen(8, 9, stringResource(R.string.area_tag), stringResource(R.string.area_title), stringResource(R.string.area_subtitle), onBack, ok, { onDone(summary) }) {
+        ServiceAreaContent(onValid = { ok = it }, onSummary = { summary = it })
+    }
+}

@@ -26,6 +26,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -60,23 +63,32 @@ fun MainNavBar(selected: MainTab, onTab: (MainTab) -> Unit, modifier: Modifier =
             val active = tab == selected
             val pill by animateColorAsState(if (active) c.accent.copy(alpha = 0.16f) else Color.Transparent, label = "pill")
             val hasBadge = tab in badges
+            val label = stringResource(tab.labelRes)
             Column(
-                Modifier.weight(1f).heightIn(min = 64.dp).selectable(active, role = Role.Tab) { onTab(tab) }
-                    .semantics { if (hasBadge) stateDescription = unread }.padding(top = 8.dp, bottom = 6.dp),
+                Modifier.weight(1f).heightIn(min = 60.dp)
+                    .selectable(active, role = Role.Tab) { onTab(tab) }
+                    .semantics(mergeDescendants = true) {
+                        selected = active
+                        contentDescription = label
+                        if (hasBadge) stateDescription = unread
+                    }
+                    .padding(top = 6.dp, bottom = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(width = 60.dp, height = 32.dp).clip(RoundedCornerShape(16.dp)).background(pill), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(width = 56.dp, height = 30.dp).clip(RoundedCornerShape(15.dp)).background(pill), contentAlignment = Alignment.Center) {
                         RideIcon(tab.icon, if (active) c.accent else c.muted, size = 22.dp)
                     }
                     if (hasBadge) Box(
-                        Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 12.dp).size(10.dp).clip(CircleShape)
+                        Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 10.dp).size(10.dp).clip(CircleShape)
                             .background(c.danger).border(1.5.dp, c.field, CircleShape),
                     )
                 }
                 Text(
-                    stringResource(tab.labelRes), color = if (active) c.accent else c.muted, fontSize = 11.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.padding(top = 4.dp),
+                    label, color = if (active) c.accent else c.muted, fontSize = 11.sp, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, softWrap = false,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                    modifier = Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp),
                 )
             }
         }

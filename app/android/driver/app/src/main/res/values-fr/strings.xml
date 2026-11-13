@@ -425,4 +425,15 @@
     <string name="plan_subtitle">D\u00e9finissez vos horaires et choisissez votre zone de service. Modifiable plus tard.</string>
     <string name="plan_section_availability">DISPONIBILIT\u00c9S</string>
     <string name="plan_section_area">ZONE DE SERVICE</string>
+    <string name="text_spanish">"Espagnol"</string>
+    <string name="text_french">"Français"</string>
+    <string name="text_german">"Allemand"</string>
+    <string name="text_japanese">"Japonais"</string>
+    <string name="text_arabic">"Arabe"</string>
+    <string name="text_hindi">"Hindi"</string>
+    <string name="text_tamil">tamoul</string>
+    <string name="text_sinhala">cinghalais</string>
+    <string name="settings_language">Langue</string>
+    <string name="text_choose_the_language_for_ridenow">"Choisissez la langue de RideNow."</string>
+    <string name="text_save">"Enregistrer"</string>
 </resources>

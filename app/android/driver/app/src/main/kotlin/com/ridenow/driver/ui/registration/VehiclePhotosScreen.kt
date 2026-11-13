@@ -47,3 +47,14 @@ fun VehiclePhotosContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit
             }
     }
 }
+
+
+/** Step 6 of 9: vehicle photos. [onDone] gets the photo summary. */
+@Composable
+fun VehiclePhotosScreen(onBack: () -> Unit, onDone: (String) -> Unit) {
+    var ok by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var summary by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    StepScreen(6, 9, stringResource(R.string.vphoto_tag), stringResource(R.string.vphoto_title), stringResource(R.string.vphoto_subtitle), onBack, ok, { onDone(summary) }) {
+        VehiclePhotosContent(onValid = { ok = it }, onSummary = { summary = it })
+    }
+}

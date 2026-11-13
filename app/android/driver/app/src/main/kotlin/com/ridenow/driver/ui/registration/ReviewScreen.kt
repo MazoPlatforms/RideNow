@@ -34,7 +34,7 @@ fun ReviewScreen(items: List<ReviewItem>, onEdit: (Int) -> Unit, onSubmit: () ->
     var confirmed by rememberSaveable { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepHeader(6, 6, stringResource(R.string.review_tag), stringResource(R.string.review_title), stringResource(R.string.review_subtitle), onBack)
+            StepHeader(9, 9, stringResource(R.string.review_tag), stringResource(R.string.review_title), stringResource(R.string.review_subtitle), onBack)
             Column(Modifier.padding(top = 18.dp).entrance(200)) {
                 HorizontalDivider(color = c.line)
                 items.forEachIndexed { i, item -> ReviewRow(item) { onEdit(i) } }

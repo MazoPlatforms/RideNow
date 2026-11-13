@@ -53,9 +53,6 @@ fun StepHeader(
                 contentAlignment = Alignment.Center,
             ) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
             Spacer(Modifier.weight(1f))
-            LogoMark(24.dp)
-            Text(stringResource(R.string.app_name), color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp))
-            Spacer(Modifier.weight(1f))
             Spacer(Modifier.width(36.dp))
         }
         if (step > 0) {

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="text_spanish">"स्पेनिश"</string>
+    <string name="text_french">"फ्रेंच"</string>
+    <string name="text_german">"जर्मन"</string>
+    <string name="text_japanese">"जापानी"</string>
+    <string name="text_arabic">"अरबी"</string>
+    <string name="text_hindi">"हिंदी"</string>
+    <string name="text_tamil">तमिल</string>
+    <string name="text_sinhala">सिंहली</string>
+    <string name="settings_language">"भाषा"</string>
+    <string name="text_choose_the_language_for_ridenow">"RideNow के लिए भाषा चुनें।"</string>
+    <string name="text_save">"सहेजें"</string>
+</resources>
