@@ -102,7 +102,17 @@ jobs:
           if hint_source.count(result_chain) != 1:
               raise SystemExit("Expected the phone-number hint result to use an unsupported task listener")
           phone_hints.write_text(hint_source.replace(result_chain, "onNumber(Identity.getSignInClient(context).getPhoneNumberFromIntent(data))", 1))
-          print("Applied build-only duplicate, dependency, and phone-hint API compatibility fixes to the temporary CI copy.")
+          account_screen = Path(os.environ["DRIVER_BUILD"]) / "app/src/main/kotlin/com/ridenow/driver/ui/account/AccountScreen.kt"
+          account_source = account_screen.read_text()
+          selectable_import = "import androidx.compose.foundation.selection.selectable"
+          if ".selectable(" in account_source and selectable_import not in account_source:
+              account_lines = account_source.splitlines(keepends=True)
+              package_index = next((i for i, line in enumerate(account_lines) if line.startswith("package ")), None)
+              if package_index is None:
+                  raise SystemExit("Could not safely add the missing selectable import to the temporary Driver source")
+              account_lines.insert(package_index + 1, nl + selectable_import + nl)
+              account_screen.write_text("".join(account_lines))
+          print("Applied build-only duplicate, dependency, phone-hint, and selectable import fixes to the temporary CI copy.")
           PYCODE
       - name: Build Rider and Driver debug APKs
         run: |
@@ -161,7 +171,7 @@ jobs:
           RideNow Rider and Driver Android APKs built from commit ${GITHUB_SHA}.
 
           - Both APKs are debug-signed previews for installation and testing, not production or Play Store releases.
-          - Rider and Driver source files and source ZIPs are included unchanged with checksums. For compilation only, Actions removes the duplicate Lock declaration, adds the missing Play Services Auth dependency, and adapts the phone-hint API calls in a temporary Driver build copy; repository source is untouched.
+          - Rider and Driver source files and source ZIPs are included unchanged with checksums. For compilation only, Actions removes the duplicate Lock declaration, adds the missing Play Services Auth dependency, and adapts the phone-hint API calls and adds a missing selectable import in a temporary Driver build copy; repository source is untouched.
           - Gradle 8.9 wrappers are generated only in GitHub Actions and are not committed.
           - Debug signing keys may differ between runs; uninstall an older preview if Android rejects an update.
           - Minimum Android version: Android 8.0 (API 26).
