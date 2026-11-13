@@ -128,7 +128,13 @@ jobs:
           add_import("app/src/main/kotlin/com/ridenow/driver/ui/status/StatusScreens.kt", "import androidx.compose.ui.unit.dp", "dp")
           add_import("app/src/main/kotlin/com/ridenow/driver/ui/trip/TripCompleteScreen.kt", "import androidx.compose.runtime.saveable.rememberSaveable", "rememberSaveable")
           add_import("app/src/main/kotlin/com/ridenow/driver/ui/trip/TripScreen.kt", "import androidx.compose.runtime.saveable.rememberSaveable", "rememberSaveable")
-          print("Applied build-only duplicate, dependency, phone-hint API, and missing Compose import fixes to the temporary CI copy.")
+          main_nav = Path(os.environ["DRIVER_BUILD"]) / "app/src/main/kotlin/com/ridenow/driver/ui/home/MainNav.kt"
+          main_nav_source = main_nav.read_text()
+          if main_nav_source.count("selected = active") != 1:
+              raise SystemExit("Expected one tab selected-semantics assignment in the temporary Driver source")
+          main_nav.write_text(main_nav_source.replace("selected = active", "this.selected = active", 1))
+          add_import("app/src/main/kotlin/com/ridenow/driver/ui/more/LanguageScreen.kt", "import androidx.compose.ui.draw.clip", ".clip(")
+          print("Applied build-only duplicate, dependency, phone-hint API, semantics, and missing Compose import fixes to the temporary CI copy.")
           PYCODE
       - name: Build Rider and Driver debug APKs
         run: |
@@ -187,7 +193,7 @@ jobs:
           RideNow Rider and Driver Android APKs built from commit ${GITHUB_SHA}.
 
           - Both APKs are debug-signed previews for installation and testing, not production or Play Store releases.
-          - Rider and Driver source files and source ZIPs are included unchanged with checksums. For compilation only, Actions removes the duplicate Lock declaration, adds the missing Play Services Auth dependency, adapts the phone-hint API calls, and adds missing Compose imports in a temporary Driver build copy; repository source is untouched.
+          - Rider and Driver source files and source ZIPs are included unchanged with checksums. For compilation only, Actions removes the duplicate Lock declaration, adds the missing Play Services Auth dependency, adapts the phone-hint API calls, clarifies a tab semantics receiver, and adds missing Compose imports in a temporary Driver build copy; repository source is untouched.
           - Gradle 8.9 wrappers are generated only in GitHub Actions and are not committed.
           - Debug signing keys may differ between runs; uninstall an older preview if Android rejects an update.
           - Minimum Android version: Android 8.0 (API 26).
