@@ -2,4 +2,6 @@
     <color name="splash_bg">#F6F8FA</color>
     <color name="ridenow_launcher_background">#0A0C10</color>
     <color name="ridenow_yellow">#FEC604</color>
+    <color name="icon_graphite">#1E2430</color>
+    <color name="icon_midnight">#0B1F3A</color>
 </resources>

@@ -389,8 +389,6 @@
     <string name="done_title">"旅行が完了しました"</string>
     <string name="done_collect">"乗客から現金で運賃を受け取ります。"</string>
     <string name="done_fare_label">"徴収する運賃"</string>
-    <string name="done_rate">"レート %1$s"</string>
-    <string name="done_star">"%1$d 星"</string>
     <string name="done_button">"現金が集まった"</string>
     <string name="earn_history_item">"%1$s · %2$s ～ %3$s"</string>
     <string name="preview_auto_home">"プレビュー: %1$d でホームを開く"</string>

@@ -8,125 +8,132 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.*
 import com.ridenow.driver.R
 import com.ridenow.driver.ui.components.*
-import com.ridenow.driver.ui.home.MainBottomBar
+import com.ridenow.driver.ui.data.*
 import com.ridenow.driver.ui.home.MainTab
-import com.ridenow.driver.ui.theme.RideNowTheme
+import com.ridenow.driver.ui.rides.RideStops
 import com.ridenow.driver.ui.theme.RideTheme
+import com.ridenow.driver.ui.util.Money
 import com.ridenow.driver.ui.util.entrance
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import com.ridenow.driver.ui.trip.CompletedTrip
-import java.text.NumberFormat
-import java.time.DayOfWeek
-import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
+private val MAX_AGE = intArrayOf(0, 6, 29, Int.MAX_VALUE)
+
 /**
- * Earnings tab. There are no trips yet, so every figure is zero; the chart, totals and history are
- * laid out for the real data. [onlineMinutes] is the real time online today.
+ * Earnings tab: period pills, summary with change, three stats, a chart with its own range menu, and recent rides.
+ * [realOnlineMinutes] is the time online today measured by the app.
  */
 @Composable
-fun EarningsScreen(onlineMinutes: Int, earnings: Double, history: List<CompletedTrip>, onTab: (MainTab) -> Unit, modifier: Modifier = Modifier) {
+fun EarningsScreen(
+    store: DriverStore, realOnlineMinutes: Int, unread: Int, initials: String, onTab: (MainTab) -> Unit, onBell: () -> Unit, onProfile: () -> Unit,
+    onSeeAll: () -> Unit, onOpenRide: (RideRecord) -> Unit, modifier: Modifier = Modifier,
+) {
     val c = RideTheme.colors
-    var period by rememberSaveable { mutableIntStateOf(0) } // 0 today, 1 this week
-    val format = remember { NumberFormat.getCurrencyInstance() }
-    val money = format.format(earnings)
-    val today = remember { LocalDate.now().dayOfWeek.value - 1 }
-    val week = remember(earnings) { List(7) { if (it == today) earnings.toFloat() else 0f } } // earnings per day, Monday first
+    var period by rememberSaveable { mutableStateOf(0) }
+    var range by rememberSaveable(period) { mutableStateOf(period) }
+    var menu by remember { mutableStateOf(false) }
+    val labels = listOf(str(R.string.earn_today), str(R.string.earn_week), str(R.string.earn_month), str(R.string.earn_all))
+    val completed = store.rides.filter { it.status == RideStatus.Completed }
+    val inPeriod = completed.filter { it.ageDays <= MAX_AGE[period] }
+    val total = inPeriod.sumOf { it.earned }
+    val minutes = if (period == 0) maxOf(realOnlineMinutes, inPeriod.sumOf { it.durationMin + 6 }) else inPeriod.sumOf { it.durationMin + 6 }
+    val prev: Int? = when (period) {
+        0 -> completed.filter { it.ageDays == 1 }.sumOf { it.earned }
+        1 -> completed.filter { it.ageDays in 7..13 }.sumOf { it.earned }
+        2 -> completed.filter { it.ageDays in 30..59 }.sumOf { it.earned }
+        else -> null
+    }
+    val delta = if (prev != null && prev > 0) Math.round((total - prev) * 100f / prev) else null
+    val recent = store.rides.sortedWith(compareBy<RideRecord> { it.ageDays }.thenByDescending { it.startMin }).take(3)
 
-    Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-            Text(stringResource(R.string.earn_title), color = c.fg, fontSize = 30.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 16.dp).semantics { heading() })
-            Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RideChip(stringResource(R.string.earn_today), period == 0, { period = 0 }, Modifier.weight(1f))
-                RideChip(stringResource(R.string.earn_week), period == 1, { period = 1 }, Modifier.weight(1f))
-            }
-            Column(Modifier.padding(top = 20.dp).entrance(60)) {
-                Text(stringResource(R.string.earn_total), color = c.muted, fontSize = 13.sp)
-                Text(money, color = c.fg, fontSize = 44.sp, fontWeight = FontWeight.Light)
-            }
-            WeekChart(week, today, Modifier.padding(top = 16.dp).entrance(120))
-            Row(Modifier.padding(top = 16.dp).entrance(180), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard(stringResource(R.string.earn_trips), history.size.toString(), Modifier.weight(1f))
-                StatCard(stringResource(R.string.earn_online), stringResource(R.string.home_time_fmt, onlineMinutes / 60, onlineMinutes % 60), Modifier.weight(1f))
-                StatCard(stringResource(R.string.earn_cash), money, Modifier.weight(1f))
-            }
-            SectionLabel(stringResource(R.string.earn_history))
-            if (history.isEmpty()) {
-                GroupCard(Modifier.padding(bottom = 20.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        RideIcon(RideIcons.Receipt, c.muted, size = 28.dp)
-                        Text(stringResource(R.string.earn_empty_title), color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))
-                        Text(stringResource(R.string.earn_empty_text), color = c.muted, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 4.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                    }
+    TabScaffold(MainTab.Earnings, onTab, unread, initials, onBell, onProfile, modifier) {
+        PageTitle(str(R.string.earn_title))
+        FilterPills(labels, period, { period = it }, Modifier.padding(top = 12.dp))
+        GroupCard(Modifier.padding(top = 14.dp).entrance(40)) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(str(R.string.earn_summary_title, labels[period]), color = c.muted, fontSize = 14.sp)
+                    Text(Money.fmt(total), color = c.fg, fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+                    Text(str(R.string.earn_rides_online, inPeriod.size, minutes / 60, minutes % 60), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
                 }
-            } else GroupCard(Modifier.padding(bottom = 20.dp)) {
-                history.forEachIndexed { i, trip ->
-                    if (i > 0) RowDivider()
-                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(trip.rider, color = c.fg, fontSize = 14.sp)
-                            Text(stringResource(R.string.earn_trip_route, trip.pickup, trip.drop), color = c.muted, fontSize = 12.sp, lineHeight = 17.sp)
-                        }
-                        Text(format.format(trip.fare), color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                if (delta != null) Column(horizontalAlignment = Alignment.End) {
+                    StatusChip((if (delta >= 0) "\u2191 +" else "\u2193 ") + delta + "%", if (delta >= 0) Tone.Good else Tone.Danger)
+                    Text(str(if (period == 0) R.string.earn_vs_yesterday else if (period == 1) R.string.earn_vs_last_week else R.string.earn_vs_last_month), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                 }
             }
         }
-        MainBottomBar(MainTab.Earnings, onTab)
-    }
-}
-
-@Composable
-private fun StatCard(label: String, value: String, modifier: Modifier) {
-    val c = RideTheme.colors
-    Column(modifier.clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(12.dp)) {
-        Text(value, color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-        Text(label, color = c.muted, fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 2.dp))
-    }
-}
-
-/** Seven bars, Monday first. Zero values show a thin baseline; today is highlighted. */
-@Composable
-private fun WeekChart(values: List<Float>, today: Int, modifier: Modifier = Modifier) {
-    val c = RideTheme.colors
-    val description = stringResource(R.string.earn_chart_desc)
-    val labels = remember { DayOfWeek.entries.map { it.getDisplayName(TextStyle.NARROW, Locale.getDefault()) } }
-    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp)).padding(16.dp).semantics { contentDescription = description }) {
-        Canvas(Modifier.fillMaxWidth().height(110.dp)) {
-            val max = (values.maxOrNull() ?: 0f).coerceAtLeast(1f)
-            val slot = size.width / values.size
-            val barW = slot * 0.46f
-            values.forEachIndexed { i, v ->
-                val h = (size.height * (v / max)).coerceAtLeast(3.dp.toPx())
-                drawRoundRect(
-                    if (i == today) c.fill else c.line, Offset(slot * i + (slot - barW) / 2f, size.height - h), Size(barW, h), CornerRadius(4.dp.toPx()),
-                )
+        GroupCard(Modifier.padding(top = 12.dp).entrance(80)) {
+            Row(Modifier.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Mini(RideIcons.Car, inPeriod.size.toString(), str(R.string.earn_rides), Modifier.weight(1f)); Sep()
+                Mini(RideIcons.Clock, str(R.string.home_time_fmt, minutes / 60, minutes % 60), str(R.string.earn_online), Modifier.weight(1f)); Sep()
+                Mini(RideIcons.Cash, Money.fmt(if (inPeriod.isEmpty()) 0 else total / inPeriod.size), str(R.string.earn_avg), Modifier.weight(1f))
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            labels.forEachIndexed { i, l ->
-                Text(l, color = if (i == today) c.accent else c.muted, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Row(Modifier.padding(top = 22.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(str(R.string.earn_overview), color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
+            Box {
+                Row(
+                    Modifier.clip(RoundedCornerShape(18.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(18.dp)).clickable(role = Role.Button) { menu = true }.heightIn(min = 36.dp).padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) { Text(labels[range], color = c.fg, fontSize = 13.sp); Spacer(Modifier.width(6.dp)); RideIcon(RideIcons.ChevronDown, c.fg, size = 14.dp) }
+                DropdownMenu(menu, { menu = false }, containerColor = c.field) {
+                    labels.forEachIndexed { i, l -> DropdownMenuItem(text = { Text(l, color = c.fg) }, onClick = { range = i; menu = false }) }
+                }
+            }
+        }
+        val (values, xl) = chartFor(completed, range)
+        GroupCard { Box(Modifier.padding(14.dp)) { BarChart(values, xl, description = str(R.string.earn_chart_desc)) } }
+        SectionTitle(str(R.string.earn_recent), action = str(R.string.see_all), onAction = onSeeAll)
+        if (recent.isEmpty()) GroupCard(Modifier.padding(bottom = 16.dp)) { EmptyState(RideIcons.Receipt, str(R.string.earn_empty_title), str(R.string.earn_empty_text)) }
+        else Column(Modifier.padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            recent.forEach { r ->
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).clickable(role = Role.Button) { onOpenRide(r) }.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.weight(1f)) { RideStops(r, withTimes = false, subtitles = false) }
+                    Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(start = 8.dp)) {
+                        Text(Calendars.timeLabel(r.startMin), color = c.muted, fontSize = 12.sp)
+                        Text(Money.fmt(r.fare), color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
+                    }
+                    RideIcon(RideIcons.Chevron, c.muted, size = 16.dp, modifier = Modifier.padding(start = 6.dp))
+                }
             }
         }
     }
 }
 
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
+/** Bars and x labels for a range: 0 hours today, 1 last 7 days, 2 last 30 days, 3 last 6 months. */
 @Composable
-private fun EarningsDarkPreview() = RideNowTheme(darkTheme = true) { EarningsScreen(75, 16.8, emptyList(), {}) }
+private fun chartFor(rides: List<RideRecord>, range: Int): Pair<List<Float>, List<String>> {
+    val hours = listOf("12 AM", "4 AM", "8 AM", "12 PM", "4 PM", "8 PM")
+    return when (range) {
+        0 -> List(24) { h -> rides.filter { it.ageDays == 0 && it.startMin / 60 == h }.sumOf { it.earned }.toFloat() } to List(24) { if (it % 4 == 0) hours[it / 4] else "" }
+        1 -> {
+            val today = java.time.LocalDate.now()
+            List(7) { i -> rides.filter { it.ageDays == 6 - i }.sumOf { it.earned }.toFloat() } to List(7) { i -> today.minusDays((6 - i).toLong()).dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
+        }
+        2 -> List(30) { i -> rides.filter { it.ageDays == 29 - i }.sumOf { it.earned }.toFloat() } to List(30) { i -> if (i % 5 == 0) java.time.LocalDate.now().minusDays((29 - i).toLong()).dayOfMonth.toString() else "" }
+        else -> List(6) { i -> rides.filter { it.ageDays / 30 == 5 - i }.sumOf { it.earned }.toFloat() } to List(6) { i -> java.time.LocalDate.now().minusMonths((5 - i).toLong()).month.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
+    }
+}
 
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun EarningsLightPreview() = RideNowTheme(darkTheme = false) { EarningsScreen(0, 0.0, emptyList(), {}) }
+private fun Sep() = Box(Modifier.width(1.dp).height(36.dp).background(RideTheme.colors.line))
+
+@Composable
+private fun Mini(icon: List<String>, value: String, label: String, modifier: Modifier) {
+    val c = RideTheme.colors
+    Row(modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        RideIcon(icon, c.fg, size = 22.dp)
+        Column(Modifier.padding(start = 8.dp)) {
+            Text(value, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(label, color = c.muted, fontSize = 11.sp, maxLines = 1)
+        }
+    }
+}

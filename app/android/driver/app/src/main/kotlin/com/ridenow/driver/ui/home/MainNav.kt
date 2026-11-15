@@ -42,7 +42,8 @@ import com.ridenow.driver.ui.theme.RideTheme
 enum class MainTab(val icon: List<String>, val labelRes: Int) {
     Home(RideIcons.Home, R.string.nav_home),
     Earnings(RideIcons.Chart, R.string.nav_earnings),
-    Inbox(RideIcons.Msg, R.string.nav_inbox),
+    Rides(RideIcons.Clock, R.string.nav_rides),
+    Support(RideIcons.Help, R.string.nav_support),
     Account(RideIcons.Person, R.string.nav_account),
 }
 

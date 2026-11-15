@@ -389,8 +389,6 @@
     <string name="done_title">"Course terminée"</string>
     <string name="done_collect">"Encaissez le tarif en espèces auprès du passager."</string>
     <string name="done_fare_label">"Tarif à encaisser"</string>
-    <string name="done_rate">"Noter %1$s"</string>
-    <string name="done_star">"%1$d étoiles"</string>
     <string name="done_button">"Espèces encaissées"</string>
     <string name="earn_history_item">"%1$s · %2$s à %3$s"</string>
     <string name="preview_auto_home">"Aperçu : ouverture de l’accueil dans %1$d s"</string>

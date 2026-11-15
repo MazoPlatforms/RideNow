@@ -22,6 +22,11 @@ enum class ApplicationStatus { Pending, ActionRequired, Rejected, Approved }
  * plus the application status. Survives rotation and theme changes. Summary keys are the step numbers (1 to 11).
  */
 class ApplicationViewModel : ViewModel() {
+    /** Rides, payouts, tickets, documents and bank accounts shown by the driver screens. */
+    val store = com.ridenow.driver.ui.data.DriverStore()
+    /** Screens to return to when the driver goes back from a pushed screen. */
+    val stack = mutableStateListOf<com.ridenow.driver.ui.Screen>()
+
     val summaries = mutableStateMapOf<Int, String>()
     var bankSaved by mutableStateOf(false)
     /** Edited on the Edit profile screen. Blank means fall back to the registration answers. */
@@ -88,5 +93,6 @@ class ApplicationViewModel : ViewModel() {
     fun reset() {
         summaries.clear(); bankSaved = false; profileName = ""; profileEmail = ""; profileAddress = ""; checks = 0; online = false; onlineSince = 0L; bankedMillis = 0L
         request = null; trip = null; history.clear(); inboxUnread = true
+        store.reset(); stack.clear()
     }
 }

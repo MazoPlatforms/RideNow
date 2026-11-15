@@ -389,8 +389,6 @@
     <string name="done_title">"Reise abgeschlossen"</string>
     <string name="done_collect">"Holen Sie den Fahrpreis in bar beim Fahrgast ab."</string>
     <string name="done_fare_label">"Fahrpreis zu sammeln"</string>
-    <string name="done_rate">"Bewerten Sie %1$s"</string>
-    <string name="done_star">"%1$d Sterne"</string>
     <string name="done_button">"Bargeld gesammelt"</string>
     <string name="earn_history_item">"%1$s · %2$s bis %3$s"</string>
     <string name="preview_auto_home">"Vorschau: Eröffnung des Hauses in %1$d s"</string>

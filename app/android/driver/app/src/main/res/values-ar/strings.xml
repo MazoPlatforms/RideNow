@@ -389,8 +389,6 @@
     <string name="done_title">"اكتملت الرحلة"</string>
     <string name="done_collect">"جمع الأجرة نقدا من الراكب."</string>
     <string name="done_fare_label">"أجرة لجمع"</string>
-    <string name="done_rate">"قيم %1$s"</string>
-    <string name="done_star">"%1$d النجوم"</string>
     <string name="done_button">"النقدية التي تم جمعها"</string>
     <string name="earn_history_item">"%1$s · %2$s إلى %3$s"</string>
     <string name="preview_auto_home">"معاينة: فتح الصفحة الرئيسية في %1$d s"</string>

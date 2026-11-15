@@ -47,7 +47,7 @@ fun TripRequestOverlay(request: TripRequest, onAccept: () -> Unit, onDecline: ()
         while (left > 0) { delay(1000); left-- }
         onDecline()
     }
-    val money = remember(request.fare) { NumberFormat.getCurrencyInstance().format(request.fare) }
+    val money = remember(request.fare) { com.ridenow.driver.ui.util.Money.fmt(request.fare) }
     val countdownDesc = stringResource(R.string.trip_req_seconds_desc, left)
     val ratingText = String.format("%.1f", request.rating)
 

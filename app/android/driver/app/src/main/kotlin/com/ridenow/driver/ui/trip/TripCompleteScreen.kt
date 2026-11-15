@@ -17,17 +17,12 @@ import com.ridenow.driver.ui.components.*
 import com.ridenow.driver.ui.theme.RideNowTheme
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.util.entrance
-import java.text.NumberFormat
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.ui.graphics.drawscope.Stroke
 
-/** After the trip: collect the cash fare, rate the rider, and record the trip. */
+/** After the trip: collect the cash fare and record the trip. */
 @Composable
 fun TripCompleteScreen(trip: TripRequest, onDone: () -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
-    var stars by rememberSaveable { mutableIntStateOf(5) }
-    val money = remember(trip.fare) { NumberFormat.getCurrencyInstance().format(trip.fare) }
-    val first = trip.rider.substringBefore(" ")
+    val money = remember(trip.fare) { com.ridenow.driver.ui.util.Money.fmt(trip.fare) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.padding(top = 40.dp).entrance(0)) { Orb(88.dp) { RideIcon(RideIcons.Check, c.onFill, size = 40.dp) } }
@@ -39,16 +34,6 @@ fun TripCompleteScreen(trip: TripRequest, onDone: () -> Unit, modifier: Modifier
             ) {
                 Text(stringResource(R.string.done_fare_label), color = c.muted, fontSize = 13.sp)
                 Text(money, color = c.fg, fontSize = 44.sp, fontWeight = FontWeight.Light)
-            }
-            Text(stringResource(R.string.done_rate, first), color = c.fg, fontSize = 15.sp, modifier = Modifier.padding(top = 28.dp))
-            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                for (i in 1..5) {
-                    val on = i <= stars
-                    val label = stringResource(R.string.done_star, i)
-                    Box(Modifier.size(52.dp).selectable(i == stars, role = androidx.compose.ui.semantics.Role.RadioButton) { stars = i }.semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
-                        Text("\u2605", color = if (on) c.fill else c.line, fontSize = 34.sp)
-                    }
-                }
             }
         }
         RideButton(stringResource(R.string.done_button), onDone, modifier = Modifier.padding(vertical = 12.dp))

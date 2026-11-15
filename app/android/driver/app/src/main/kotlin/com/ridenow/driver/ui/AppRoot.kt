@@ -33,7 +33,6 @@ import com.ridenow.driver.ui.earnings.EarningsScreen
 import com.ridenow.driver.ui.home.HomeScreen
 import com.ridenow.driver.ui.home.LocalNavBadges
 import com.ridenow.driver.ui.home.MainTab
-import com.ridenow.driver.ui.inbox.InboxScreen
 import com.ridenow.driver.ui.intro.IntroScreen
 import com.ridenow.driver.ui.registration.ApplicationStatus
 import com.ridenow.driver.ui.registration.ApplicationViewModel
@@ -66,11 +65,51 @@ import com.ridenow.driver.ui.trip.TripPhase
 import com.ridenow.driver.ui.trip.TripScreen
 import kotlinx.coroutines.delay
 import com.ridenow.driver.ui.welcome.WelcomeScreen
+import com.ridenow.driver.ui.components.initialsOf
+import com.ridenow.driver.ui.components.toast
+import com.ridenow.driver.ui.data.BankAccountInfo
+import com.ridenow.driver.ui.data.Notice
+import com.ridenow.driver.ui.legal.LegalAboutScreen
+import com.ridenow.driver.ui.legal.LegalDocScreen
+import com.ridenow.driver.ui.legal.LegalDocs
+import com.ridenow.driver.ui.more.LanguageScreen
+import com.ridenow.driver.ui.notifications.NotificationsScreen
+import com.ridenow.driver.ui.payouts.BankAccountManageScreen
+import com.ridenow.driver.ui.payouts.BankFormScreen
+import com.ridenow.driver.ui.payouts.PayoutsScreen
+import com.ridenow.driver.ui.earnings.EarningsDetailsScreen
+import com.ridenow.driver.ui.rides.RideDetailsScreen
+import com.ridenow.driver.ui.rides.RideHistoryScreen
+import com.ridenow.driver.ui.settings.AppearanceScreen
+import com.ridenow.driver.ui.settings.DeleteAccountScreen
+import com.ridenow.driver.ui.settings.NotificationSettingsScreen
+import com.ridenow.driver.ui.settings.PaymentMethodsScreen
+import com.ridenow.driver.ui.settings.PrivacySecurityScreen
+import com.ridenow.driver.ui.settings.SettingsScreen
+import com.ridenow.driver.ui.support.EmergencyAssistScreen
+import com.ridenow.driver.ui.support.FaqScreen
+import com.ridenow.driver.ui.support.HelpSafetyScreen
+import com.ridenow.driver.ui.support.NewTicketScreen
+import com.ridenow.driver.ui.support.ReportIssueScreen
+import com.ridenow.driver.ui.support.SafetyCenterScreen
+import com.ridenow.driver.ui.support.ShareTripScreen
+import com.ridenow.driver.ui.support.SupportCenterScreen
+import com.ridenow.driver.ui.support.TicketConversationScreen
+import com.ridenow.driver.ui.support.TicketsScreen
+import com.ridenow.driver.ui.theme.AppearanceState
+import com.ridenow.driver.ui.theme.MapStyle
+import com.ridenow.driver.ui.trip.CompletedTrip
+import com.ridenow.driver.ui.vehicle.EditVehicleScreen
+import com.ridenow.driver.ui.vehicle.VehicleDetailsScreen
+import com.ridenow.driver.ui.vehicle.VehicleDocumentsScreen
 
 enum class Screen {
     Splash, Intro, Welcome, Phone, Otp, Terms, Background, Notifications, Personal, Identity, License, Vehicle,
     VehicleDocs, VehiclePhotos, Availability, ServiceArea, Bank, Review, Submitted,
-    ActionRequired, Rejected, Approved, Home, Earnings, Inbox, Account, Trip, TripComplete, DriverProfile, EditProfile,
+    ActionRequired, Rejected, Approved, Home, Earnings, Rides, Support, Account, Trip, TripComplete, DriverProfile, EditProfile,
+    NotificationCenter, EarningsDetails, RideDetails, VehicleDetails, EditVehicle, VehicleDocuments, Payouts, BankManage, BankForm,
+    Settings, Appearance, LanguageSettings, NotificationSettings, Privacy, DeleteAccount, PaymentMethods,
+    Faq, Tickets, Conversation, NewTicket, HelpSafety, SafetyCenter, Emergency, ShareTrip, ReportIssue, Legal, LegalDoc,
 }
 
 /** Survives activity recreation within one app process, so the splash does not replay on rotation or theme changes. */
@@ -88,7 +127,7 @@ private const val STEP_AVAILABILITY = 9
 private const val STEP_AREA = 10
 
 @Composable
-fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
+fun AppRoot(appearance: AppearanceState) {
     var screen by rememberSaveable { mutableStateOf(Screen.Splash) }
     var phone by rememberSaveable { mutableStateOf("") }
     // True while the driver is fixing one section from the Review screen: finishing it returns to Review.
@@ -100,6 +139,32 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     val shownPhone = formatPhoneForDisplay(phone.ifBlank { "+1 555 012 3456" })
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("ridenowdriver", 0) }
+    val store = app.store
+    val stack = app.stack
+    val driverName = app.profileName.ifBlank { app.summaries[STEP_PERSONAL].orEmpty() }
+    val initials = initialsOf(driverName)
+    var selRide by rememberSaveable { mutableStateOf("") }
+    var selTicket by rememberSaveable { mutableStateOf("") }
+    var selTopic by rememberSaveable { mutableStateOf(-1) }
+    var selDoc by rememberSaveable { mutableStateOf("") }
+    var reportCat by rememberSaveable { mutableStateOf(0) }
+    var editBankId by rememberSaveable { mutableStateOf(-1) }
+
+    /** Opens a pushed screen and remembers where the driver came from. */
+    fun go(target: Screen) { stack.add(screen); screen = target }
+    /** Returns to the screen that opened the current one, or Home. */
+    fun back() { screen = stack.removeLastOrNull() ?: Screen.Home }
+    /** Switches tab and forgets the pushed screens. */
+    fun tab(t: MainTab) { stack.clear(); screen = tabScreen(t) }
+    fun nowMinute(): Int = java.util.Calendar.getInstance().let { it.get(java.util.Calendar.HOUR_OF_DAY) * 60 + it.get(java.util.Calendar.MINUTE) }
+    fun signOut() {
+        app.reset(); phone = ""; editing = false; bankReturn = null
+        prefs.edit().remove("terms_accepted").remove("application_submitted").apply()
+        screen = Screen.Welcome
+    }
+    fun openNotice(n: Notice) {
+        when { n.icon == "wallet" -> go(Screen.Payouts); n.icon == "person" -> tab(MainTab.Home); n.icon == "check" -> tab(MainTab.Rides) }
+    }
 
     // Text for the Review rows that do not come from a screen.
     val accepted = stringResource(R.string.review_accepted)
@@ -166,7 +231,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         }
     }
     Box(Modifier.fillMaxSize()) {
-        CompositionLocalProvider(LocalNavBadges provides (if (app.inboxUnread) setOf(MainTab.Inbox) else emptySet())) {
+        CompositionLocalProvider(LocalNavBadges provides emptySet()) {
         Crossfade(targetState = screen, animationSpec = tween(400), label = "root") { current ->
             // Keeps typed text, dates and choices when the driver goes back to a screen.
             saveable.SaveableStateProvider(current.name) {
@@ -239,7 +304,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     }
                     Screen.Bank -> {
                         BackHandler { backFromBank() }
-                        BankAccountScreen(onBack = { backFromBank() }, onSaved = { finishBank(true) }, onSkip = { finishBank(false) })
+                        BankAccountScreen(onBack = { backFromBank() }, onSaved = { h, b, br, n -> store.addBank(h, b, br, n); finishBank(true) }, onSkip = { finishBank(false) })
                     }
                     Screen.Review -> {
                         BackHandler { screen = Screen.Bank }
@@ -271,23 +336,34 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     Screen.Rejected -> RejectedScreen(onReapply = { editing = false; screen = Screen.Terms }, onSupport = { })
                     Screen.Approved -> ApprovedScreen(onOpenHome = { screen = Screen.Home }, onExplore = { screen = Screen.Home })
                     Screen.Home -> HomeScreen(
-                        online = app.online, bankSaved = app.bankSaved, driverName = app.summaries[STEP_PERSONAL].orEmpty(),
+                        online = app.online, bankSaved = app.bankSaved, driverName = driverName,
                         onlineSince = app.onlineSince, bankedMillis = app.bankedMillis,
                         onToggle = { if (app.online) app.goOffline() else if (app.bankSaved) app.goOnline() else { bankReturn = Screen.Home.name; screen = Screen.Bank } },
                         onAddBank = { bankReturn = Screen.Home.name; screen = Screen.Bank },
-                        onTab = { screen = tabScreen(it) },
+                        onTab = { tab(it) },
                         earnings = app.earnings, trips = app.history.size, request = app.request,
                         onOfferRequest = { app.offerRequest() }, onDecline = { app.declineRequest() },
                         onAccept = { app.acceptRequest(); screen = Screen.Trip },
+                        unread = store.unreadCount, onBell = { go(Screen.NotificationCenter) }, onProfile = { go(Screen.DriverProfile) },
+                        onCycleMap = { appearance.setMapStyle(MapStyle.entries[(appearance.mapStyle.ordinal + 1) % MapStyle.entries.size]) },
                     )
                     Screen.Earnings -> {
-                        BackHandler { screen = Screen.Home }
-                        EarningsScreen(onlineMinutes = app.onlineMinutes(), earnings = app.earnings, history = app.history, onTab = { screen = tabScreen(it) })
+                        BackHandler { tab(MainTab.Home) }
+                        EarningsScreen(
+                            store, app.onlineMinutes(), store.unreadCount, initials, { tab(it) }, { go(Screen.NotificationCenter) }, { go(Screen.DriverProfile) },
+                            onSeeAll = { tab(MainTab.Rides) }, onOpenRide = { selRide = it.id; go(Screen.EarningsDetails) },
+                        )
                     }
-                    Screen.Inbox -> {
-                        BackHandler { screen = Screen.Home }
-                        LaunchedEffect(Unit) { app.markInboxRead() }
-                        InboxScreen(onTab = { screen = tabScreen(it) })
+                    Screen.Rides -> {
+                        BackHandler { tab(MainTab.Home) }
+                        RideHistoryScreen(store, store.unreadCount, initials, { tab(it) }, { go(Screen.NotificationCenter) }, { go(Screen.DriverProfile) }, { selRide = it.id; go(Screen.RideDetails) })
+                    }
+                    Screen.Support -> {
+                        BackHandler { tab(MainTab.Home) }
+                        SupportCenterScreen(
+                            store.unreadCount, initials, { tab(it) }, { go(Screen.NotificationCenter) }, { go(Screen.DriverProfile) },
+                            onTopic = { selTopic = it; go(Screen.Faq) }, onContact = { go(Screen.NewTicket) }, onTickets = { go(Screen.Tickets) }, onFaqs = { selTopic = -1; go(Screen.Faq) },
+                        )
                     }
                     Screen.Trip -> {
                         val trip = app.trip
@@ -304,43 +380,115 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                         val trip = app.trip
                         if (trip == null) LaunchedEffect(Unit) { screen = Screen.Home } else {
                             BackHandler { }
-                            TripCompleteScreen(trip = trip, onDone = { app.finishTrip(); screen = Screen.Home })
+                            TripCompleteScreen(trip = trip, onDone = {
+                                store.addFinished(CompletedTrip(trip.rider, trip.pickup, trip.drop, trip.fare, System.currentTimeMillis()), nowMinute())
+                                app.finishTrip(); screen = Screen.Home
+                            })
                         }
                     }
                     Screen.DriverProfile -> {
-                        BackHandler { screen = Screen.Account }
+                        BackHandler { back() }
                         DriverProfileScreen(
-                            name = app.profileName.ifBlank { app.summaries[STEP_PERSONAL].orEmpty() }, phone = shownPhone,
-                            email = app.profileEmail, address = app.profileAddress,
-                            vehicle = app.summaries[STEP_VEHICLE].orEmpty(), availability = app.summaries[STEP_AVAILABILITY].orEmpty(),
-                            active = app.status == ApplicationStatus.Approved,
-                            onBack = { screen = Screen.Account }, onEdit = { screen = Screen.EditProfile },
+                            store, driverName, shownPhone, app.profileEmail, app.profileAddress, app.status == ApplicationStatus.Approved,
+                            onBack = { back() }, onEdit = { go(Screen.EditProfile) }, onEditVehicle = { go(Screen.EditVehicle) }, onDocs = { go(Screen.VehicleDocuments) },
                         )
                     }
                     Screen.EditProfile -> {
-                        BackHandler { screen = Screen.DriverProfile }
+                        BackHandler { back() }
                         EditProfileScreen(
-                            name = app.profileName.ifBlank { app.summaries[STEP_PERSONAL].orEmpty() }, phone = shownPhone,
-                            email = app.profileEmail, address = app.profileAddress,
-                            onBack = { screen = Screen.DriverProfile },
-                            onSave = { n, e, a -> app.profileName = n; app.profileEmail = e; app.profileAddress = a; screen = Screen.DriverProfile },
+                            store, driverName, shownPhone, app.profileEmail, app.profileAddress, onBack = { back() },
+                            onSave = { n, p, e, a -> app.profileName = n; if (p.isNotBlank()) phone = p; app.profileEmail = e; app.profileAddress = a; back() },
                         )
                     }
                     Screen.Account -> {
-                        BackHandler { screen = Screen.Home }
+                        BackHandler { tab(MainTab.Home) }
                         AccountScreen(
-                            name = app.profileName.ifBlank { app.summaries[STEP_PERSONAL].orEmpty() }, phone = shownPhone, vehicle = app.summaries[STEP_VEHICLE].orEmpty(),
-                            availability = app.summaries[STEP_AVAILABILITY].orEmpty(), bankSaved = app.bankSaved,
-                            mode = themeMode, onMode = onThemeMode,
-                            onAddBank = { bankReturn = Screen.Account.name; screen = Screen.Bank },
-                            onProfile = { screen = Screen.DriverProfile },
-                            onSignOut = {
-                                app.reset(); phone = ""; editing = false; bankReturn = null
-                                prefs.edit().remove("terms_accepted").remove("application_submitted").apply()
-                                screen = Screen.Welcome
-                            },
-                            onTab = { screen = tabScreen(it) },
+                            store, driverName, shownPhone, app.online, app.bankSaved, store.unreadCount, { tab(it) }, { go(Screen.NotificationCenter) },
+                            onProfile = { go(Screen.DriverProfile) }, onVehicle = { go(Screen.VehicleDetails) }, onDocuments = { go(Screen.VehicleDocuments) },
+                            onPayouts = { go(Screen.Payouts) }, onBank = { go(Screen.BankManage) }, onSettings = { go(Screen.Settings) },
+                            onNotificationSettings = { go(Screen.NotificationSettings) }, onHelpSafety = { go(Screen.HelpSafety) }, onLegal = { go(Screen.Legal) },
+                            onGoOffline = { app.goOffline() }, onSignOut = { signOut() },
                         )
+                    }
+                    Screen.NotificationCenter -> { BackHandler { back() }; NotificationsScreen(store, { back() }, { openNotice(it) }) }
+                    Screen.EarningsDetails -> {
+                        BackHandler { back() }
+                        val ride = store.rides.firstOrNull { it.id == selRide }
+                        if (ride == null) LaunchedEffect(Unit) { back() } else EarningsDetailsScreen(ride, store.sample, { back() }, { reportCat = 0; go(Screen.ReportIssue) })
+                    }
+                    Screen.RideDetails -> {
+                        BackHandler { back() }
+                        val ride = store.rides.firstOrNull { it.id == selRide }
+                        if (ride == null) LaunchedEffect(Unit) { back() } else RideDetailsScreen(ride, store.sample, { back() }, { reportCat = 0; go(Screen.ReportIssue) })
+                    }
+                    Screen.VehicleDetails -> { BackHandler { back() }; VehicleDetailsScreen(store, { back() }, { go(Screen.EditVehicle) }, { go(Screen.VehicleDocuments) }) }
+                    Screen.EditVehicle -> { BackHandler { back() }; EditVehicleScreen(store, { back() }, { back() }) }
+                    Screen.VehicleDocuments -> { BackHandler { back() }; VehicleDocumentsScreen(store, { back() }, { selTopic = 1; go(Screen.Faq) }) }
+                    Screen.Payouts -> { BackHandler { back() }; PayoutsScreen(store, { back() }, { selTopic = 2; go(Screen.Faq) }, { editBankId = -1; go(Screen.BankForm) }) }
+                    Screen.BankManage -> {
+                        BackHandler { back() }
+                        BankAccountManageScreen(
+                            store, { back() }, { selTopic = 2; go(Screen.Faq) }, onEdit = { editBankId = it.id; go(Screen.BankForm) },
+                            onAdd = { editBankId = -1; go(Screen.BankForm) }, onRemoved = { app.bankSaved = store.banks.isNotEmpty(); if (!app.bankSaved && app.online) app.goOffline() },
+                        )
+                    }
+                    Screen.BankForm -> {
+                        BackHandler { back() }
+                        val existing = store.banks.firstOrNull { it.id == editBankId }
+                        BankFormScreen(existing, { back() }, onSave = { h, b, br, n, t ->
+                            if (existing != null) { val i = store.banks.indexOf(existing); store.banks[i] = BankAccountInfo(existing.id, h, b, n, br, t) } else store.addBank(h, b, br, n, t)
+                            app.bankSaved = true; back()
+                        })
+                    }
+                    Screen.Settings -> {
+                        BackHandler { back() }
+                        SettingsScreen(
+                            store, driverName, shownPhone, appearance.mode, { back() }, onProfile = { go(Screen.DriverProfile) }, onAppearance = { go(Screen.Appearance) },
+                            onLanguage = { go(Screen.LanguageSettings) }, onNotifications = { go(Screen.NotificationSettings) }, onPrivacy = { go(Screen.Privacy) },
+                            onPaymentMethods = { go(Screen.PaymentMethods) }, onBank = { go(Screen.BankManage) }, onPayouts = { go(Screen.Payouts) },
+                            onHelp = { go(Screen.HelpSafety) }, onTickets = { go(Screen.Tickets) }, onAbout = { go(Screen.Legal) }, onSignOut = { signOut() },
+                        )
+                    }
+                    Screen.Appearance -> { BackHandler { back() }; AppearanceScreen(appearance, { back() }) }
+                    Screen.LanguageSettings -> { BackHandler { back() }; LanguageScreen { back() } }
+                    Screen.NotificationSettings -> { BackHandler { back() }; NotificationSettingsScreen({ back() }) }
+                    Screen.Privacy -> { BackHandler { back() }; PrivacySecurityScreen({ back() }, onPersonalData = { go(Screen.DriverProfile) }, onDelete = { go(Screen.DeleteAccount) }) }
+                    Screen.PaymentMethods -> { BackHandler { back() }; PaymentMethodsScreen(store, { back() }, { go(Screen.BankManage) }) }
+                    Screen.DeleteAccount -> {
+                        BackHandler { back() }
+                        val requested = stringResource(R.string.priv_download_done)
+                        DeleteAccountScreen(
+                            { back() }, onDownload = { toast(context, requested) }, onGoOffline = { app.goOffline(); tab(MainTab.Home) },
+                            onDelete = { prefs.edit().clear().apply(); app.reset(); phone = ""; editing = false; bankReturn = null; screen = Screen.Welcome },
+                        )
+                    }
+                    Screen.Faq -> { BackHandler { back() }; FaqScreen(selTopic, { back() }, { go(Screen.NewTicket) }) }
+                    Screen.Tickets -> {
+                        BackHandler { back() }
+                        TicketsScreen(store, store.unreadCount, initials, { tab(it) }, { go(Screen.NotificationCenter) }, { go(Screen.DriverProfile) }, { selTicket = it.id; go(Screen.Conversation) }, { go(Screen.NewTicket) })
+                    }
+                    Screen.Conversation -> {
+                        BackHandler { back() }
+                        val t = store.tickets.firstOrNull { it.id == selTicket }
+                        if (t == null) LaunchedEffect(Unit) { back() } else TicketConversationScreen(t, { back() })
+                    }
+                    Screen.NewTicket -> { BackHandler { back() }; NewTicketScreen(store, { back() }, onCreated = { t -> selTicket = t.id; screen = Screen.Conversation }) }
+                    Screen.HelpSafety -> {
+                        BackHandler { back() }
+                        HelpSafetyScreen(
+                            { back() }, onTopic = { selTopic = it; go(Screen.Faq) }, onSafetyCenter = { go(Screen.SafetyCenter) }, onEmergency = { go(Screen.Emergency) },
+                            onShareTrip = { go(Screen.ShareTrip) }, onReportSafety = { reportCat = 5; go(Screen.ReportIssue) }, onContact = { go(Screen.NewTicket) },
+                        )
+                    }
+                    Screen.SafetyCenter -> { BackHandler { back() }; SafetyCenterScreen({ back() }, { go(Screen.Emergency) }, { go(Screen.ShareTrip) }, { reportCat = 5; go(Screen.ReportIssue) }) }
+                    Screen.Emergency -> { BackHandler { back() }; EmergencyAssistScreen({ back() }, { reportCat = 5; go(Screen.ReportIssue) }) }
+                    Screen.ShareTrip -> { BackHandler { back() }; ShareTripScreen({ back() }) }
+                    Screen.ReportIssue -> { BackHandler { back() }; ReportIssueScreen(store, reportCat, { back() }, { screen = Screen.Tickets }) }
+                    Screen.Legal -> { BackHandler { back() }; LegalAboutScreen({ back() }, { selDoc = it; go(Screen.LegalDoc) }) }
+                    Screen.LegalDoc -> {
+                        BackHandler { back() }
+                        val doc = LegalDocs.find(selDoc)
+                        if (doc == null) LaunchedEffect(Unit) { back() } else LegalDocScreen(doc, { back() })
                     }
                 }
             }
@@ -352,7 +500,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
 private fun tabScreen(tab: MainTab): Screen = when (tab) {
     MainTab.Home -> Screen.Home
     MainTab.Earnings -> Screen.Earnings
-    MainTab.Inbox -> Screen.Inbox
+    MainTab.Rides -> Screen.Rides
+    MainTab.Support -> Screen.Support
     MainTab.Account -> Screen.Account
 }
 

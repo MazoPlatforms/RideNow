@@ -9,12 +9,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.ridenow.driver.ui.AppRoot
 import com.ridenow.driver.ui.theme.RideNowTheme
+import com.ridenow.driver.ui.settings.AppLockGate
+import com.ridenow.driver.ui.theme.AppearanceState
 import com.ridenow.driver.ui.theme.ThemeMode
 
 class MainActivity : ComponentActivity() {
@@ -28,7 +28,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         migrateAppLanguageToSystem(this)
         setContent {
-            var mode by rememberSaveable { mutableStateOf(ThemeMode.System) }
+            val appearance = remember { AppearanceState(this@MainActivity) }
+            val mode = appearance.mode
             val dark = when (mode) { ThemeMode.System -> isSystemInDarkTheme(); ThemeMode.Light -> false; ThemeMode.Dark -> true }
             // Keep status and navigation bar icons readable when the theme is forced.
             SideEffect {
@@ -37,7 +38,9 @@ class MainActivity : ComponentActivity() {
                     navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark },
                 )
             }
-            RideNowTheme(darkTheme = dark) { AppRoot(mode) { mode = it } }
+            RideNowTheme(darkTheme = dark, accent = appearance.accent, mapStyle = appearance.mapStyle, fontScale = appearance.fontScale) {
+                AppLockGate { AppRoot(appearance) }
+            }
         }
     }
 }

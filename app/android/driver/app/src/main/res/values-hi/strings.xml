@@ -389,8 +389,6 @@
     <string name="done_title">"यात्रा पूरी हुई"</string>
     <string name="done_collect">"सवार से किराया नकद ले लें।"</string>
     <string name="done_fare_label">"किराया वसूलना है"</string>
-    <string name="done_rate">"%1$s को रेट करें"</string>
-    <string name="done_star">"%1$d सितारे"</string>
     <string name="done_button">"नकद एकत्रित किया गया"</string>
     <string name="earn_history_item">"%1$s · %2$s से %3$s"</string>
     <string name="preview_auto_home">"पूर्वावलोकन: %1$d s में होम खोलना"</string>

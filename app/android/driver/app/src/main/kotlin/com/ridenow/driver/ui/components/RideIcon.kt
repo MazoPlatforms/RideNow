@@ -68,7 +68,35 @@ object RideIcons {
     val Doc = listOf("M5 2.5h7l3 3V17.5H5z", "M12 2.5v3h3M8 9h4M8 12h4")
     val WifiOff = listOf("M2.5 8a11 11 0 0 1 15 0M5 11a7 7 0 0 1 10 0M8 14a3 3 0 0 1 4 0M3 3l14 14")
     val Alert = listOf("M10 3l8 14H2z", "M10 8v4M10 14.5v.01")
-    val Lock = listOf("M4.5,9h11v8h-11z", "M7 9V7a3 3 0 0 1 6 0v2")
+    val Building = listOf("M4.5 17V3.5h8V17", "M12.5 8h3V17", "M3 17h14M7 6.5h2M7 9.5h2M7 12.5h2")
+    val Chevron = listOf("M7 4l6 6-6 6")
+    val Bank = listOf("M3 8l7-4.5L17 8z", "M4.5 8.5v5.5M8 8.5v5.5M12 8.5v5.5M15.5 8.5v5.5M3 16.5h14")
+    val Filter = listOf("M3 5h14M6 10h8M8.5 15h3")
+    val Navigate = listOf("M16.5 3.5L3.5 9l5.5 2 2 5.5z")
+    val Layers = listOf("M10 3l7 4-7 4-7-4z", "M3 10.5l7 4 7-4", "M3 13.5l7 4 7-4")
+    val Locate = listOf("M10,10m-3.5,0a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0", "M10 2v3M10 15v3M2 10h3M15 10h3")
+    val Route = listOf("M5,15m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0", "M15,5m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0", "M7 15h5a2.5 2.5 0 0 0 0-5H8a2.5 2.5 0 0 1 0-5h5")
+    val Gift = listOf("M3 7.5h14V11H3z", "M4 11h12v6H4z", "M10 7.5V17", "M10 7.5C8 7.5 6.2 6.8 6.2 5.5S8.5 3 10 7.5zM10 7.5c2 0 3.8-.7 3.8-2S11.5 3 10 7.5z")
+    val Block = listOf("M10,10m-7,0a7,7 0 1,0 14,0a7,7 0 1,0 -14,0", "M5 5l10 10")
+    val Eye = listOf("M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10z", "M10,10m-2.2,0a2.2,2.2 0 1,0 4.4,0a2.2,2.2 0 1,0 -4.4,0")
+    val Key = listOf("M7,13m-3.5,0a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0", "M9.5 10.5L17 3M14 6l2 2M12 8l1.5 1.5")
+    val Pause = listOf("M6.5 4.5v11M13.5 4.5v11")
+    val Play = listOf("M6 4l10 6-10 6z")
+    val Megaphone = listOf("M3 8v4h3l8 4V4L6 8z", "M6 12l1 4h2l-1-4")
+    val Paperclip = listOf("M15 9l-5.5 5.5a3 3 0 0 1-4.2-4.2L11 4.6a2 2 0 0 1 2.8 2.8L8.3 13")
+    val Send = listOf("M17 3L3 9l5 2 2 5z", "M8 11l9-8")
+    val Users = listOf("M7,7m-2.5,0a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0", "M2.5 16c.6-2.8 2.4-4.2 4.5-4.2s3.9 1.4 4.5 4.2", "M13.5 4.7a2.5 2.5 0 0 1 0 4.6M14 12c1.9.3 3.1 1.7 3.5 4")
+    val Siren = listOf("M5 16V11a5 5 0 0 1 10 0v5z", "M3 16h14M10 3v2M3.5 6l1.5 1.5M16.5 6L15 7.5")
+    val Grid = listOf("M3.5,3.5h5v5h-5zM11.5,3.5h5v5h-5zM3.5,11.5h5v5h-5zM11.5,11.5h5v5h-5z")
+    val Gear = listOf("M10,10m-2.5,0a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0", "M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4")
+    val Power = listOf("M10 3v7", "M5.5 6a6 6 0 1 0 9 0")
+    val IdCard = listOf("M3.5,4.5h13a1,1 0 0 1 1,1v9a1,1 0 0 1 -1,1h-13a1,1 0 0 1 -1,-1v-9a1,1 0 0 1 1,-1z", "M6.5,9m-1.5,0a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0", "M5 13c.5-1.3 1.3-1.8 1.5-1.8s1 .5 1.5 1.8M11.5 8.5h3M11.5 11.5h3")
+    val Fuel = listOf("M4 17V4.5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1V17z", "M12 8h2a1.5 1.5 0 0 1 1.5 1.5v4a1 1 0 0 0 2 0V7l-2-2", "M6 7h4")
+    val Palette = listOf("M10 3a7 7 0 1 0 0 14c1.2 0 1.6-.8 1.2-1.6-.5-1 0-2 1.3-2H14a3 3 0 0 0 3-3C17 5.6 13.9 3 10 3z", "M6.5 9.5v.01M9 6.5v.01M12.5 6.5v.01")
+    val Sun = listOf("M10,10m-3,0a3,3 0 1,0 6,0a3,3 0 1,0 -6,0", "M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4")
+    val TextSize = listOf("M3 16l4-11 4 11M4.5 12h5M13 16l2.5-6.5L18 16M13.9 14h3.2")
+    val CheckCircle = listOf("M10,10m-7,0a7,7 0 1,0 14,0a7,7 0 1,0 -14,0", "M6.8 10.2l2.2 2.2 4.2-4.6")
+    val Calendar2 = listOf("M5.5,4.5h9a2.5,2.5 0 0 1 2.5,2.5v8a2.5,2.5 0 0 1 -2.5,2.5h-9a2.5,2.5 0 0 1 -2.5,-2.5v-8a2.5,2.5 0 0 1 2.5,-2.5z", "M3 8.5h14M7 3v3M13 3v3")
     val Card = listOf("M4.5,4.5h11a2.5,2.5 0 0 1 2.5,2.5v6a2.5,2.5 0 0 1 -2.5,2.5h-11a2.5,2.5 0 0 1 -2.5,-2.5v-6a2.5,2.5 0 0 1 2.5,-2.5z", "M2 8.5h16")
 }
 
@@ -76,7 +104,7 @@ object RideIcons {
 fun RideIcon(paths: List<String>, tint: Color, modifier: Modifier = Modifier, size: Dp = 20.dp) {
     val parsed = remember(paths) { paths.map { PathParser().parsePathString(it).toPath() } }
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val mirror = rtl && (paths == RideIcons.Back || paths == RideIcons.Logout || paths == listOf("M7 4l6 6-6 6"))
+    val mirror = rtl && (paths == RideIcons.Back || paths == RideIcons.Logout || paths == RideIcons.Chevron)
     Canvas(modifier.size(size)) {
         val s = this.size.width / 20f
         val center = Offset(this.size.width / 2f, this.size.height / 2f)

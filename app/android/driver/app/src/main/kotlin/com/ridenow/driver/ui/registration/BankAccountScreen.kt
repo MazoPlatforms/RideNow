@@ -31,7 +31,7 @@ private val DigitsRegex = Regex("^\\d{6,20}$")
  * [onSaved] runs with valid details, [onSkip] when the driver chooses to add it later.
  */
 @Composable
-fun BankAccountScreen(onBack: () -> Unit, onSaved: () -> Unit, onSkip: () -> Unit, modifier: Modifier = Modifier) {
+fun BankAccountScreen(onBack: () -> Unit, onSaved: (holder: String, bank: String, branch: String, number: String) -> Unit, onSkip: () -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val focus = LocalFocusManager.current
     var holder by rememberSaveable { mutableStateOf("") }
@@ -94,7 +94,7 @@ fun BankAccountScreen(onBack: () -> Unit, onSaved: () -> Unit, onSkip: () -> Uni
             Spacer(Modifier.height(12.dp))
         }
         Column(Modifier.padding(vertical = 12.dp)) {
-            RideButton(stringResource(R.string.bank_save), onSaved, enabled = canSave)
+            RideButton(stringResource(R.string.bank_save), { onSaved(holder.trim(), bank.trim(), branch.trim(), number) }, enabled = canSave)
             RideButton(stringResource(R.string.bank_skip), onSkip, style = RideButtonStyle.Text, modifier = Modifier.padding(top = 4.dp))
         }
     }

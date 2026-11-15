@@ -390,8 +390,6 @@
     <string name="done_title">Trip completed</string>
     <string name="done_collect">Collect the fare in cash from the rider.</string>
     <string name="done_fare_label">Fare to collect</string>
-    <string name="done_rate">Rate %1$s</string>
-    <string name="done_star">%1$d stars</string>
     <string name="done_button">Cash collected</string>
     <string name="earn_history_item">%1$s \u00b7 %2$s to %3$s</string>
     <string name="preview_auto_home">Preview: opening Home in %1$d s</string>

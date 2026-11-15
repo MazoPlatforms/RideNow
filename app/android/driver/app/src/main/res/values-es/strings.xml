@@ -389,8 +389,6 @@
     <string name="done_title">"Viaje completado"</string>
     <string name="done_collect">"Cobra la tarifa en efectivo al pasajero."</string>
     <string name="done_fare_label">"Tarifa a cobrar"</string>
-    <string name="done_rate">"Calificar a %1$s"</string>
-    <string name="done_star">"%1$d estrellas"</string>
     <string name="done_button">"Efectivo cobrado"</string>
     <string name="earn_history_item">"%1$s · de %2$s a %3$s"</string>
     <string name="preview_auto_home">"Vista previa: abriendo Inicio en %1$d s"</string>

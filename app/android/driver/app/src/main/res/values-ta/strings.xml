@@ -389,8 +389,6 @@
     <string name="done_title">"பயணம் முடிந்தது"</string>
     <string name="done_collect">"ரைடரிடமிருந்து கட்டணத்தை பணமாக வசூலிக்கவும்."</string>
     <string name="done_fare_label">"வசூலிக்க கட்டணம்"</string>
-    <string name="done_rate">"விகிதம் %1$s"</string>
-    <string name="done_star">"%1$d நட்சத்திரங்கள்"</string>
     <string name="done_button">"பணம் வசூல் செய்யப்பட்டது"</string>
     <string name="earn_history_item">"%1$s · %2$s முதல் %3$s வரை"</string>
     <string name="preview_auto_home">"முன்னோட்டம்: %1$d s இல் முகப்பு திறக்கிறது"</string>

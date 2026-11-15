@@ -59,7 +59,7 @@ import androidx.compose.ui.unit.sp
 import com.ridenow.driver.R
 import com.ridenow.driver.ui.components.RideIcon
 import com.ridenow.driver.ui.components.RideIcons
-import com.ridenow.driver.ui.components.drawCityStreets
+import com.ridenow.driver.ui.components.drawMapBase
 import com.ridenow.driver.ui.theme.RideNowTheme
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.preview.PreviewConfig
@@ -80,12 +80,14 @@ import kotlinx.coroutines.isActive
 fun HomeScreen(
     online: Boolean, bankSaved: Boolean, driverName: String, onlineSince: Long, bankedMillis: Long,
     onToggle: () -> Unit, onAddBank: () -> Unit, onTab: (MainTab) -> Unit = {}, earnings: Double = 0.0, trips: Int = 0,
+    unread: Int = 0, onBell: () -> Unit = {}, onProfile: () -> Unit = {}, onCycleMap: () -> Unit = {},
     request: TripRequest? = null, onOfferRequest: () -> Unit = {}, onAccept: () -> Unit = {}, onDecline: () -> Unit = {}, modifier: Modifier = Modifier,
 ) {
     val c = RideTheme.colors
     val context = LocalContext.current
     val reduceMotion = rememberReducedMotion()
     val locationOk = hasBackgroundLocation(context)
+    val mapStyle = com.ridenow.driver.ui.theme.LocalMapStyle.current
 
     // Re-read the clock every 15 seconds while online so "Online time" keeps moving.
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
@@ -98,7 +100,7 @@ fun HomeScreen(
         if (PreviewConfig.ENABLED && online && request == null) { delay(PreviewConfig.MOCK_REQUEST_DELAY_MS); onOfferRequest() }
     }
     val totalMinutes = ((bankedMillis + if (online) (now - onlineSince).coerceAtLeast(0) else 0L) / 60_000L).toInt()
-    val money = remember(earnings) { NumberFormat.getCurrencyInstance().format(earnings) }
+    val money = remember(earnings) { com.ridenow.driver.ui.util.Money.fmt(earnings) }
 
     val pulse by rememberInfiniteTransition(label = "home").animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearOutSlowInEasing)), label = "pulse")
     val ping = if (reduceMotion) 0f else pulse
@@ -106,7 +108,7 @@ fun HomeScreen(
     Box(modifier.fillMaxSize().background(c.bg)) {
         // Map
         Canvas(Modifier.fillMaxSize()) {
-            drawCityStreets(c, 0.9f)
+            drawMapBase(mapStyle)
             val me = Offset(size.width / 2f, size.height * 0.34f)
             if (online) {
                 val dash = PathEffect.dashPathEffect(floatArrayOf(12f, 14f))
@@ -118,17 +120,15 @@ fun HomeScreen(
             }
             drawCircle(c.accent.copy(alpha = 0.2f), 22.dp.toPx(), me)
             rotate(-25f, me) {
-                drawRoundRect(c.fg, Offset(me.x - 9.dp.toPx(), me.y - 16.dp.toPx()), Size(18.dp.toPx(), 32.dp.toPx()), CornerRadius(7.dp.toPx()))
-                drawRoundRect(c.bg, Offset(me.x - 6.dp.toPx(), me.y - 8.dp.toPx()), Size(12.dp.toPx(), 9.dp.toPx()), CornerRadius(3.dp.toPx()))
+                drawRoundRect(Color(0xFF0A0C10), Offset(me.x - 9.dp.toPx(), me.y - 16.dp.toPx()), Size(18.dp.toPx(), 32.dp.toPx()), CornerRadius(7.dp.toPx()))
+                drawRoundRect(Color(0xFFBFD6E8), Offset(me.x - 6.dp.toPx(), me.y - 8.dp.toPx()), Size(12.dp.toPx(), 9.dp.toPx()), CornerRadius(3.dp.toPx()))
             }
         }
 
         // Top bar and chips
         Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                RoundButton(contentDescription = stringResource(R.string.nav_account)) {
-                    Text(driverName.take(1).uppercase().ifEmpty { "?" }, color = c.accent, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                }
+                com.ridenow.driver.ui.components.Avatar(com.ridenow.driver.ui.components.initialsOf(driverName), 48.dp, onClick = onProfile, description = stringResource(R.string.nav_account))
                 Spacer(Modifier.weight(1f))
                 Row(
                     Modifier.height(44.dp).clip(RoundedCornerShape(22.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(22.dp)).padding(horizontal = 18.dp),
@@ -138,7 +138,10 @@ fun HomeScreen(
                     Text(stringResource(R.string.home_today), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
                 }
                 Spacer(Modifier.weight(1f))
-                RoundButton(contentDescription = stringResource(R.string.home_notifications)) { RideIcon(RideIcons.Bell, c.fg, size = 20.dp) }
+                Box {
+                    com.ridenow.driver.ui.components.CircleButton(RideIcons.Bell, stringResource(R.string.home_notifications), onBell, size = 48.dp)
+                    if (unread > 0) Box(Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 3.dp).size(11.dp).clip(CircleShape).background(c.danger).border(1.5.dp, c.bg, CircleShape))
+                }
             }
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusChip(
@@ -161,6 +164,11 @@ fun HomeScreen(
                 }
             }
         }
+
+        // Map style shortcut
+        com.ridenow.driver.ui.components.CircleButton(
+            RideIcons.Layers, stringResource(R.string.home_map_style), onCycleMap, Modifier.align(Alignment.CenterEnd).padding(end = 20.dp).offset(y = (-70).dp),
+        )
 
         // Bottom sheet
         val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)

@@ -6,6 +6,8 @@ package com.ridenow.driver.ui.preview
  */
 object PreviewConfig {
     const val ENABLED = true
+    /** Fill rides, earnings, payouts, tickets and notifications with sample data. Set false for a real build to start empty. */
+    const val SAMPLE_DATA = true
     /** Seconds on the Application submitted screen before the preview jumps to Home. */
     const val SUBMITTED_TO_HOME_SECONDS = 6
     /** Milliseconds after going online before a sample trip request appears. */

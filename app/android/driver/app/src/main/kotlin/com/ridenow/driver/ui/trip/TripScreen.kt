@@ -32,7 +32,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 fun TripScreen(trip: TripRequest, phase: TripPhase, onAdvance: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     var confirmCancel by rememberSaveable { mutableStateOf(false) }
-    val money = remember(trip.fare) { NumberFormat.getCurrencyInstance().format(trip.fare) }
+    val money = remember(trip.fare) { com.ridenow.driver.ui.util.Money.fmt(trip.fare) }
     val title = stringResource(when (phase) { TripPhase.ToPickup -> R.string.trip_phase_pickup; TripPhase.Arrived -> R.string.trip_phase_arrived; TripPhase.InTrip -> R.string.trip_phase_trip })
     val sub = when (phase) {
         TripPhase.ToPickup -> stringResource(R.string.trip_phase_pickup_sub, trip.rider.substringBefore(" "), trip.pickup)

@@ -389,8 +389,6 @@
     <string name="done_title">"ගමන අවසන්"</string>
     <string name="done_collect">"අසරුවාගෙන් ගාස්තුව මුදලින් එකතු කරන්න."</string>
     <string name="done_fare_label">"එකතු කිරීමට ගාස්තු"</string>
-    <string name="done_rate">"අගය %1$s"</string>
-    <string name="done_star">"%1$d තරු"</string>
     <string name="done_button">"මුදල් එකතු කළා"</string>
     <string name="earn_history_item">"%1$s · %2$s සිට %3$s"</string>
     <string name="preview_auto_home">"පෙරදසුන: %1$d s හි මුල් පිටුව විවෘත කිරීම"</string>

@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
@@ -54,47 +55,45 @@ fun RadioRow(title: String, selected: Boolean, onClick: () -> Unit, sub: String?
 
 @Composable
 fun LanguageScreen(onBack: () -> Unit) {
-    val textEnglish = stringResource(R.string.language_native_english)
-    val textEspaOl = stringResource(R.string.language_native_spanish)
-    val textSpanish = stringResource(R.string.text_spanish)
-    val textFranAis = stringResource(R.string.language_native_french)
-    val textFrench = stringResource(R.string.text_french)
-    val textDeutsch = stringResource(R.string.language_native_german)
-    val textGerman = stringResource(R.string.text_german)
-    val textValue = stringResource(R.string.language_native_japanese)
-    val textJapanese = stringResource(R.string.text_japanese)
-    val textValue2 = stringResource(R.string.language_native_arabic)
-    val textArabic = stringResource(R.string.text_arabic)
-    val textValue3 = stringResource(R.string.language_native_hindi)
-    val textHindi = stringResource(R.string.text_hindi)
-    val textTamil = stringResource(R.string.text_tamil)
-    val textSinhala = stringResource(R.string.text_sinhala)
-    val nativeTamil = stringResource(R.string.language_native_tamil)
-    val nativeSinhala = stringResource(R.string.language_native_sinhala)
-    val textSettingsLanguage = stringResource(R.string.settings_language)
-    val textChooseTheLanguageForRidenow = stringResource(R.string.text_choose_the_language_for_ridenow)
-    val textSave = stringResource(R.string.text_save)
-
+    val c = RideTheme.colors
     val context = LocalContext.current
+    // Languages shown in the Language settings design come first, then the rest the app is translated into.
     val langs = listOf(
-        Triple("en", textEnglish, textEnglish), Triple("es", textEspaOl, textSpanish), Triple("fr", textFranAis, textFrench),
-        Triple("de", textDeutsch, textGerman), Triple("ja", textValue, textJapanese), Triple("ar", textValue2, textArabic),
-        Triple("hi", textValue3, textHindi),
-        Triple("ta", nativeTamil, textTamil), Triple("si", nativeSinhala, textSinhala),
+        Triple("en", R.string.language_native_english, R.string.language_native_english), Triple("si", R.string.language_native_sinhala, R.string.text_sinhala),
+        Triple("ta", R.string.language_native_tamil, R.string.text_tamil), Triple("ar", R.string.language_native_arabic, R.string.text_arabic),
+        Triple("es", R.string.language_native_spanish, R.string.text_spanish), Triple("fr", R.string.language_native_french, R.string.text_french),
+        Triple("de", R.string.language_native_german, R.string.text_german), Triple("ja", R.string.language_native_japanese, R.string.text_japanese),
+        Triple("hi", R.string.language_native_hindi, R.string.text_hindi),
     )
     var sel by rememberSaveable { mutableStateOf(getAppLanguage(context)) }
-    MoreScaffold(textSettingsLanguage, onBack, subtitle = textChooseTheLanguageForRidenow, bottom = {
-        RideButton(textSave, {
-            val saved = getAppLanguage(context)
-            if (sel != saved) {
-                setAppLanguage(context, sel)
-            } else onBack()
-        })
+    MoreScaffold(stringResource(R.string.lang_screen_title), onBack, bottom = {
+        RideButton(stringResource(R.string.lang_save), { if (sel != getAppLanguage(context)) setAppLanguage(context, sel) else onBack() })
     }) {
-        GroupCard(Modifier.padding(top = 16.dp)) {
-            langs.forEachIndexed { i, (code, name, english) ->
-                if (i > 0) RowDivider()
-                Column(Modifier.padding(horizontal = 16.dp)) { RadioRow(name, sel == code, { sel = code }, english) }
+        GroupCard(Modifier.padding(top = 8.dp)) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
+                Box(Modifier.size(44.dp).clip(CircleShape).background(c.line), contentAlignment = Alignment.Center) { RideIcon(RideIcons.Globe, c.fg, size = 22.dp) }
+                Column(Modifier.padding(start = 12.dp)) {
+                    Text(stringResource(R.string.lang_choose), color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.lang_choose_text), color = c.muted, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 2.dp))
+                }
+            }
+        }
+        Column(Modifier.padding(top = 14.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            langs.forEach { (code, nativeRes, englishRes) ->
+                val on = sel == code
+                val shape = RoundedCornerShape(16.dp)
+                Row(
+                    Modifier.fillMaxWidth().clip(shape).background(if (on) c.fill.copy(alpha = 0.14f) else c.field).border(1.dp, if (on) c.fill else c.border, shape)
+                        .selectable(on, role = Role.RadioButton) { sel = code }.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FlagBadge(code)
+                    Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+                        Text(stringResource(nativeRes), color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        if (code != "en") Text(stringResource(englishRes), color = c.muted, fontSize = 13.sp)
+                    }
+                    RadioDot(on)
+                }
             }
         }
     }

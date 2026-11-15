@@ -28,3 +28,24 @@ Package: `com.ridenow.driver` · minSdk 26 · targetSdk 35 · same structure and
 
 ## Next: Backend (sign in, requests, earnings)
 Home, Earnings, Inbox and Account tabs are built. Trips, earnings and messages stay empty until a backend exists, and the status outcomes remain a demo (each Check status tap advances) until a backend decides.
+
+## Driver update: screens from the concept screenshots (no side drawer)
+Navigation: top header (logo, bell with unread dot, profile avatar) and a five-tab bottom bar: Home, Earnings, Rides, Support, Account. The drawer items live in the Account tab, the bell and the avatar.
+
+- Notifications (`ui/notifications`): All / Rides / System, clear all.
+- Earnings (`ui/earnings`): period pills, summary with change, stats, bar chart with range menu, recent rides; Earnings Details per ride.
+- Ride History and Ride Details (`ui/rides`): status pills, search, filter sheet, grouped by day, map, rider contact buttons, breakdown, share.
+- Driver Profile, Edit Profile (`ui/profile`); Vehicle Details, Edit Vehicle, Vehicle Documents (`ui/vehicle`).
+- Payouts & Transactions with Withdraw, Bank Account (view, add, edit, remove) (`ui/payouts`).
+- Settings, Appearance (theme, map style, accent colour, text size, launcher icon), Language (`ui/more`), Notification Settings, Privacy & Security (App Lock uses the phone screen lock), Payment Methods, Delete Account (`ui/settings`).
+- Support Center, FAQs, Tickets, ticket chat with attachments, New Ticket, Help & Safety, Safety Center, Emergency Assist, Share Live Trip, Report an Issue (`ui/support`); Legal & About (`ui/legal`).
+
+Notes
+- Sample data: `PreviewConfig.SAMPLE_DATA` fills rides, payouts, notifications and tickets (`ui/data/DriverStore.kt`). Set it to false to start empty. Replace the store loaders with API calls when a backend exists.
+- New text is in `res/values/strings_driver.xml` (English). Other languages fall back to English until translated.
+- Fares are shown as `LKR` through `ui/util/Money.kt`; change `CURRENCY` there.
+- Legal pages, emergency number (`emergency_number`) and company details are placeholders to replace.
+- The launcher icon choice uses `activity-alias` entries in the manifest.
+- Rate rider removed: the trip-complete screen only collects the fare now.
+- Fixed from the supplied source: `RideIcons.Lock` was declared twice.
+- Not compiled here (no Android SDK in the build environment). Run a Gradle build and fix any small compile errors.
