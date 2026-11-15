@@ -141,7 +141,20 @@ jobs:
           if step_source.count(helper) != 1:
               raise SystemExit("Expected one form bottom-insets helper in the temporary Driver source")
           step_screen.write_text(step_source.replace(helper, "@Composable\nfun Modifier.formBottomInsets(): Modifier =", 1))
-          print("Applied build-only duplicate, dependency, phone-hint API, semantics, and missing Compose import fixes to the temporary CI copy.")
+          add_import("app/src/main/kotlin/com/ridenow/driver/ui/profile/EditProfileScreen.kt", "import androidx.compose.ui.semantics.Role", "Role.")
+          bank_screen = Path(os.environ["DRIVER_BUILD"]) / "app/src/main/kotlin/com/ridenow/driver/ui/registration/BankAccountScreen.kt"
+          bank_source = bank_screen.read_text()
+          preview_call = "BankAccountScreen({}, {}, {})"
+          if bank_source.count(preview_call) != 2:
+              raise SystemExit("Expected the two BankAccountScreen preview calls in the temporary Driver source")
+          bank_screen.write_text(bank_source.replace(preview_call, "BankAccountScreen({}, { _, _, _, _ -> }, {})"))
+          help_safety = Path(os.environ["DRIVER_BUILD"]) / "app/src/main/kotlin/com/ridenow/driver/ui/support/HelpSafetyScreens.kt"
+          help_source = help_safety.read_text()
+          composable_label = 'str(R.string.hs_emergency).let { "RideNow" }'
+          if help_source.count(composable_label) != 1:
+              raise SystemExit("Expected one emergency help share label in the temporary Driver source")
+          help_safety.write_text(help_source.replace(composable_label, '"RideNow"', 1))
+          print("Applied build-only Kotlin compatibility and missing Compose import fixes to the temporary CI copy.")
           PYCODE
       - name: Build Rider and Driver debug APKs
         run: |
@@ -200,7 +213,7 @@ jobs:
           RideNow Rider and Driver Android APKs built from commit ${GITHUB_SHA}.
 
           - Both APKs are debug-signed previews for installation and testing, not production or Play Store releases.
-          - Rider and Driver source files and source ZIPs are included unchanged with checksums. For compilation only, Actions removes the duplicate Lock declaration, adds the missing Play Services Auth dependency, adapts the phone-hint API calls, clarifies a tab semantics receiver, adds the missing composable annotation and Compose imports in a temporary Driver build copy; repository source is untouched.
+          - Rider and Driver source files and source ZIPs are included unchanged with checksums. For compilation only, Actions applies Kotlin compatibility fixes and missing Compose imports in a temporary Driver build copy; repository source is untouched.
           - Gradle 8.9 wrappers are generated only in GitHub Actions and are not committed.
           - Debug signing keys may differ between runs; uninstall an older preview if Android rejects an update.
           - Minimum Android version: Android 8.0 (API 26).
