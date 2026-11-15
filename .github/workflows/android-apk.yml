@@ -154,6 +154,22 @@ jobs:
           if help_source.count(composable_label) != 1:
               raise SystemExit("Expected one emergency help share label in the temporary Driver source")
           help_safety.write_text(help_source.replace(composable_label, '"RideNow"', 1))
+
+          kotlin_root = Path(os.environ["DRIVER_BUILD"]) / "app/src/main/kotlin"
+          setter_names = ("setMode", "setAccent", "setMapStyle", "setSystemFont", "setTextSize")
+          rename_counts = {name: 0 for name in setter_names}
+          for kotlin_file in kotlin_root.rglob("*.kt"):
+              kotlin_text = kotlin_file.read_text()
+              for name in setter_names:
+                  replacement = "update" + name.removeprefix("set")
+                  token = name + "("
+                  count = kotlin_text.count(token)
+                  if count:
+                      kotlin_text = kotlin_text.replace(token, replacement + "(")
+                      rename_counts[name] += count
+              kotlin_file.write_text(kotlin_text)
+          if any(count == 0 for count in rename_counts.values()):
+              raise SystemExit(f"Expected all appearance setters in temporary Driver source: {rename_counts}")
           print("Applied build-only Kotlin compatibility and missing Compose import fixes to the temporary CI copy.")
           PYCODE
       - name: Build Rider and Driver debug APKs
