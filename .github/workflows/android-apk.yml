@@ -80,10 +80,11 @@ jobs:
           source = icon.read_text()
           lines = source.splitlines(keepends=True)
           lock_declarations = [index for index, line in enumerate(lines) if "val Lock =" in line]
-          if len(lock_declarations) != 2:
-              raise SystemExit(f"Expected two duplicate Lock declarations, found {len(lock_declarations)}")
-          del lines[lock_declarations[0]]
-          icon.write_text("".join(lines))
+          if len(lock_declarations) == 2:
+              del lines[lock_declarations[0]]
+              icon.write_text("".join(lines))
+          elif len(lock_declarations) != 1:
+              raise SystemExit(f"Expected one or two Lock declarations, found {len(lock_declarations)}")
           gradle_file = Path(os.environ["DRIVER_BUILD"]) / "app/build.gradle.kts"
           gradle_source = gradle_file.read_text()
           auth_dependency = '    implementation("com.google.android.gms:play-services-auth:21.3.0")\n'
