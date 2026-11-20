@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import com.ridenow.driver.ui.system.rememberLocationEnabled
 import com.ridenow.driver.ui.util.currentCity
 
 private val Zones = listOf(R.string.zone_centre, R.string.zone_airport, R.string.zone_harbour, R.string.zone_university, R.string.zone_station, R.string.zone_suburbs)
@@ -40,7 +41,13 @@ fun ServiceAreaContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, 
     var radius by rememberSaveable { mutableFloatStateOf(15f) }
     var zones by rememberSaveable { mutableIntStateOf(0b000011) }
     var outside by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(Unit) { if (city.isBlank()) city = currentCity(context)?.substringBefore(",").orEmpty() }
+    val locationOn = rememberLocationEnabled()
+    LaunchedEffect(locationOn) {
+        if (locationOn && city.isBlank()) {
+            val suggestion = currentCity(context)?.substringBefore(",").orEmpty()
+            if (city.isBlank()) city = suggestion
+        }
+    }
 
     val km = radius.toInt()
     val canContinue = city.isNotBlank() && zones != 0

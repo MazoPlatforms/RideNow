@@ -67,6 +67,9 @@ import com.ridenow.app.ui.support.SupportChatScreen
 import androidx.compose.runtime.mutableStateListOf
 import com.ridenow.app.ui.payments.PaymentsScreen
 import com.ridenow.app.ui.permissions.LocationPermissionScreen
+import com.ridenow.app.ui.permissions.RiderLocationOffScreen
+import com.ridenow.app.ui.permissions.deviceLocationEnabled
+import com.ridenow.app.ui.permissions.rememberDeviceLocationEnabled
 import com.ridenow.app.ui.permissions.NotificationPermissionScreen
 import com.ridenow.app.ui.post.RateDriverScreen
 import com.ridenow.app.ui.post.ReportProblemScreen
@@ -132,7 +135,19 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var doc by rememberSaveable { mutableStateOf("") }
     val contacts = remember { mutableStateListOf(Contact(textAna, "+15550101"), Contact(textBen, "+15550102")) }
     val scope = rememberCoroutineScope()
-    val me = rememberUserLocation()
+    val locationOn = rememberDeviceLocationEnabled()
+    var locationDismissed by rememberSaveable(locationOn) { mutableStateOf(false) }
+    var locationRequested by remember(screen, locationOn) { mutableStateOf(false) }
+    val showLocationOff = !locationOn && (locationRequested || (!locationDismissed && screen in setOf(
+        Screen.Location, Screen.Home, Screen.Search, Screen.Options, Screen.Confirm, Screen.Finding,
+        Screen.Trip, Screen.MapPick, Screen.ChangePickup, Screen.ShareTrip,
+    )))
+    val dismissLocationOff = {
+        locationDismissed = true
+        locationRequested = false
+        if (screen == Screen.Location) screen = Screen.Notifications
+    }
+    val me = rememberUserLocation(locationOn = locationOn)
     var destLat by rememberSaveable { mutableStateOf(0.0) }
     var destLng by rememberSaveable { mutableStateOf(0.0) }
     val destLL = if (destLat != 0.0 || destLng != 0.0) LatLng(destLat, destLng) else null
@@ -148,6 +163,9 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     }
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("ridenow", 0) }
+    val allowCurrentLocation = {
+        deviceLocationEnabled(context).also { enabled -> if (!enabled) locationRequested = true }
+    }
     suspend fun loadProfilePhoto(url: String?): android.graphics.Bitmap? {
         if (url == null) return null
         return try { PhoneAuthApi.downloadProfilePhoto(url) }
@@ -268,7 +286,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.Location -> {
                 BackHandler { screen = Screen.Details }
-                LocationPermissionScreen(onDone = { screen = Screen.Notifications })
+                if (!showLocationOff) LocationPermissionScreen(onDone = { screen = Screen.Notifications })
             }
             Screen.Notifications -> {
                 BackHandler { screen = Screen.Location }
@@ -426,8 +444,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.MapPick -> {
                 BackHandler { back() }
-                if (mapFor == "pickup") MapPickerScreen(textSetPickup, textPickupConfirm, onBack = { back() }, onConfirm = { addr, _ -> pickup = addr; back() })
-                else MapPickerScreen(textMapSetDrop, textMapSetDrop, onBack = { back() }, onConfirm = { addr, ll -> pickDest(addr, null, ll); isReturn = false; screen = Screen.Options })
+                if (mapFor == "pickup") MapPickerScreen(textSetPickup, textPickupConfirm, onBack = { back() }, onConfirm = { addr, _ -> pickup = addr; back() }, onLocationOff = { locationRequested = true })
+                else MapPickerScreen(textMapSetDrop, textMapSetDrop, onBack = { back() }, onConfirm = { addr, ll -> pickDest(addr, null, ll); isReturn = false; screen = Screen.Options }, onLocationOff = { locationRequested = true })
             }
             Screen.ShareTrip -> {
                 BackHandler { back() }
@@ -438,7 +456,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 val places = buildList {
                     add("Current location" to text128MeridianWalk); home?.let { add("Home" to it) }; work?.let { add("Work" to it) }; others.forEach { add(it.first to it.second) }
                 }
-                ChangePickupScreen(pickup, places, onBack = { back() }, onConfirm = { pickup = it; back() }, onMap = { mapFor = "pickup"; screen = Screen.MapPick })
+                ChangePickupScreen(pickup, places, onBack = { back() }, onConfirm = { pickup = it; back() }, onMap = { mapFor = "pickup"; screen = Screen.MapPick }, allowCurrentLocation = allowCurrentLocation)
             }
             Screen.Friend -> {
                 BackHandler { back() }
@@ -449,7 +467,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 AddAddressScreen(addLabel, onBack = { back() }, onSave = { l, a ->
                     when (l) { "Home" -> home = a; "Work" -> work = a; else -> others.add(0, a.substringBefore(",") to a.substringAfter(", ", textSavedPlace)) }
                     back()
-                })
+                }, allowCurrentLocation = allowCurrentLocation)
             }
             Screen.Stub -> if (MoreRoutes.handles(stub)) {
                 key(stub) { MoreHost(stub, MoreCtx(name, shownPhone, dest.ifBlank { textHelixGardenPlaza }, pickup, vehicle, scheduled), moreNav) }
@@ -465,6 +483,9 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     if (!online && screen != Screen.Splash && screen != Screen.Intro) {
         BackHandler { }
         NoInternetScreen(onRetry = { netKey++ }, onOpenRides = { })
+    } else if (showLocationOff) {
+        BackHandler(onBack = dismissLocationOff)
+        RiderLocationOffScreen(onManual = dismissLocationOff)
     }
     }
 }

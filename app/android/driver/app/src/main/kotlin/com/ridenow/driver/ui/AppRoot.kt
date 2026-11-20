@@ -153,6 +153,14 @@ fun AppRoot(appearance: AppearanceState) {
     val saveable = rememberSaveableStateHolder()
     val shownPhone = formatPhoneForDisplay(phone.ifBlank { "+1 555 012 3456" })
     val context = LocalContext.current
+    var netKey by remember { mutableIntStateOf(0) }
+    var offlineSkip by rememberSaveable { mutableStateOf(false) }
+    val hasInternet = rememberOnline(netKey)
+    val locationOn = rememberLocationEnabled()
+    val notificationsOn = rememberNotificationsEnabled()
+    var locDismissed by rememberSaveable(locationOn) { mutableStateOf(false) }
+    var onboardingLocationDismissed by rememberSaveable(screen, locationOn) { mutableStateOf(false) }
+    var ntfDismissed by rememberSaveable { mutableStateOf(false) }
     val prefs = remember { context.getSharedPreferences("ridenowdriver", 0) }
     val scope = rememberCoroutineScope()
     val activityError = stringResource(R.string.onboarding_connection_error)
@@ -516,8 +524,8 @@ fun AppRoot(appearance: AppearanceState) {
                         onlineSince = app.onlineSince, bankedMillis = app.bankedMillis,
                         onToggle = {
                             if (app.online) app.goOffline()
-                            else if (!app.bankSaved) { bankReturn = Screen.Home.name; screen = Screen.Bank }
                             else if (!locationOn) locDismissed = false
+                            else if (!app.bankSaved) { bankReturn = Screen.Home.name; screen = Screen.Bank }
                             else app.goOnline()
                         },
                         onAddBank = { bankReturn = Screen.Home.name; screen = Screen.Bank },
@@ -683,12 +691,21 @@ fun AppRoot(appearance: AppearanceState) {
         }
         // Full-screen states shown over everything, in this order of priority.
         val inApp = screen in setOf(Screen.Home, Screen.Earnings, Screen.Rides, Screen.Support, Screen.Account, Screen.Trip)
+        val onboardingUsesLocation = screen in setOf(Screen.Background, Screen.Personal, Screen.ServiceArea)
+        val needsLocation = when {
+            onboardingUsesLocation -> !onboardingLocationDismissed
+            inApp || screen == Screen.ShareTrip -> !locDismissed
+            else -> false
+        }
         if (!hasInternet && !offlineSkip && screen != Screen.Splash && screen != Screen.Intro) {
             BackHandler { }
             NoInternetScreen(onRetry = { netKey++ }, onOpenRides = { offlineSkip = true; tab(MainTab.Rides) })
-        } else if (inApp && !locationOn && !locDismissed) {
-            BackHandler { locDismissed = true }
-            LocationOffScreen(onNotNow = { locDismissed = true })
+        } else if (!locationOn && needsLocation) {
+            val dismissLocation = {
+                if (onboardingUsesLocation) onboardingLocationDismissed = true else locDismissed = true
+            }
+            BackHandler(onBack = dismissLocation)
+            LocationOffScreen(onNotNow = dismissLocation)
         } else if (inApp && !notificationsOn && !ntfDismissed) {
             BackHandler { ntfDismissed = true }
             NotificationsOffScreen(onNotNow = { ntfDismissed = true })

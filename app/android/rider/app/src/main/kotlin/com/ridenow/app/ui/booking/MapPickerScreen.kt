@@ -36,6 +36,7 @@ import com.ridenow.app.ui.components.RideIcons
 import com.ridenow.app.ui.map.GoogleApi
 import com.ridenow.app.ui.map.RideMap
 import com.ridenow.app.ui.map.rememberUserLocation
+import com.ridenow.app.ui.permissions.rememberDeviceLocationEnabled
 import com.ridenow.app.ui.theme.BrandYellow
 import com.ridenow.app.ui.theme.Ink
 import com.ridenow.app.ui.theme.RideNowTheme
@@ -43,7 +44,10 @@ import com.ridenow.app.ui.theme.RideTheme
 
 /** Drag the Google map under a fixed pin. The address comes from reverse geocoding the map centre. */
 @Composable
-fun MapPickerScreen(title: String, confirmLabel: String, onBack: () -> Unit, onConfirm: (String, LatLng) -> Unit, modifier: Modifier = Modifier) {
+fun MapPickerScreen(
+    title: String, confirmLabel: String, onBack: () -> Unit, onConfirm: (String, LatLng) -> Unit,
+    modifier: Modifier = Modifier, onLocationOff: () -> Unit = {},
+) {
     val textMapMoving = stringResource(R.string.map_moving)
 
     val c = RideTheme.colors
@@ -51,7 +55,8 @@ fun MapPickerScreen(title: String, confirmLabel: String, onBack: () -> Unit, onC
     val selectedLabel = stringResource(R.string.map_selected)
     val recenterLabel = stringResource(R.string.map_recenter)
     val backLabel = stringResource(R.string.search_back)
-    val me = rememberUserLocation()
+    val locationOn = rememberDeviceLocationEnabled()
+    val me = rememberUserLocation(locationOn = locationOn)
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(me.position, 16f) }
     var address by remember { mutableStateOf(locatingLabel) }
     var first by remember { mutableStateOf(true) }
@@ -73,7 +78,7 @@ fun MapPickerScreen(title: String, confirmLabel: String, onBack: () -> Unit, onC
         }
         Box(Modifier.statusBarsPadding().padding(20.dp).size(48.dp).clip(CircleShape).background(c.bg).border(1.dp, c.line, CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = backLabel }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
         Text(stringResource(R.string.map_move), color = c.muted, fontSize = 13.sp, modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 28.dp).clip(RoundedCornerShape(50)).background(c.bg).border(1.dp, c.line, RoundedCornerShape(50)).padding(horizontal = 16.dp, vertical = 10.dp))
-        Box(Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 210.dp).navigationBarsPadding().size(48.dp).clip(CircleShape).background(c.bg).border(1.dp, c.line, CircleShape).clickable(role = Role.Button) { /* recenter */ }.semantics { contentDescription = recenterLabel }, contentAlignment = Alignment.Center) { RideIcon(listOf("M10,10m-5,0a5,5 0 1,0 10,0a5,5 0 1,0 -10,0", "M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3"), c.accent, size = 22.dp) }
+        Box(Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 210.dp).navigationBarsPadding().size(48.dp).clip(CircleShape).background(c.bg).border(1.dp, c.line, CircleShape).clickable(role = Role.Button) { if (!locationOn) onLocationOff() }.semantics { contentDescription = recenterLabel }, contentAlignment = Alignment.Center) { RideIcon(listOf("M10,10m-5,0a5,5 0 1,0 10,0a5,5 0 1,0 -10,0", "M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3"), c.accent, size = 22.dp) }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(c.bg).border(1.dp, c.line, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).navigationBarsPadding().padding(20.dp)) {
             Text(title, color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             Row(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {

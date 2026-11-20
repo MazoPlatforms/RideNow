@@ -1,9 +1,12 @@
 package com.ridenow.app.ui.permissions
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -63,6 +66,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -101,6 +105,50 @@ private fun OnResume(action: () -> Unit) {
     }
 }
 
+internal fun deviceLocationEnabled(context: Context): Boolean =
+    LocationManagerCompat.isLocationEnabled(context.getSystemService(LocationManager::class.java))
+
+@Composable
+internal fun rememberDeviceLocationEnabled(): Boolean {
+    val context = LocalContext.current
+    var enabled by remember(context) { mutableStateOf(deviceLocationEnabled(context)) }
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                enabled = deviceLocationEnabled(context)
+            }
+        }
+        val filter = IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION).apply {
+            addAction(LocationManager.MODE_CHANGED_ACTION)
+        }
+        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    OnResume { enabled = deviceLocationEnabled(context) }
+    return enabled
+}
+
+@Composable
+internal fun RiderLocationOffScreen(onManual: () -> Unit, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    LocationUnavailable(
+        onSettings = { runCatching { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) } },
+        onManual = onManual, modifier = modifier,
+        steps = listOf(R.string.loc_step1, R.string.loc_device_step2, R.string.loc_device_step3),
+    )
+}
+
+@Composable
+private fun LocationUnavailable(
+    onSettings: () -> Unit, onManual: () -> Unit, modifier: Modifier, steps: List<Int>,
+) {
+    PermissionLayout(
+        icon = RideIcons.Pin, title = R.string.loc_off_title, subtitle = R.string.loc_off_subtitle, denied = true,
+        steps = steps, primary = R.string.perm_open_settings, secondary = R.string.loc_off_manual,
+        onPrimary = onSettings, onSecondary = onManual, modifier = modifier,
+    )
+}
+
 /** Asks for location. Calls [onDone] when granted, or when the rider chooses to skip. */
 @Composable
 fun LocationPermissionScreen(onDone: () -> Unit, modifier: Modifier = Modifier) {
@@ -118,11 +166,9 @@ fun LocationPermissionScreen(onDone: () -> Unit, modifier: Modifier = Modifier) 
         primary = R.string.loc_allow, secondary = R.string.perm_not_now, note = R.string.loc_note,
         onPrimary = { launcher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },
         onSecondary = onDone, modifier = modifier,
-    ) else PermissionLayout(
-        icon = RideIcons.Pin, title = R.string.loc_off_title, subtitle = R.string.loc_off_subtitle, denied = true,
+    ) else LocationUnavailable(
+        onSettings = { context.openAppSettings() }, onManual = onDone, modifier = modifier,
         steps = listOf(R.string.loc_step1, R.string.loc_step2, R.string.loc_step3),
-        primary = R.string.perm_open_settings, secondary = R.string.loc_off_manual,
-        onPrimary = { context.openAppSettings() }, onSecondary = onDone, modifier = modifier,
     )
 }
 

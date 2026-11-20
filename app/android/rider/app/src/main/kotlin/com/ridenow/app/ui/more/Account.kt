@@ -4,6 +4,9 @@ import com.ridenow.app.getAppLanguage
 import com.ridenow.app.setAppLanguage
 
 import com.ridenow.app.R
+import com.ridenow.app.ui.permissions.RiderLocationOffScreen
+import com.ridenow.app.ui.permissions.deviceLocationEnabled
+import com.ridenow.app.ui.permissions.rememberDeviceLocationEnabled
 import androidx.compose.ui.res.stringResource
 
 import androidx.compose.foundation.text.BasicTextField
@@ -198,31 +201,54 @@ fun CityPickerScreen(onBack: () -> Unit) {
     val c = RideTheme.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val locationOn = rememberDeviceLocationEnabled()
+    var locationRequested by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var city by rememberSaveable { mutableStateOf(context.prefs().getString("city", textOrbitCity) ?: textOrbitCity) }
     var detecting by remember { mutableStateOf(false) }
     val all = listOf(textOrbitCity, textHelixCity, textNovaHarbor, textAuroraBay)
     val shown = all.filter { it.contains(query.trim(), ignoreCase = true) }
-    MoreScaffold(textCurrentCity, onBack, subtitle = textSearchForYourCity, bottom = { RideButton(textSave, { context.prefs().edit().putString("city", city).apply(); context.toast(textCitySaved); onBack() }) }) {
-        RideTextField(query, { query = it.take(40) }, textSearchCity, RideIcons.Search, Modifier.padding(top = 16.dp))
-        GroupCard(Modifier.padding(top = 12.dp)) {
-            NavRow(RideIcons.Pin, textUseCurrentLocation, {
-                if (!detecting) { detecting = true; scope.launch { val found = withContext(Dispatchers.IO) { detectCity(context) }; detecting = false; if (found != null) city = found else context.toast(textCouldNotDetectYourCity) } }
-            }, subtitle = if (detecting) textDetecting else textDetectAutomatically, trailing = {})
+    Box(Modifier.fillMaxSize()) {
+        MoreScaffold(textCurrentCity, onBack, subtitle = textSearchForYourCity, bottom = { RideButton(textSave, { context.prefs().edit().putString("city", city).apply(); context.toast(textCitySaved); onBack() }) }) {
+            RideTextField(query, { query = it.take(40) }, textSearchCity, RideIcons.Search, Modifier.padding(top = 16.dp))
+            GroupCard(Modifier.padding(top = 12.dp)) {
+                NavRow(RideIcons.Pin, textUseCurrentLocation, {
+                    if (!deviceLocationEnabled(context)) {
+                        locationRequested = true
+                    } else if (!detecting) {
+                        detecting = true
+                        scope.launch {
+                            try {
+                                val found = withContext(Dispatchers.IO) { detectCity(context) }
+                                if (!deviceLocationEnabled(context)) locationRequested = true
+                                else if (found != null) city = found else context.toast(textCouldNotDetectYourCity)
+                            } finally {
+                                detecting = false
+                            }
+                        }
+                    }
+                }, subtitle = if (detecting) textDetecting else textDetectAutomatically, trailing = {})
+            }
+            SectionLabel(textResults)
+            GroupCard {
+                val list = if (city !in all && query.isBlank()) listOf(city) + shown else shown
+                list.forEachIndexed { i, n -> if (i > 0) RowDivider(); Column(Modifier.padding(horizontal = 16.dp)) { RadioRow(n, city == n, { city = n }, if (city == n) textSelected else null) } }
+                if (list.isEmpty()) Text(textNoMatchingCity, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
+            }
         }
-        SectionLabel(textResults)
-        GroupCard {
-            val list = if (city !in all && query.isBlank()) listOf(city) + shown else shown
-            list.forEachIndexed { i, n -> if (i > 0) RowDivider(); Column(Modifier.padding(horizontal = 16.dp)) { RadioRow(n, city == n, { city = n }, if (city == n) textSelected else null) } }
-            if (list.isEmpty()) Text(textNoMatchingCity, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
+        if (locationRequested && !locationOn) {
+            val dismiss = { locationRequested = false }
+            androidx.activity.compose.BackHandler(onBack = dismiss)
+            RiderLocationOffScreen(onManual = dismiss)
         }
     }
+    LaunchedEffect(locationOn) { if (locationOn) locationRequested = false }
 }
 
 @Suppress("DEPRECATION", "MissingPermission")
 private fun detectCity(context: Context): String? = try {
     val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    val loc = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER).mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }.firstOrNull()
+    val loc = lm.getProviders(true).mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }.firstOrNull()
     loc?.let { Geocoder(context).getFromLocation(it.latitude, it.longitude, 1)?.firstOrNull()?.let { a -> a.locality ?: a.subAdminArea } }
 } catch (e: Exception) { null }
 
