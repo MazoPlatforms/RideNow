@@ -83,7 +83,7 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: suspend (String) -> Unit, modifi
     var digits by rememberSaveable { mutableStateOf("") }
     var showPicker by rememberSaveable { mutableStateOf(false) }
     var sending by remember { mutableStateOf(false) }
-    var sendError by remember { mutableStateOf(false) }
+    var sendErrorRes by remember { mutableStateOf<Int?>(null) }
     var focused by remember { mutableStateOf(false) }
     val country = Countries.byIso(iso)
     val valid = digits.length >= country.min
@@ -107,13 +107,17 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: suspend (String) -> Unit, modifi
     LaunchedEffect(Unit) { delay(400); focusRequester.requestFocus() }
     LaunchedEffect(sending) {
         if (sending) {
-            sendError = false
+            sendErrorRes = null
             try {
                 onCodeSent(country.dial + digits)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                sendError = true
+            } catch (failure: Exception) {
+                sendErrorRes = when ((failure as? PhoneAuthException)?.code) {
+                    "OTP_PROVIDER_UNAVAILABLE" -> R.string.phone_provider_error
+                    "OTP_RATE_LIMIT" -> R.string.phone_rate_error
+                    else -> R.string.phone_error
+                }
                 sending = false
             }
         }
@@ -191,7 +195,7 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: suspend (String) -> Unit, modifi
 
         Spacer(Modifier.weight(1f))
         Column(Modifier.entrance(240).padding(bottom = 12.dp)) {
-            if (sendError) Text(stringResource(R.string.phone_error), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(bottom = 10.dp))
+            sendErrorRes?.let { Text(stringResource(it), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(bottom = 10.dp)) }
             RideButton(stringResource(R.string.phone_send), onClick = { send() }, enabled = valid, loading = sending)
             Text(
                 stringResource(R.string.phone_terms), color = c.muted, fontSize = 12.sp, lineHeight = 18.sp,

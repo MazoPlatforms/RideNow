@@ -94,6 +94,7 @@ fun OtpScreen(
     val haptics = LocalHapticFeedback.current
     var code by rememberSaveable { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
+    var errorRes by remember { mutableStateOf(R.string.otp_error) }
     var errorTick by remember { mutableIntStateOf(0) }
     var verifying by remember { mutableStateOf(false) }
     var resending by remember { mutableStateOf(false) }
@@ -113,8 +114,13 @@ fun OtpScreen(
                 onVerified()
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
                 error = true
+                errorRes = when ((failure as? PhoneAuthException)?.status) {
+                    429 -> R.string.otp_rate_error
+                    503 -> R.string.otp_provider_error
+                    else -> R.string.otp_error
+                }
                 errorTick++
                 verifying = false
                 code = ""
@@ -130,8 +136,13 @@ fun OtpScreen(
                 resendKey++
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
                 error = true
+                errorRes = when ((failure as? PhoneAuthException)?.status) {
+                    429 -> R.string.otp_rate_error
+                    503 -> R.string.otp_provider_error
+                    else -> R.string.otp_error
+                }
                 errorTick++
             } finally {
                 resending = false
@@ -178,7 +189,7 @@ fun OtpScreen(
             value = code,
             onValueChange = { v ->
                 if (!verifying) {
-                    code = v.filter(Char::isDigit).take(CODE_LENGTH); error = false
+                    code = v.filter(Char::isDigit).take(CODE_LENGTH); error = false; errorRes = R.string.otp_error
                     if (code.length == CODE_LENGTH) verifying = true
                 }
             },
@@ -210,7 +221,7 @@ fun OtpScreen(
             },
         )
 
-        if (error) Text(stringResource(R.string.otp_error), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp))
+        if (error) Text(stringResource(errorRes), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp))
 
         Row(Modifier.padding(top = 12.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
             if (seconds > 0) {

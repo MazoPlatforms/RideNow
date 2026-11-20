@@ -18,6 +18,8 @@
     <string name="phone_privacy">Your number stays private and is only shared with your driver as a masked call.</string>
     <string name="phone_send">Send code</string>
     <string name="phone_error">We couldn’t send the code. Check your connection and try again.</string>
+    <string name="phone_provider_error">WhatsApp verification is temporarily unavailable. Please try again later.</string>
+    <string name="phone_rate_error">Please wait before requesting another code.</string>
     <string name="phone_terms">By continuing you agree to the Terms and Privacy Policy. Message rates may apply.</string>
     <string name="country_title">Select country</string>
     <string name="country_search">Search country or code</string>
@@ -31,6 +33,8 @@
     <string name="otp_resend_in">Resend code in %1$d:%2$02d</string>
     <string name="otp_resend">Resend code</string>
     <string name="otp_error">That code is not right. Try again.</string>
+    <string name="otp_provider_error">WhatsApp verification is temporarily unavailable. Please try again later.</string>
+    <string name="otp_rate_error">Please wait before trying again.</string>
     <string name="otp_verify">Verify and continue</string>
 
     <string name="details_title">Tell us about you.</string>
