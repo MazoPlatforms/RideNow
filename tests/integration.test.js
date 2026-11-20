@@ -250,6 +250,39 @@ test('international phone OTP verification creates a Rider account and profile',
   assert.equal(nextDeviceSession.user.profileComplete, true);
   assert.equal((await one(pool, 'SELECT count(*)::int AS n FROM users WHERE phone=$1', ['+14155552671'])).n, 1);
 });
+test('only approved active drivers can skip unfinished rider onboarding after phone verification', async () => {
+  const session = await login();
+  const admin = await login();
+  await pool.query("UPDATE users SET roles=ARRAY['ADMIN'] WHERE id=$1", [admin.user.id]);
+  await request('post', '/v1/drivers/onboarding', session, { name: 'Driver Applicant' }).expect(200);
+  const checkProfile = async (expected) => {
+    const response = await request('get', '/v1/me', session).expect(200);
+    assert.equal(response.body.profileComplete, expected);
+    assert.equal(response.body.profileCompletedAt, null);
+    const adminView = await request('get', '/v1/admin/users/' + session.user.id, admin).expect(200);
+    assert.equal(adminView.body.user.profile_complete, expected);
+  };
+  for (const status of ['DRAFT', 'PENDING', 'REJECTED', 'SUSPENDED', 'APPROVED']) {
+    await pool.query('UPDATE driver_profiles SET status=$2 WHERE user_id=$1', [session.user.id, status]);
+    await checkProfile(status === 'APPROVED');
+  }
+  await pool.query("UPDATE otp_challenges SET created_at=now()-interval '2 minutes' WHERE phone=$1", [session.user.phone]);
+  const challenge = (await api.post('/v1/auth/otp/request').send({ phone: session.user.phone }).expect(202)).body;
+  const job = await one(pool, "SELECT payload FROM jobs WHERE payload->>'challengeId'=$1", [challenge.challengeId]);
+  const samePhone = (await api.post('/v1/auth/otp/verify').send({
+    challengeId: challenge.challengeId,
+    code: decrypt(job.payload.encryptedCode, config.ENCRYPTION_KEY),
+  }).expect(200)).body;
+  assert.equal(samePhone.user.id, session.user.id);
+  assert.equal(samePhone.user.profileComplete, true);
+  assert.equal((await login()).user.profileComplete, false);
+
+  await pool.query("UPDATE driver_profiles SET status='SUSPENDED' WHERE user_id=$1", [session.user.id]);
+  await checkProfile(false);
+  await request('patch', '/v1/me', session, { name: 'Rider Profile' }).expect(200);
+  assert.equal((await request('get', '/v1/me', session).expect(200)).body.profileComplete, true);
+});
+
 test('rider profile creation stores name, email and only a normalized private profile photo', async () => {
   const session = await login();
   const saved = await request('patch', '/v1/me', session, {
@@ -284,6 +317,31 @@ test('rider profile creation stores name, email and only a normalized private pr
     bytes: 5 * 1024 * 1024 + 1,
   }).expect(400);
 });
+test('concurrent rider photo completion publishes once and commits both references together', async () => {
+  const rider = await login();
+  const staged = (await request('post', '/v1/me/profile-photo', rider,
+    { mime: 'image/jpeg', bytes: 100 }).expect(200)).body;
+  const original = storage.sanitizeProfilePhoto;
+  let calls = 0;
+  storage.sanitizeProfilePhoto = async () => {
+    const version = 'sanitized-' + (++calls);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return { status: 'CLEAN', version };
+  };
+  try {
+    const path = '/v1/me/profile-photo/' + staged.photoId + '/complete';
+    await Promise.all([request('post', path, rider).expect(200), request('post', path, rider).expect(200)]);
+    await request('post', path, rider).expect(200);
+    const result = await one(pool, `SELECT u.profile_photo_version AS profile_version, p.object_version AS upload_version
+      FROM users u JOIN profile_photo_uploads p ON p.user_id=u.id WHERE p.id=$1`, [staged.photoId]);
+    assert.equal(calls, 1);
+    assert.equal(result.profile_version, 'sanitized-1');
+    assert.equal(result.upload_version, result.profile_version);
+  } finally {
+    storage.sanitizeProfilePhoto = original;
+  }
+});
+
 test('refresh token reuse revokes the entire family', async () => {
   const s = await login(),
     next = await auth.refresh(s.refreshToken);

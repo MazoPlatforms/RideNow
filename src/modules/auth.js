@@ -6,6 +6,7 @@ import * as OTPAuth from 'otpauth';
 import { hash, token, equal, encrypt, decrypt } from '../shared/crypto.js';
 import { transaction, one } from '../shared/db.js';
 import { AppError, ensure } from '../shared/errors.js';
+import { riderProfileComplete } from './rider-profile.js';
 export function normalizePhone(input) {
   ensure(typeof input === 'string', 400, 'INVALID_PHONE_NUMBER');
   const compact = input.trim().replace(/[\s().-]/g, '');
@@ -61,7 +62,7 @@ export function createAuth(pool, config) {
         roles: user.roles,
         name: user.name,
         email: user.email ?? '',
-        profileComplete: Boolean(user.profile_completed_at || user.name?.trim()),
+        profileComplete: await riderProfileComplete(db, user),
       },
     };
   }

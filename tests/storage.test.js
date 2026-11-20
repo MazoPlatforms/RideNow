@@ -205,7 +205,7 @@ test('non-versioned storage publishes only scanned bytes under a server-only ver
       1,
     );
 
-    const photoKey = `staging/${randomUUID()}.png`,
+    const photoKey = `profiles/${randomUUID()}/${randomUUID()}`,
       photoId = randomUUID(),
       photoBytes = await sharp({
         create: { width: 32, height: 24, channels: 3, background: '#ffcc00' },
@@ -226,6 +226,8 @@ test('non-versioned storage publishes only scanned bytes under a server-only ver
     assert.equal(photo.status, 'CLEAN');
     assert.match(photo.verifiedKey, new RegExp(`^verified/${photoId}/`));
     assert.equal(photo.version, null);
+    await storage.discardProfileStaging(photoKey);
+    assert.equal((await s3.send(new ListObjectsV2Command({ Bucket, Prefix: photoKey }))).KeyCount, 0);
     const profileImage = await fetch(await storage.download(photo.verifiedKey));
     assert.equal(profileImage.headers.get('content-type'), 'image/jpeg');
     assert.equal((await sharp(Buffer.from(await profileImage.arrayBuffer())).metadata()).format, 'jpeg');

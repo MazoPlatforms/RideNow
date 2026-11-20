@@ -219,6 +219,7 @@ fun AppRoot(appearance: AppearanceState) {
                 }
             }
         } else if (reviewStatus != "SCAN_FAILED") {
+            if (!app.draft.acceptedTerms) DriverOnboardingApi.prefillPersonalDetails(context, app.draft)
             screen = Screen.Terms
         }
     }

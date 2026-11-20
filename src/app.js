@@ -15,6 +15,7 @@ import { createAuth, permission } from './modules/auth.js';
 import { quote } from './modules/pricing.js';
 import * as rides from './modules/rides.js';
 import * as drivers from './modules/drivers.js';
+import { riderProfileComplete, riderProfileCompleteSql } from './modules/rider-profile.js';
 import * as application from './modules/driver-application.js';
 import * as ledger from './modules/ledger.js';
 import { acceptOffer } from './modules/dispatch.js';
@@ -69,7 +70,7 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       phone: user.phone,
       name: user.name,
       email: user.email ?? '',
-      profileComplete: Boolean(user.profile_completed_at || user.name?.trim()),
+      profileComplete: await riderProfileComplete(pool, user),
       profileCompletedAt: user.profile_completed_at,
       profilePhotoUrl: user.profile_photo_key
         ? await storage.download(user.profile_photo_key, user.profile_photo_version)
@@ -306,31 +307,44 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     'post',
     '/v1/me/profile-photo/:id/complete',
     {},
-    async ({ db, user, req }) => {
-      const upload = await one(
-        db,
-        'SELECT * FROM profile_photo_uploads WHERE id=$1 AND user_id=$2',
-        [req.params.id, user.id],
-      );
-      ensure(upload, 404, 'PROFILE_PHOTO_UPLOAD_NOT_FOUND');
-      if (upload.status === 'CLEAN') return profileView(await one(db, 'SELECT * FROM users WHERE id=$1', [user.id]));
-      ensure(upload.status === 'PENDING' && upload.expires_at > Date.now(), 409, 'PROFILE_PHOTO_UPLOAD_EXPIRED');
-      const result = await storage.sanitizeProfilePhoto(upload);
-      if (result.status !== 'CLEAN') {
-        await db.query("UPDATE profile_photo_uploads SET status='REJECTED' WHERE id=$1", [upload.id]);
-        throw new AppError(422, 'PROFILE_PHOTO_REJECTED');
+    async ({ user, req }) => {
+      const outcome = await transaction(pool, async (db) => {
+        const upload = ensure(await one(
+          db,
+          'SELECT * FROM profile_photo_uploads WHERE id=$1 AND user_id=$2 FOR UPDATE',
+          [req.params.id, user.id],
+        ), 404, 'PROFILE_PHOTO_UPLOAD_NOT_FOUND');
+        if (upload.status === 'CLEAN') {
+          return { user: await one(db, 'SELECT * FROM users WHERE id=$1', [user.id]) };
+        }
+        ensure(upload.status === 'PENDING' && upload.expires_at > Date.now(), 409, 'PROFILE_PHOTO_UPLOAD_EXPIRED');
+        const result = await storage.sanitizeProfilePhoto(upload);
+        if (result.status !== 'CLEAN') {
+          await db.query("UPDATE profile_photo_uploads SET status='REJECTED' WHERE id=$1", [upload.id]);
+          return { rejected: true };
+        }
+        const key = result.verifiedKey ?? upload.object_key;
+        const version = result.version ?? null;
+        await db.query(
+          "UPDATE profile_photo_uploads SET status='CLEAN',object_key=$2,object_version=$3 WHERE id=$1",
+          [upload.id, key, version],
+        );
+        const updated = await one(
+          db,
+          'UPDATE users SET profile_photo_key=$2,profile_photo_version=$3 WHERE id=$1 RETURNING *',
+          [user.id, key, version],
+        );
+        return { user: updated, stagingKey: upload.object_key, stagingVersion: result.stagingVersion };
+      });
+      ensure(!outcome.rejected, 422, 'PROFILE_PHOTO_REJECTED');
+      if (outcome.stagingKey && storage.discardProfileStaging) {
+        try {
+          await storage.discardProfileStaging(outcome.stagingKey, outcome.stagingVersion);
+        } catch {
+          logger.warn({ photoId: req.params.id }, 'Profile photo staging cleanup failed');
+        }
       }
-      const key = result.verifiedKey ?? upload.object_key;
-      await db.query(
-        "UPDATE profile_photo_uploads SET status='CLEAN',object_key=$2,object_version=$3 WHERE id=$1 AND status='PENDING'",
-        [upload.id, key, result.version ?? null],
-      );
-      const updated = await one(
-        db,
-        'UPDATE users SET profile_photo_key=$2,profile_photo_version=$3 WHERE id=$1 RETURNING *',
-        [user.id, key, result.version ?? null],
-      );
-      return profileView(updated);
+      return profileView(outcome.user);
     },
   );
   route(
@@ -668,12 +682,15 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     rides: (await db.query('SELECT state,count(*)::int AS count FROM rides GROUP BY state ORDER BY count(*) DESC')).rows,
     recent: (await db.query('SELECT id,state,created_at,final_minor FROM rides ORDER BY created_at DESC LIMIT 6')).rows,
   }));
+  const adminUserFields = `id,phone,name,email,roles,permissions,suspended,deleted_at,created_at,
+    profile_completed_at,${riderProfileCompleteSql} AS profile_complete,
+    (profile_photo_key IS NOT NULL) AS has_profile_photo`;
   route('get', '/v1/admin/users', { permission: 'users.manage' }, async ({ db, req }) => {
     const p = page.parse(req.query);
     return {
       items: (
         await db.query(
-          "SELECT id,phone,name,email,roles,permissions,suspended,deleted_at,created_at,profile_completed_at,(profile_completed_at IS NOT NULL OR btrim(name)<>'') AS profile_complete,(profile_photo_key IS NOT NULL) AS has_profile_photo FROM users WHERE ($1::uuid IS NULL OR id<$1) ORDER BY id DESC LIMIT $2",
+          `SELECT ${adminUserFields} FROM users u WHERE ($1::uuid IS NULL OR id<$1) ORDER BY id DESC LIMIT $2`,
           [p.cursor ?? null, p.limit],
         )
       ).rows,
@@ -681,7 +698,7 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
   });
   route('get', '/v1/admin/users/:id', { permission: 'users.manage' }, async ({ db, req }) => {
     const user = ensure(await one(db,
-      "SELECT id,phone,name,email,roles,permissions,suspended,deleted_at,created_at,profile_completed_at,(profile_completed_at IS NOT NULL OR btrim(name)<>'') AS profile_complete,(profile_photo_key IS NOT NULL) AS has_profile_photo FROM users WHERE id=$1",
+      `SELECT ${adminUserFields} FROM users u WHERE id=$1`,
       [req.params.id]), 404, 'USER_NOT_FOUND');
     return { user };
   });

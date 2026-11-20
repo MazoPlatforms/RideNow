@@ -34,7 +34,7 @@ export async function onboard(db, user, body) {
   if (!profile)
     return one(db, `SELECT ${profileFields} FROM driver_profiles WHERE user_id=$1`, [user.id]);
   await db.query(
-    "UPDATE users SET roles=array(SELECT DISTINCT unnest(roles||ARRAY['DRIVER'])),name=$2 WHERE id=$1",
+    "UPDATE users SET roles=array(SELECT DISTINCT unnest(roles||ARRAY['DRIVER'])),name=CASE WHEN btrim(name)='' THEN $2 ELSE name END WHERE id=$1",
     [user.id, body.name],
   );
   return profile;

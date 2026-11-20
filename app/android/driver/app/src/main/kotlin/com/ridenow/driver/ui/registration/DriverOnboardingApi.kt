@@ -2,9 +2,11 @@ package com.ridenow.driver.ui.registration
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.ridenow.driver.ui.auth.PhoneAuthApi
 import com.ridenow.driver.ui.auth.PhoneAuthException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -62,6 +64,65 @@ internal object DriverOnboardingApi {
         PhoneAuthApi.authorized(context, "GET", "/v1/drivers/me")
     } catch (error: PhoneAuthException) {
         if (error.code == "DRIVER_REQUIRED") null else throw error
+    }
+
+    suspend fun prefillPersonalDetails(context: Context, draft: DriverDraft) {
+        val profile = try {
+            PhoneAuthApi.authorized(context, "GET", "/v1/me")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: PhoneAuthException) {
+            if (error.status == 401) throw error
+            return
+        } catch (_: Exception) {
+            return
+        }
+        for (field in listOf("name", "email")) {
+            val value = profile.opt(field) as? String
+            if (!draft.fields.has(field) && !value.isNullOrBlank()) draft.fields.put(field, value)
+        }
+        val photoUrl = profile.opt("profilePhotoUrl") as? String
+        if (photoUrl != null && draft.photo("PROFILE_PHOTO") == null) {
+            val photo = try {
+                downloadProfilePhoto(photoUrl)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            if (photo != null) draft.setPhoto("PROFILE_PHOTO", photo)
+        }
+    }
+
+    private suspend fun downloadProfilePhoto(value: String): Bitmap? = withContext(Dispatchers.IO) {
+        val url = URL(value)
+        if (url.protocol != "https" || url.userInfo != null || url.host.isBlank()) return@withContext null
+        val connection = (url.openConnection() as HttpsURLConnection).apply {
+            instanceFollowRedirects = false
+            connectTimeout = 5_000
+            readTimeout = 5_000
+            useCaches = false
+        }
+        try {
+            if (connection.responseCode !in 200..299) return@withContext null
+            val data = connection.inputStream.use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count == -1) break
+                    if (output.size() + count > 3 * 1024 * 1024) return@withContext null
+                    output.write(buffer, 0, count)
+                }
+                output.toByteArray()
+            }
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+            if (bounds.outWidth !in 1..512 || bounds.outHeight !in 1..512) return@withContext null
+            BitmapFactory.decodeByteArray(data, 0, data.size)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     suspend fun queue(context: Context, draft: DriverDraft, progress: (Int, Int) -> Unit): JSONObject {

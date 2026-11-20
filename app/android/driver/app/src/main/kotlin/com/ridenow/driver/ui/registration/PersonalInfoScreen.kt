@@ -58,8 +58,8 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
     val c = RideTheme.colors
     val context = LocalContext.current
     val focus = LocalFocusManager.current
-    var name by rememberSaveable { mutableStateOf("") }
-    var email by rememberSaveable { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf(draft?.fields?.optString("name").orEmpty()) }
+    var email by rememberSaveable { mutableStateOf(draft?.fields?.optString("email").orEmpty()) }
     var dob by rememberSaveable { mutableStateOf<Long?>(null) }
     var gender by rememberSaveable { mutableStateOf<Int?>(null) }
     var city by rememberSaveable { mutableStateOf<String?>(null) }
@@ -69,8 +69,15 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
     var emailFocused by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { if (city == null) city = currentCity(context) }
 
-    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { if (it != null) photo = it }
-    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> if (uri != null) photo = decodeSampled(context, uri) }
+    fun updatePhoto(value: Bitmap?) {
+        photo = value
+        draft?.setPhoto("PROFILE_PHOTO", value)
+    }
+
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { if (it != null) updatePhoto(it) }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { decodeSampled(context, it) }?.let(::updatePhoto)
+    }
 
     val emailOk = email.isBlank() || EmailRegex.matches(email.trim())
     val canContinue = photo != null && name.trim().length >= 2 && dob != null && gender != null && emailOk
@@ -138,7 +145,7 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
             hasPhoto = photo != null,
             onCamera = { camera.launch(null) },
             onGallery = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-            onRemove = { photo = null },
+            onRemove = { updatePhoto(null) },
             onDismiss = { showSheet = false },
         )
     }

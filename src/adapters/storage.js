@@ -32,7 +32,7 @@ export async function sanitizeProfilePhotoBytes(data, mime) {
     return await sharp(data, { failOn: 'error', limitInputPixels: 16_777_216 })
       .rotate()
       .resize({ width: 320, height: 320, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 82, mozjpeg: true, chromaSubsampling: '4:2:0' })
+      .jpeg({ quality: 76, mozjpeg: true, chromaSubsampling: '4:2:0' })
       .toBuffer();
   } catch {
     throw new AppError(422, 'PROFILE_PHOTO_INVALID');
@@ -104,6 +104,11 @@ export function createStorage(config) {
     async discardVerified(Key) {
       ensure(VERIFIED.test(Key), 400, 'INVALID_VERIFIED_OBJECT_KEY');
       await send(new DeleteObjectCommand({ Bucket, Key }));
+    },
+    async discardProfileStaging(Key, VersionId) {
+      ensure(/^profiles\/[a-f\d-]{36}\/[a-f\d-]{36}$/.test(Key), 400, 'INVALID_PROFILE_STAGING_KEY');
+      if (mode === 'versioned') ensure(VersionId && VersionId !== 'null', 409, 'PROFILE_STAGING_VERSION_REQUIRED');
+      await send(new DeleteObjectCommand({ Bucket, Key, ...(mode === 'versioned' ? { VersionId } : {}) }));
     },
     async scan(doc) {
       const head = await send(new HeadObjectCommand({ Bucket, Key: doc.object_key }));
@@ -194,6 +199,7 @@ export function createStorage(config) {
       if (mode === 'versioned') ensure(saved.VersionId && saved.VersionId !== 'null', 503, 'BUCKET_VERSIONING_REQUIRED');
       return {
         status: 'CLEAN',
+        stagingVersion: mode === 'versioned' ? head.VersionId : undefined,
         version: mode === 'versioned' ? saved.VersionId : null,
         ...(mode === 'immutable' ? { verifiedKey: key } : {}),
       };
