@@ -156,6 +156,7 @@
     <string name="veh_type_car">"車"</string>
     <string name="veh_type_van">"バン"</string>
     <string name="veh_type_three">"三輪車"</string>
+    <string name="vehicle_details_three_wheeler">"三輪車"</string>
     <string name="veh_type_bike">"自転車"</string>
     <string name="veh_make">"作る"</string>
     <string name="veh_model">"モデル"</string>
@@ -390,7 +391,6 @@
     <string name="done_fare_label">"徴収する運賃"</string>
     <string name="done_button">"現金が集まった"</string>
     <string name="earn_history_item">"%1$s · %2$s ～ %3$s"</string>
-    <string name="preview_auto_home">"プレビュー: %1$d でホームを開く"</string>
     <string name="earn_trip_route">"%1$s ～ %2$s"</string>
     <string name="nav_unread_desc">"未読メッセージ"</string>
     <string name="notif_title">"常に最新情報を入手してください。"</string>

@@ -73,6 +73,7 @@ import com.ridenow.driver.ui.welcome.WelcomeScreen
 import com.ridenow.driver.ui.components.initialsOf
 import com.ridenow.driver.ui.components.toast
 import com.ridenow.driver.ui.data.BankAccountInfo
+import com.ridenow.driver.ui.data.DriverVehicleSnapshot
 import com.ridenow.driver.ui.data.Notice
 import com.ridenow.driver.ui.legal.LegalAboutScreen
 import com.ridenow.driver.ui.legal.LegalDocScreen
@@ -113,7 +114,6 @@ import com.ridenow.driver.ui.system.rememberOnline
 import com.ridenow.driver.ui.theme.AppearanceState
 import com.ridenow.driver.ui.theme.MapStyle
 import com.ridenow.driver.ui.trip.CompletedTrip
-import com.ridenow.driver.ui.vehicle.EditVehicleScreen
 import com.ridenow.driver.ui.vehicle.VehicleDetailsScreen
 import com.ridenow.driver.ui.vehicle.VehicleDocumentsScreen
 
@@ -121,7 +121,7 @@ enum class Screen {
     Splash, Intro, Welcome, Phone, Otp, Terms, Background, Notifications, Personal, Identity, License, Vehicle,
     VehicleDocs, VehiclePhotos, Availability, ServiceArea, Bank, Review, Submitted,
     ActionRequired, Rejected, Approved, Home, Earnings, Rides, Support, Account, Trip, TripComplete, DriverProfile, EditProfile,
-    NotificationCenter, EarningsDetails, RideDetails, VehicleDetails, EditVehicle, VehicleDocuments, Payouts, BankManage, BankForm,
+    NotificationCenter, EarningsDetails, RideDetails, VehicleDetails, VehicleDocuments, Payouts, BankManage, BankForm,
     Settings, Appearance, LanguageSettings, NotificationSettings, Privacy, DeleteAccount, PaymentMethods, ManageDevices, TwoStep, DownloadData,
     Faq, Tickets, Conversation, NewTicket, HelpSafety, SafetyCenter, Emergency, ShareTrip, ReportIssue, Legal, LegalDoc,
 }
@@ -182,6 +182,10 @@ fun AppRoot(appearance: AppearanceState) {
     suspend fun checkStatus() {
         val data = DriverOnboardingApi.status(context)
         val profile = data?.optJSONObject("profile")
+        val snapshot = DriverVehicleSnapshot.from(data ?: JSONObject())
+        app.store.vehicle = snapshot.vehicle
+        app.store.docs.clear()
+        app.store.docs.addAll(snapshot.documents)
         reviewStatus = profile?.optString("status").orEmpty()
         reviewReason = profile?.opt("review_reason") as? String ?: ""
         data?.optJSONObject("application")?.let {
@@ -193,7 +197,11 @@ fun AppRoot(appearance: AppearanceState) {
         if (reviewStatus == "APPROVED") {
             if (pending != null) PhoneAuthApi.savePendingApplication(context, null)
             app.draft = com.ridenow.driver.ui.registration.DriverDraft()
-            screen = Screen.Home
+            when (screen) {
+                Screen.Submitted -> screen = Screen.Approved
+                Screen.Splash, Screen.Review -> screen = Screen.Home
+                else -> Unit
+            }
         } else if (reviewStatus in setOf("PENDING", "SUSPENDED") || (reviewStatus == "REJECTED" && pending == null)) {
             if (pending != null) PhoneAuthApi.savePendingApplication(context, null)
             screen = Screen.Submitted
@@ -366,7 +374,9 @@ fun AppRoot(appearance: AppearanceState) {
         if (SessionFlags.splashDone && screen == Screen.Splash) runOnboarding { restoreAuth() }
     }
     LaunchedEffect(screen, reviewStatus) {
-        if (screen == Screen.Submitted && reviewStatus in setOf("PENDING", "SCANNING")) {
+        if (screen in setOf(Screen.VehicleDetails, Screen.VehicleDocuments)) {
+            runOnboarding { checkStatus() }
+        } else if (screen == Screen.Submitted && reviewStatus in setOf("PENDING", "SCANNING")) {
             while (true) {
                 delay(if (reviewStatus == "SCANNING") 15_000 else 30_000)
                 runOnboarding { checkStatus() }
@@ -579,7 +589,7 @@ fun AppRoot(appearance: AppearanceState) {
                         BackHandler { back() }
                         DriverProfileScreen(
                             store, driverName, shownPhone, app.profileEmail, app.profileAddress, reviewStatus == "APPROVED",
-                            onBack = { back() }, onEdit = { go(Screen.EditProfile) }, onEditVehicle = { go(Screen.EditVehicle) }, onDocs = { go(Screen.VehicleDocuments) },
+                            onBack = { back() }, onEdit = { go(Screen.EditProfile) }, onVehicleDetails = { go(Screen.VehicleDetails) }, onDocs = { go(Screen.VehicleDocuments) },
                         )
                     }
                     Screen.EditProfile -> {
@@ -610,8 +620,10 @@ fun AppRoot(appearance: AppearanceState) {
                         val ride = store.rides.firstOrNull { it.id == selRide }
                         if (ride == null) LaunchedEffect(Unit) { back() } else RideDetailsScreen(ride, store.sample, { back() }, { reportCat = 0; go(Screen.ReportIssue) })
                     }
-                    Screen.VehicleDetails -> { BackHandler { back() }; VehicleDetailsScreen(store, { back() }, { go(Screen.EditVehicle) }, { go(Screen.VehicleDocuments) }) }
-                    Screen.EditVehicle -> { BackHandler { back() }; EditVehicleScreen(store, { back() }, { back() }) }
+                    Screen.VehicleDetails -> {
+                        BackHandler { back() }
+                        VehicleDetailsScreen(store, { back() }, { go(Screen.VehicleDocuments) })
+                    }
                     Screen.VehicleDocuments -> { BackHandler { back() }; VehicleDocumentsScreen(store, { back() }, { selTopic = 1; go(Screen.Faq) }) }
                     Screen.Payouts -> { BackHandler { back() }; PayoutsScreen(store, { back() }, { selTopic = 2; go(Screen.Faq) }, { editBankId = -1; go(Screen.BankForm) }) }
                     Screen.BankManage -> {

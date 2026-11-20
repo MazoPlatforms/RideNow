@@ -156,6 +156,7 @@
     <string name="veh_type_car">"කාර්"</string>
     <string name="veh_type_van">"වෑන්"</string>
     <string name="veh_type_three">"ත්‍රිරෝද රථය"</string>
+    <string name="vehicle_details_three_wheeler">"ත්‍රිරෝද රථය"</string>
     <string name="veh_type_bike">"බයිසිකලය"</string>
     <string name="veh_make">"හදන්න"</string>
     <string name="veh_model">"ආකෘතිය"</string>
@@ -390,7 +391,6 @@
     <string name="done_fare_label">"එකතු කිරීමට ගාස්තු"</string>
     <string name="done_button">"මුදල් එකතු කළා"</string>
     <string name="earn_history_item">"%1$s · %2$s සිට %3$s"</string>
-    <string name="preview_auto_home">"පෙරදසුන: %1$d s හි මුල් පිටුව විවෘත කිරීම"</string>
     <string name="earn_trip_route">"%1$s සිට %2$s"</string>
     <string name="nav_unread_desc">"නොකියවූ පණිවිඩ"</string>
     <string name="notif_title">"ලූප් එකේ ඉන්න."</string>

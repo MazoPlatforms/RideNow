@@ -156,6 +156,7 @@
     <string name="veh_type_car">"سيارة"</string>
     <string name="veh_type_van">"فان"</string>
     <string name="veh_type_three">"ذات ثلاث عجلات"</string>
+    <string name="vehicle_details_three_wheeler">"ذات ثلاث عجلات"</string>
     <string name="veh_type_bike">"دراجة"</string>
     <string name="veh_make">"يصنع"</string>
     <string name="veh_model">"نموذج"</string>
@@ -390,7 +391,6 @@
     <string name="done_fare_label">"أجرة لجمع"</string>
     <string name="done_button">"النقدية التي تم جمعها"</string>
     <string name="earn_history_item">"%1$s · %2$s إلى %3$s"</string>
-    <string name="preview_auto_home">"معاينة: فتح الصفحة الرئيسية في %1$d s"</string>
     <string name="earn_trip_route">"من %1$s إلى %2$s"</string>
     <string name="nav_unread_desc">"رسائل غير مقروءة"</string>
     <string name="notif_title">"البقاء في الحلقة."</string>

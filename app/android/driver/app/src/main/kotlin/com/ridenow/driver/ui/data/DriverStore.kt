@@ -48,11 +48,6 @@ class DriverStore {
         sessionEarned = 0; balance = 0; rating = 0.0; totalRides = 0; memberSince = ""; dob = ""; nic = ""; prefLanguage = "English"; photo = null
         vehicle = VehicleInfo("", "", "", "", "", "")
         acceptCash = true; acceptCard = true; acceptWallet = false
-        docs.addAll(listOf(
-            VehicleDoc(DocType.License, null, DocStatus.Pending), VehicleDoc(DocType.Registration, null, DocStatus.Pending),
-            VehicleDoc(DocType.Insurance, null, DocStatus.Pending), VehicleDoc(DocType.Emission, null, DocStatus.Pending),
-            VehicleDoc(DocType.Photos, null, DocStatus.Pending, photos = 0),
-        ))
         if (sample) loadSample()
     }
 
@@ -109,14 +104,6 @@ class DriverStore {
 
     private fun loadSample() {
         rating = 4.8; totalRides = 128; memberSince = "Oct 2026"; dob = "23 Apr 1995"; nic = "950423678V"; balance = 12_450
-        vehicle = VehicleInfo("Tuk Tuk (Three Wheeler)", "ABT 1234", "Green", "Bajaj RE", "2022", "Petrol")
-        docs.clear()
-        docs.addAll(listOf(
-            VehicleDoc(DocType.License, "15 Aug 2027", DocStatus.Verified), VehicleDoc(DocType.Registration, "15 Aug 2027", DocStatus.Verified),
-            VehicleDoc(DocType.Insurance, "20 Jun 2027", DocStatus.Verified), VehicleDoc(DocType.Emission, "10 Mar 2027", DocStatus.Verified),
-            VehicleDoc(DocType.Photos, null, DocStatus.Verified, photos = 4),
-        ))
-
         val riders = listOf("Ahmed R.", "Nimal S.", "Priya K.", "Fathima A.", "Kumar T.", "Sara M.")
         val places = listOf(
             "Main Street, Kallady" to "Main Street, Kallady, Batticaloa", "Batticaloa Town, Bus Stand" to "Bus Stand, Batticaloa Town",

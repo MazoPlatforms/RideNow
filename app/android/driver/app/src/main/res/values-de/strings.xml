@@ -156,6 +156,7 @@
     <string name="veh_type_car">"Auto"</string>
     <string name="veh_type_van">"Van"</string>
     <string name="veh_type_three">"Dreirad"</string>
+    <string name="vehicle_details_three_wheeler">"Dreirad"</string>
     <string name="veh_type_bike">"Fahrrad"</string>
     <string name="veh_make">"Machen"</string>
     <string name="veh_model">"Modell"</string>
@@ -390,7 +391,6 @@
     <string name="done_fare_label">"Fahrpreis zu sammeln"</string>
     <string name="done_button">"Bargeld gesammelt"</string>
     <string name="earn_history_item">"%1$s · %2$s bis %3$s"</string>
-    <string name="preview_auto_home">"Vorschau: Eröffnung des Hauses in %1$d s"</string>
     <string name="earn_trip_route">"%1$s bis %2$s"</string>
     <string name="nav_unread_desc">"Ungelesene Nachrichten"</string>
     <string name="notif_title">"Bleiben Sie auf dem Laufenden."</string>

@@ -156,6 +156,7 @@
     <string name="veh_type_car">"Voiture"</string>
     <string name="veh_type_van">"Fourgon"</string>
     <string name="veh_type_three">"Tricycle motorisé"</string>
+    <string name="vehicle_details_three_wheeler">"Tricycle motorisé"</string>
     <string name="veh_type_bike">"Moto"</string>
     <string name="veh_make">"Marque"</string>
     <string name="veh_model">"Modèle"</string>
@@ -390,7 +391,6 @@
     <string name="done_fare_label">"Tarif à encaisser"</string>
     <string name="done_button">"Espèces encaissées"</string>
     <string name="earn_history_item">"%1$s · %2$s à %3$s"</string>
-    <string name="preview_auto_home">"Aperçu : ouverture de l’accueil dans %1$d s"</string>
     <string name="earn_trip_route">"%1$s à %2$s"</string>
     <string name="nav_unread_desc">"Messages non lus"</string>
     <string name="notif_title">"Restez informé."</string>

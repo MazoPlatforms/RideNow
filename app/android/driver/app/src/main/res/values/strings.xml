@@ -162,6 +162,7 @@
     <string name="veh_type_car">Car</string>
     <string name="veh_type_van">Van</string>
     <string name="veh_type_three">Three-wheeler</string>
+    <string name="vehicle_details_three_wheeler">Three Wheeler</string>
     <string name="veh_type_bike">Bike</string>
     <string name="veh_make">Make</string>
     <string name="veh_model">Model</string>
@@ -396,7 +397,6 @@
     <string name="done_fare_label">Fare to collect</string>
     <string name="done_button">Cash collected</string>
     <string name="earn_history_item">%1$s \u00b7 %2$s to %3$s</string>
-    <string name="preview_auto_home">Preview: opening Home in %1$d s</string>
     <string name="earn_trip_route">%1$s to %2$s</string>
     <string name="nav_unread_desc">Unread messages</string>
     <string name="notif_title">Stay in the loop.</string>
@@ -485,4 +485,5 @@
     <string name="onboarding_edit">Update application</string>
     <string name="onboarding_service_area">Service area</string>
     <string name="onboarding_status_title">Application status</string>
+    <string name="doc_scan_rejected">Could not be verified</string>
 </resources>

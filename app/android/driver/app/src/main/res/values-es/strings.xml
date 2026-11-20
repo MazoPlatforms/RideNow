@@ -156,6 +156,7 @@
     <string name="veh_type_car">"Auto"</string>
     <string name="veh_type_van">"Furgoneta"</string>
     <string name="veh_type_three">"Vehículo de tres ruedas"</string>
+    <string name="vehicle_details_three_wheeler">"Vehículo de tres ruedas"</string>
     <string name="veh_type_bike">"Moto"</string>
     <string name="veh_make">"Marca"</string>
     <string name="veh_model">"Modelo"</string>
@@ -390,7 +391,6 @@
     <string name="done_fare_label">"Tarifa a cobrar"</string>
     <string name="done_button">"Efectivo cobrado"</string>
     <string name="earn_history_item">"%1$s · de %2$s a %3$s"</string>
-    <string name="preview_auto_home">"Vista previa: abriendo Inicio en %1$d s"</string>
     <string name="earn_trip_route">"de %1$s a %2$s"</string>
     <string name="nav_unread_desc">"Mensajes sin leer"</string>
     <string name="notif_title">"Mantente al día."</string>

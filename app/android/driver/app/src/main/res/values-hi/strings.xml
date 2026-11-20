@@ -156,6 +156,7 @@
     <string name="veh_type_car">"कार"</string>
     <string name="veh_type_van">"वैन"</string>
     <string name="veh_type_three">"तिपहिया"</string>
+    <string name="vehicle_details_three_wheeler">"तिपहिया"</string>
     <string name="veh_type_bike">"बाइक"</string>
     <string name="veh_make">"बनाना"</string>
     <string name="veh_model">"नमूना"</string>
@@ -390,7 +391,6 @@
     <string name="done_fare_label">"किराया वसूलना है"</string>
     <string name="done_button">"नकद एकत्रित किया गया"</string>
     <string name="earn_history_item">"%1$s · %2$s से %3$s"</string>
-    <string name="preview_auto_home">"पूर्वावलोकन: %1$d s में होम खोलना"</string>
     <string name="earn_trip_route">"%1$s से %2$s"</string>
     <string name="nav_unread_desc">"अपठित संदेश"</string>
     <string name="notif_title">"लूप में रहें।"</string>

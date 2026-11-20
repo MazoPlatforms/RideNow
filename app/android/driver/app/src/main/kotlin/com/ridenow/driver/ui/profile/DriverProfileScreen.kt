@@ -16,6 +16,7 @@ import com.ridenow.driver.R
 import com.ridenow.driver.ui.components.*
 import com.ridenow.driver.ui.data.*
 import com.ridenow.driver.ui.theme.RideTheme
+import com.ridenow.driver.ui.vehicle.detailsTypeLabel
 import com.ridenow.driver.ui.util.entrance
 
 /** Round profile picture: the chosen photo, or initials when there is none. */
@@ -30,7 +31,7 @@ fun ProfilePhoto(store: DriverStore, name: String, size: Dp, modifier: Modifier 
 @Composable
 fun DriverProfileScreen(
     store: DriverStore, name: String, phone: String, email: String, address: String, active: Boolean,
-    onBack: () -> Unit, onEdit: () -> Unit, onEditVehicle: () -> Unit, onDocs: () -> Unit, modifier: Modifier = Modifier,
+    onBack: () -> Unit, onEdit: () -> Unit, onVehicleDetails: () -> Unit, onDocs: () -> Unit, modifier: Modifier = Modifier,
 ) {
     val c = RideTheme.colors
     val none = str(R.string.profile_none)
@@ -69,9 +70,9 @@ fun DriverProfileScreen(
             DetailRow(RideIcons.Mail, str(R.string.profile_email), email.ifBlank { none }); RowDivider()
             DetailRow(RideIcons.Pin, str(R.string.profile_address), address.ifBlank { none })
         }
-        SectionTitle(str(R.string.profile_section_vehicle), action = str(R.string.profile_edit), actionIcon = RideIcons.Pencil, onAction = onEditVehicle)
+        SectionTitle(str(R.string.profile_section_vehicle), action = str(R.string.view_all), onAction = onVehicleDetails)
         GroupCard {
-            DetailRow(RideIcons.Car, str(R.string.vd_type), v.type.ifBlank { none }); RowDivider()
+            DetailRow(RideIcons.Car, str(R.string.vd_type), v.detailsTypeLabel().ifBlank { none }); RowDivider()
             DetailRow(RideIcons.Doc, str(R.string.veh_number), v.number.ifBlank { none }); RowDivider()
             DetailRow(RideIcons.Palette, str(R.string.vd_color), v.color.ifBlank { none }); RowDivider()
             DetailRow(RideIcons.Gear, str(R.string.vd_model), v.model.ifBlank { none }); RowDivider()
@@ -106,15 +107,15 @@ private fun DocRow(d: VehicleDoc, onClick: () -> Unit) {
 @Composable
 fun docTitle(t: DocType): String = str(when (t) {
     DocType.License -> R.string.doc_license; DocType.Registration -> R.string.doc_registration; DocType.Insurance -> R.string.doc_insurance
-    DocType.Emission -> R.string.doc_emission; DocType.Photos -> R.string.doc_photos
+    DocType.Revenue -> R.string.vdoc_revenue; DocType.Emission -> R.string.doc_emission; DocType.Photos -> R.string.doc_photos
 })
 
 fun docIcon(t: DocType): List<String> = when (t) {
-    DocType.License -> RideIcons.IdCard; DocType.Registration -> RideIcons.IdCard; DocType.Insurance -> RideIcons.Shield; DocType.Emission -> RideIcons.Doc; DocType.Photos -> RideIcons.Image
+    DocType.License -> RideIcons.IdCard; DocType.Registration -> RideIcons.IdCard; DocType.Insurance -> RideIcons.Shield; DocType.Emission, DocType.Revenue -> RideIcons.Doc; DocType.Photos -> RideIcons.Image
 }
 
 @Composable
 fun DocStatusChip(s: DocStatus, modifier: Modifier = Modifier) = StatusChip(
-    str(when (s) { DocStatus.Verified -> R.string.doc_verified; DocStatus.Pending -> R.string.doc_pending; DocStatus.Expired -> R.string.doc_expired }),
-    when (s) { DocStatus.Verified -> Tone.Good; DocStatus.Pending -> Tone.Warn; DocStatus.Expired -> Tone.Danger }, modifier, dot = s == DocStatus.Verified,
+    str(when (s) { DocStatus.Verified -> R.string.doc_verified; DocStatus.Pending -> R.string.doc_pending; DocStatus.Expired -> R.string.doc_expired; DocStatus.Rejected -> R.string.doc_scan_rejected }),
+    when (s) { DocStatus.Verified -> Tone.Good; DocStatus.Pending -> Tone.Warn; DocStatus.Expired, DocStatus.Rejected -> Tone.Danger }, modifier, dot = s == DocStatus.Verified,
 )

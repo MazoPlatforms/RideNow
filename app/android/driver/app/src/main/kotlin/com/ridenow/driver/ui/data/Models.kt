@@ -47,8 +47,8 @@ class Ticket(val id: String, val title: String, val icon: String, val dateLabel:
     val createdLabel: String get() = "$dateLabel, $time"
 }
 
-enum class DocType { License, Registration, Insurance, Emission, Photos }
-enum class DocStatus { Verified, Pending, Expired }
+enum class DocType { License, Registration, Revenue, Insurance, Emission, Photos }
+enum class DocStatus { Verified, Pending, Expired, Rejected }
 
 class VehicleDoc(val type: DocType, expiry: String?, status: DocStatus, val photos: Int = 0) {
     var expiry by mutableStateOf(expiry)
@@ -57,10 +57,14 @@ class VehicleDoc(val type: DocType, expiry: String?, status: DocStatus, val phot
 
 class BankAccountInfo(val id: Int, val holder: String, val bank: String, val number: String, val branch: String, val type: String, val verified: Boolean = true)
 
+enum class VehicleCategory { TUK, CAR, BIKE, VAN }
+
 class VehicleInfo(
     type: String, number: String, color: String, model: String, year: String, fuel: String,
+    category: VehicleCategory? = null, val make: String = "", val approved: Boolean = false,
 ) {
     var type by mutableStateOf(type)
+    var category by mutableStateOf(category)
     var number by mutableStateOf(number)
     var color by mutableStateOf(color)
     var model by mutableStateOf(model)

@@ -1,9 +1,6 @@
 package com.ridenow.driver.ui.status
 
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -16,7 +13,6 @@ import com.ridenow.driver.ui.theme.RideTheme
 @Composable
 fun SubmittedScreen(
     name: String, reference: String, onCheckStatus: () -> Unit, onSupport: () -> Unit, modifier: Modifier = Modifier,
-    previewSecondsLeft: Int? = null,
 ) {
     val c = RideTheme.colors
     StatusScaffold(
@@ -27,10 +23,6 @@ fun SubmittedScreen(
         StatusRow(RideIcons.Check, stringResource(R.string.sub_row_sent), stringResource(R.string.sub_reference, reference), c.accent)
         StatusRow(RideIcons.Clock, stringResource(R.string.sub_row_pending), stringResource(R.string.sub_row_pending_text), c.fg)
         StatusRow(RideIcons.Shield, stringResource(R.string.sub_row_decision), stringResource(R.string.sub_row_decision_text), c.muted)
-        if (previewSecondsLeft != null) androidx.compose.material3.Text(
-            stringResource(R.string.preview_auto_home, previewSecondsLeft), color = c.muted, fontSize = 12.sp,
-            modifier = Modifier.fillMaxWidth().padding(top = 14.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
     }
 }
 
