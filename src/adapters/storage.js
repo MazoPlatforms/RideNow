@@ -94,6 +94,7 @@ export function createStorage(config) {
     },
     download(Key, VersionId) {
       if (mode === 'immutable') ensure(VERIFIED.test(Key), 409, 'DOCUMENT_RESCAN_REQUIRED');
+      if (mode === 'versioned') ensure(VersionId && VersionId !== 'null', 409, 'DOCUMENT_RESCAN_REQUIRED');
       return getSignedUrl(
         signer,
         new GetObjectCommand({ Bucket, Key, ...(mode === 'versioned' ? { VersionId } : {}) }),

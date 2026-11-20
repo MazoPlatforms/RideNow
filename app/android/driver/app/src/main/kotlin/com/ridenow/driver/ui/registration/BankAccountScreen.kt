@@ -37,8 +37,8 @@ fun BankAccountScreen(onBack: () -> Unit, onSaved: (holder: String, bank: String
     var holder by rememberSaveable { mutableStateOf("") }
     var bank by rememberSaveable { mutableStateOf("") }
     var branch by rememberSaveable { mutableStateOf("") }
-    var number by rememberSaveable { mutableStateOf("") }
-    var confirm by rememberSaveable { mutableStateOf("") }
+    var number by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
     var numberFocused by remember { mutableStateOf(false) }
     var confirmFocused by remember { mutableStateOf(false) }
 

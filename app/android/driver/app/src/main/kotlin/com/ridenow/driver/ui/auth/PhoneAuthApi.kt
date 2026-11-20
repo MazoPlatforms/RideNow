@@ -1,105 +1,146 @@
 package com.ridenow.driver.ui.auth
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.net.HttpURLConnection
 import java.net.URL
+import javax.net.ssl.HttpsURLConnection
 
-/** RideNow's OTP API. OTP delivery is WhatsApp; Android cannot inspect WhatsApp messages. */
+/** Authenticated RideNow requests use the Keystore-backed session from WhatsApp verification. */
 object PhoneAuthApi {
     private const val BASE_URL = "https://mzn-api.onrender.com"
     private const val PREFS = "ridenow_driver_auth_session"
+    private const val PENDING = "pending_driver_application"
+    private val lock = Mutex()
 
     private fun prefs(context: Context) = EncryptedSharedPreferences.create(
-        context,
-        PREFS,
-        MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+        context, PREFS, MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
 
     suspend fun requestCode(context: Context, phone: String): String = withContext(Dispatchers.IO) {
-        val response = post("/v1/auth/otp/request", JSONObject().put("phone", phone))
-        val challengeId = response.optString("challengeId")
-        check(challengeId.isNotBlank()) { "OTP response did not contain a challenge ID" }
-        challengeId
+        request("POST", "/v1/auth/otp/request", JSONObject().put("phone", phone)).getString("challengeId")
     }
 
     suspend fun verifyCode(context: Context, phone: String, challengeId: String, code: String): String = withContext(Dispatchers.IO) {
-        val result = post("/v1/auth/otp/verify", JSONObject().put("challengeId", challengeId).put("code", code))
-        val access = result.optString("accessToken")
-        val refresh = result.optString("refreshToken")
-        check(access.isNotBlank() && refresh.isNotBlank()) { "Authentication response did not contain session tokens" }
-        prefs(context).edit().putString("access_token", access).putString("refresh_token", refresh)
-            .putString("phone", phone).apply()
-        result.optJSONObject("user")?.optString("name").orEmpty()
+        lock.withLock {
+            val result = request("POST", "/v1/auth/otp/verify", JSONObject().put("challengeId", challengeId).put("code", code))
+            val storage = prefs(context)
+            val verifiedPhone = result.optJSONObject("user")?.optString("phone")?.ifBlank { null } ?: phone
+            val edit = storage.edit().putString("phone", verifiedPhone)
+            if (storage.getString("phone", null) != verifiedPhone) edit.remove(PENDING)
+            writeTokens(edit, result)
+            result.optJSONObject("user")?.optString("name").orEmpty()
+        }
     }
 
-    /** Rotates the refresh token and returns the saved phone only for a valid server session. */
     suspend fun restoreSession(context: Context): String? = withContext(Dispatchers.IO) {
-        val storage = prefs(context)
-        val refresh = storage.getString("refresh_token", null) ?: return@withContext null
-        val phone = storage.getString("phone", null) ?: return@withContext null
-        try {
-            val result = post("/v1/auth/refresh", JSONObject().put("refreshToken", refresh))
-            val access = result.optString("accessToken")
-            val nextRefresh = result.optString("refreshToken")
-            check(access.isNotBlank() && nextRefresh.isNotBlank())
-            storage.edit().putString("access_token", access).putString("refresh_token", nextRefresh).apply()
-            phone
-        } catch (_: Exception) {
-            storage.edit().clear().apply()
-            null
+        lock.withLock {
+            val storage = prefs(context)
+            val phone = storage.getString("phone", null) ?: return@withLock null
+            if (storage.getString("access_token", null).isNullOrBlank()) null else phone
+        }
+    }
+
+    suspend fun authorized(
+        context: Context, method: String, path: String, body: JSONObject? = null, key: String? = null,
+    ): JSONObject = withContext(Dispatchers.IO) {
+        lock.withLock {
+            val storage = prefs(context)
+            val access = storage.getString("access_token", null) ?: throw PhoneAuthException("AUTH_REQUIRED", 401)
+            try {
+                request(method, path, body, access, key)
+            } catch (error: PhoneAuthException) {
+                if (error.status != 401) throw error
+                request(method, path, body, rotate(storage), key)
+            }
+        }
+    }
+
+    suspend fun pendingApplication(context: Context): JSONObject? = withContext(Dispatchers.IO) {
+        lock.withLock { prefs(context).getString(PENDING, null)?.let { JSONObject(it) } }
+    }
+
+    suspend fun savePendingApplication(context: Context, value: JSONObject?) = withContext(Dispatchers.IO) {
+        lock.withLock {
+            val storage = prefs(context)
+            if (value != null && storage.getString("access_token", null).isNullOrBlank())
+                throw PhoneAuthException("AUTH_REQUIRED", 401)
+            val edit = storage.edit()
+            if (value == null) edit.remove(PENDING) else edit.putString(PENDING, value.toString())
+            check(edit.commit())
         }
     }
 
     suspend fun signOut(context: Context) = withContext(Dispatchers.IO) {
-        val storage = prefs(context)
-        var access = storage.getString("access_token", null)
-        try {
-            if (access.isNullOrBlank()) return@withContext
+        lock.withLock {
+            val storage = prefs(context)
             try {
-                post("/v1/auth/logout", JSONObject(), access)
-            } catch (_: Exception) {
-                val refresh = storage.getString("refresh_token", null) ?: return@withContext
-                val rotated = post("/v1/auth/refresh", JSONObject().put("refreshToken", refresh))
-                access = rotated.optString("accessToken")
-                if (!access.isNullOrBlank()) post("/v1/auth/logout", JSONObject(), access)
+                val access = storage.getString("access_token", null) ?: return@withLock
+                try {
+                    request("POST", "/v1/auth/logout", JSONObject(), access)
+                } catch (error: PhoneAuthException) {
+                    if (error.status == 401) request("POST", "/v1/auth/logout", JSONObject(), rotate(storage))
+                }
+            } finally {
+                storage.edit().clear().commit()
             }
-        } finally {
-            storage.edit().clear().apply()
         }
     }
 
-    private fun post(path: String, payload: JSONObject, bearer: String? = null): JSONObject {
-        val connection = (URL(BASE_URL + path).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
+    private fun rotate(storage: SharedPreferences): String {
+        val refresh = storage.getString("refresh_token", null) ?: throw PhoneAuthException("AUTH_REQUIRED", 401)
+        val result = try {
+            request("POST", "/v1/auth/refresh", JSONObject().put("refreshToken", refresh))
+        } catch (error: PhoneAuthException) {
+            if (error.status == 401) storage.edit().clear().commit()
+            throw error
+        }
+        return writeTokens(storage.edit(), result)
+    }
+
+    private fun writeTokens(edit: SharedPreferences.Editor, result: JSONObject): String {
+        val access = result.getString("accessToken")
+        val refresh = result.getString("refreshToken")
+        check(access.isNotBlank() && refresh.isNotBlank())
+        check(edit.putString("access_token", access).putString("refresh_token", refresh).commit())
+        return access
+    }
+
+    private fun request(method: String, path: String, body: JSONObject?, bearer: String? = null, key: String? = null): JSONObject {
+        require(path.startsWith("/v1/"))
+        val connection = (URL(BASE_URL + path).openConnection() as HttpsURLConnection).apply {
+            requestMethod = method
+            instanceFollowRedirects = false
             connectTimeout = 15_000
-            // Render's free web service can take over 20s to wake from idle.
             readTimeout = 60_000
-            doOutput = true
             setRequestProperty("Accept", "application/json")
-            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            if (body != null) {
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            }
             if (bearer != null) setRequestProperty("Authorization", "Bearer $bearer")
+            if (key != null) setRequestProperty("Idempotency-Key", key)
         }
         return try {
-            connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+            if (body != null) connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            val json = runCatching { JSONObject(body) }.getOrElse { JSONObject() }
-            if (status !in 200..299) throw PhoneAuthException(
-                json.optString("code", "NETWORK_ERROR"), json.optString("message", "Could not complete verification"), status,
-            )
-            json
+            val raw = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            val response = runCatching { JSONObject(raw) }.getOrElse { JSONObject() }
+            if (status !in 200..299) throw PhoneAuthException(response.optString("code", "NETWORK_ERROR"), status)
+            response
         } finally {
             connection.disconnect()
         }
     }
 }
 
-class PhoneAuthException(val code: String, message: String, val status: Int) : Exception(message)
+class PhoneAuthException(val code: String, val status: Int) : Exception(code)

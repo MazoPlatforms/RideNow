@@ -15,6 +15,7 @@ import { createAuth, permission } from './modules/auth.js';
 import { quote } from './modules/pricing.js';
 import * as rides from './modules/rides.js';
 import * as drivers from './modules/drivers.js';
+import * as application from './modules/driver-application.js';
 import * as ledger from './modules/ledger.js';
 import { acceptOffer } from './modules/dispatch.js';
 import { mountWebsite } from './website.js';
@@ -380,36 +381,55 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     { idem: true, body: z.object({ name: text }).strict() },
     ({ db, user, body }) => drivers.onboard(db, user, body),
   );
-  route('get', '/v1/drivers/me', { access: 'driver' }, async ({ db, user }) => ({
-    profile: await one(db, 'SELECT * FROM driver_profiles WHERE user_id=$1', [user.id]),
-    vehicles: (await db.query('SELECT * FROM vehicles WHERE driver_id=$1', [user.id])).rows,
-    documents: (
-      await db.query(
-        'SELECT id,kind,vehicle_id,expires_at,scan_status FROM documents WHERE driver_id=$1',
-        [user.id],
-      )
-    ).rows,
-  }));
+  route('get', '/v1/drivers/me', { access: 'driver' }, async ({ db, user }) => {
+    const profile = await one(db, 'SELECT * FROM driver_profiles WHERE user_id=$1', [user.id]);
+    const saved = profile ? application.readApplication(profile, config.ENCRYPTION_KEY) : null;
+    if (saved?.bank) {
+      const { number, ...bank } = saved.bank;
+      saved.bank = { ...bank, lastFour: number.slice(-4) };
+    }
+    return {
+      profile: application.publicProfile(profile),
+      application: saved,
+      vehicles: (await db.query('SELECT * FROM vehicles WHERE driver_id=$1 ORDER BY created_at', [user.id])).rows,
+      documents: (await db.query(
+        `SELECT ${application.documentFields} FROM documents WHERE driver_id=$1 ORDER BY created_at`, [user.id]
+      )).rows,
+    };
+  });
+  route(
+    'put', '/v1/drivers/application', { access: 'driver', body: application.applicationSchema },
+    ({ user, body }) => transaction(pool, (db) =>
+      application.saveApplication(db, user.id, body, config.ENCRYPTION_KEY)),
+  );
   route(
     'post',
     '/v1/drivers/vehicles',
     {
       access: 'driver',
       idem: true,
-      body: z
-        .object({
-          registration: z.string().min(3).max(30),
-          category,
-          capacity: z.number().int().min(1).max(15),
-        })
-        .strict(),
+      body: z.strictObject({
+        registration: z.string().trim().min(3).max(30),
+        category: z.enum(['TUK', 'CAR', 'VAN', 'BIKE']),
+        capacity: z.number().int().min(1).max(15).optional(),
+        ...application.vehicleDetails,
+      }),
     },
-    ({ db, user, body }) =>
-      one(
-        db,
-        'INSERT INTO vehicles(driver_id,registration,category,capacity) VALUES($1,$2,$3,$4) RETURNING *',
-        [user.id, body.registration, body.category, body.capacity],
-      ),
+    async ({ db, user, body }) => {
+      const profile = await application.editableProfile(db, user.id);
+      ensure(!['RESERVED', 'ON_TRIP'].includes(profile.availability), 409, 'DRIVER_BUSY');
+      const plate = body.registration.normalize('NFKC').toUpperCase().replace(/[^\p{L}\p{N}]/gu, '');
+      ensure(plate.length >= 3 && plate.length <= 30, 400, 'INVALID_REGISTRATION');
+      return one(db,
+        `INSERT INTO vehicles(driver_id,registration,category,capacity,make,model,model_year,color)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT(driver_id,registration) DO UPDATE SET category=EXCLUDED.category,capacity=EXCLUDED.capacity,
+           make=EXCLUDED.make,model=EXCLUDED.model,model_year=EXCLUDED.model_year,color=EXCLUDED.color
+         RETURNING *`,
+        [user.id, plate, body.category, body.capacity ?? { TUK: 3, CAR: 4, VAN: 6, BIKE: 1 }[body.category],
+          body.make, body.model, body.modelYear, body.color],
+      );
+    },
   );
   route(
     'post',
@@ -417,43 +437,38 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     {
       access: 'driver',
       idem: true,
-      body: z
-        .object({
-          vehicleId: uuid.optional(),
-          kind: z.enum(['IDENTITY', 'LICENSE', 'REGISTRATION', 'INSURANCE']),
-          mime: z.enum(['image/jpeg', 'image/png', 'application/pdf']),
-          bytes: z.number().int().positive().max(10485760),
-          expiresAt: z.iso.datetime(),
-        })
-        .strict(),
+      body: z.strictObject({
+        vehicleId: uuid.optional(),
+        kind: z.enum(application.documentKinds),
+        mime: z.enum(['image/jpeg', 'image/png', 'application/pdf']),
+        bytes: z.number().int().positive().max(10485760),
+        expiresAt: z.iso.datetime().optional(),
+      }),
     },
     async ({ db, user, body }) => {
-      ensure(new Date(body.expiresAt) > Date.now(), 400, 'DOCUMENT_EXPIRED');
-      ensure(
-        ['REGISTRATION', 'INSURANCE'].includes(body.kind) === !!body.vehicleId,
-        400,
-        'DOCUMENT_OWNER_INVALID',
-      );
+      await application.editableProfile(db, user.id);
+      const photo = body.kind === 'PROFILE_PHOTO' ||
+        (body.kind.startsWith('VEHICLE_') && application.vehicleKinds.includes(body.kind));
+      ensure(!photo || (body.mime !== 'application/pdf' && !body.expiresAt), 400, 'INVALID_PHOTO');
+      if (application.expiringKinds.includes(body.kind))
+        ensure(body.expiresAt, 400, 'DOCUMENT_EXPIRY_REQUIRED');
+      ensure(!body.expiresAt || new Date(body.expiresAt) > Date.now(), 400, 'DOCUMENT_EXPIRED');
+      ensure(application.vehicleKinds.includes(body.kind) === !!body.vehicleId, 400, 'DOCUMENT_OWNER_INVALID');
       if (body.vehicleId)
-        ensure(
-          await one(db, 'SELECT id FROM vehicles WHERE id=$1 AND driver_id=$2', [
-            body.vehicleId,
-            user.id,
-          ]),
-          403,
-          'FORBIDDEN',
-        );
+        ensure(await one(db, 'SELECT id FROM vehicles WHERE id=$1 AND driver_id=$2', [
+          body.vehicleId, user.id,
+        ]), 403, 'FORBIDDEN');
+      const recent = await one(db,
+        "SELECT count(*)::int AS count FROM documents WHERE driver_id=$1 AND created_at>now()-interval '1 day'",
+        [user.id]);
+      ensure(recent.count < 60, 429, 'DOCUMENT_UPLOAD_LIMIT');
       const key = `drivers/${user.id}/${randomUUID()}`;
       const doc = await one(
         db,
         'INSERT INTO documents(driver_id,vehicle_id,kind,object_key,mime,bytes,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-        [user.id, body.vehicleId ?? null, body.kind, key, body.mime, body.bytes, body.expiresAt],
+        [user.id, body.vehicleId ?? null, body.kind, key, body.mime, body.bytes, body.expiresAt ?? null],
       );
-      return {
-        documentId: doc.id,
-        uploadUrl: await storage.upload(key, body.mime, body.bytes),
-        expiresIn: 300,
-      };
+      return { documentId: doc.id, uploadUrl: await storage.upload(key, body.mime, body.bytes), expiresIn: 300 };
     },
   );
   route(
@@ -461,26 +476,23 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     '/v1/drivers/documents/:id/submit',
     { access: 'driver', idem: true },
     async ({ db, user, req }) => {
-      const d = await one(db, 'SELECT * FROM documents WHERE id=$1 AND driver_id=$2', [
-        req.params.id,
-        user.id,
-      ]);
-      ensure(d, 404, 'DOCUMENT_NOT_FOUND');
-      await db.query(
-        "INSERT INTO jobs(kind,payload,run_at) VALUES('scan',$1,now()+interval '6 minutes')",
-        [{ documentId: d.id }],
-      );
+      await application.editableProfile(db, user.id);
+      const d = ensure(await one(db,
+        'SELECT id,submitted_at FROM documents WHERE id=$1 AND driver_id=$2', [req.params.id, user.id]),
+        404, 'DOCUMENT_NOT_FOUND');
+      if (!d.submitted_at) {
+        await db.query('UPDATE documents SET submitted_at=now() WHERE id=$1', [d.id]);
+        await db.query(
+          "INSERT INTO jobs(kind,payload,run_at) VALUES('scan',$1,now()+interval '6 minutes')",
+          [{ documentId: d.id }],
+        );
+      }
       return { queued: true };
     },
   );
-  route('post', '/v1/drivers/submit', { access: 'driver', idem: true }, async ({ db, user }) => {
-    const result = await one(
-      db,
-      "UPDATE driver_profiles SET status='PENDING' WHERE user_id=$1 AND status IN ('DRAFT','REJECTED') RETURNING *",
-      [user.id],
-    );
-    return ensure(result, 409, 'INVALID_ONBOARDING_STATE');
-  });
+  route('post', '/v1/drivers/submit', { access: 'driver', idem: true, body: application.submitSchema },
+    ({ db, user, body }) => application.submitApplication(db, user.id, body, config.ENCRYPTION_KEY),
+  );
   route(
     'put',
     '/v1/drivers/availability',
@@ -698,12 +710,15 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     },
   );
   route('get', '/v1/admin/drivers', { permission: 'drivers.review' }, async ({ db, req }) => {
-    const p = page.parse(req.query);
+    const p = page.extend({ status: z.enum(['DRAFT','PENDING','APPROVED','REJECTED','SUSPENDED']).optional() }).parse(req.query);
     return {
       items: (
         await db.query(
-          'SELECT d.*,u.name,u.phone FROM driver_profiles d JOIN users u ON u.id=d.user_id WHERE ($1::uuid IS NULL OR d.user_id<$1) ORDER BY d.user_id DESC LIMIT $2',
-          [p.cursor ?? null, p.limit],
+          `SELECT d.user_id,d.status,d.availability,d.submitted_at,u.name,u.phone
+           FROM driver_profiles d JOIN users u ON u.id=d.user_id
+           WHERE u.deleted_at IS NULL AND ($1::uuid IS NULL OR d.user_id<$1)
+           AND ($3::text IS NULL OR d.status=$3) ORDER BY d.user_id DESC LIMIT $2`,
+          [p.cursor ?? null, p.limit, p.status ?? null],
         )
       ).rows,
     };
@@ -718,33 +733,50 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
         .object({
           status: z.enum(['APPROVED', 'REJECTED', 'SUSPENDED']),
           vehicleId: uuid.optional(),
+          revision: uuid.optional(),
+          expectedStatus: z.enum(['PENDING', 'APPROVED', 'SUSPENDED']).optional(),
           reason: text.optional(),
         })
         .strict(),
     },
-    ({ db, user, req, body }) => drivers.review(db, user, req.params.id, body),
+    ({ db, user, req, body }) => drivers.review(db, user, req.params.id, body, config.ENCRYPTION_KEY),
   );
-  route('get', '/v1/admin/drivers/:id', { permission: 'drivers.review' }, async ({ db, req }) => ({
-    driver: ensure(await one(db, 'SELECT d.*,u.name,u.phone FROM driver_profiles d JOIN users u ON u.id=d.user_id WHERE d.user_id=$1', [req.params.id]), 404, 'DRIVER_NOT_FOUND'),
-    vehicles: (await db.query('SELECT * FROM vehicles WHERE driver_id=$1 ORDER BY created_at', [req.params.id])).rows,
-    documents: (await db.query('SELECT id,kind,mime,bytes,scan_status,expires_at,created_at FROM documents WHERE driver_id=$1 ORDER BY created_at', [req.params.id])).rows,
-  }));
-  route(
-    'get',
-    '/v1/admin/documents/:id',
-    { permission: 'drivers.review' },
-    async ({ db, user, req }) => {
-      const d = ensure(
-        await one(db, "SELECT * FROM documents WHERE id=$1 AND scan_status='CLEAN'", [
-          req.params.id,
-        ]),
-        404,
-        'DOCUMENT_NOT_AVAILABLE',
-      );
-      await audit(db, user.id, 'DOCUMENT_VIEW', d.id);
-      return { document: d, downloadUrl: await storage.download(d.object_key, d.object_version) };
-    },
-  );
+  route('get', '/v1/admin/drivers/:id', { permission: 'drivers.review' }, async ({ db, req, user }) => {
+    const id = req.params.id;
+    const profile = ensure(await one(db,
+      `SELECT d.*,u.name,u.phone,u.suspended FROM driver_profiles d JOIN users u ON u.id=d.user_id
+       WHERE d.user_id=$1 AND u.deleted_at IS NULL`, [id]), 404, 'DRIVER_NOT_FOUND');
+    const saved = profile.application_revision && ['PENDING','APPROVED','SUSPENDED'].includes(profile.status)
+      ? application.readApplication(profile, config.ENCRYPTION_KEY)
+      : null;
+    const { bank, identity, license, ...details } = saved ?? {};
+    if (saved) {
+      details.identity = { ...identity, number: '••••' + identity.number.slice(-4) };
+      details.license = { ...license, number: '••••' + license.number.slice(-4) };
+      details.bankProvided = Boolean(bank);
+      await audit(db, user.id, 'DRIVER_APPLICATION_VIEW', id);
+    }
+    return {
+      driver: application.publicProfile(profile),
+      application: saved ? details : null,
+      vehicles: (await db.query('SELECT * FROM vehicles WHERE driver_id=$1 ORDER BY created_at', [id])).rows,
+      documents: (await db.query(
+        `SELECT ${application.documentFields} FROM documents WHERE driver_id=$1 ORDER BY created_at`, [id]
+      )).rows,
+    };
+  });
+  route('get', '/v1/admin/documents/:id', { permission: 'drivers.review' }, async ({ db, user, req }) => {
+    const d = ensure(await one(db,
+      `SELECT v.id,v.object_key,v.object_version
+       FROM documents v JOIN users u ON u.id=v.driver_id
+       JOIN driver_profiles p ON p.user_id=v.driver_id
+       WHERE v.id=$1 AND v.scan_status='CLEAN' AND u.deleted_at IS NULL
+       AND (v.id=ANY(p.application_document_ids) OR
+         (p.application_revision IS NULL AND p.status IN ('APPROVED','SUSPENDED'))) `,
+      [req.params.id]), 404, 'DOCUMENT_NOT_AVAILABLE');
+    await audit(db, user.id, 'DOCUMENT_VIEW', d.id);
+    return { downloadUrl: await storage.download(d.object_key, d.object_version) };
+  });
   route('get', '/v1/admin/rides', { permission: 'rides.monitor' }, async ({ db, req }) => {
     const p = page.parse(req.query);
     return {

@@ -19,8 +19,10 @@ import com.ridenow.driver.ui.util.entrance
 /** Form section of the merged step: 5 of 9: photo and expiry date for the registration certificate, revenue license and insurance. */
 @Composable
 fun VehicleDocsContent(onValid: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val draft = LocalDriverDraft.current
     val c = RideTheme.colors
-    val photos = remember { mutableStateListOf<Bitmap?>(null, null, null) }
+    val uploadKinds = listOf("REGISTRATION", "REVENUE_LICENSE", "INSURANCE")
+    val photos = remember { mutableStateListOf(*uploadKinds.map { draft?.photo(it) }.toTypedArray()) }
     var e0 by rememberSaveable { mutableStateOf<Long?>(null) }
     var e1 by rememberSaveable { mutableStateOf<Long?>(null) }
     var e2 by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -32,6 +34,11 @@ fun VehicleDocsContent(onValid: (Boolean) -> Unit, modifier: Modifier = Modifier
     val titles = listOf(R.string.vdoc_registration, R.string.vdoc_revenue, R.string.vdoc_insurance)
     val kinds = listOf(PaperKind.Certificate, PaperKind.Revenue, PaperKind.Insurance)
 
+    SideEffect { if (canContinue) draft?.let {
+        uploadKinds.forEachIndexed { index, kind ->
+            it.setPhoto(kind, photos[index], expiries[index]?.let(::pickedDay))
+        }
+    } }
     LaunchedEffect(canContinue) { onValid(canContinue) }
     Column(modifier) {
             Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

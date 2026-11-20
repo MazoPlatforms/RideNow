@@ -33,6 +33,7 @@ private val Zones = listOf(R.string.zone_centre, R.string.zone_airport, R.string
 /** Form section of the merged step: 8 of 9: service city, radius, zones and whether trips outside the area are accepted. */
 @Composable
 fun ServiceAreaContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, modifier: Modifier = Modifier) {
+    val draft = LocalDriverDraft.current
     val c = RideTheme.colors
     val context = LocalContext.current
     var city by rememberSaveable { mutableStateOf("") }
@@ -45,6 +46,12 @@ fun ServiceAreaContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, 
     val canContinue = city.isNotBlank() && zones != 0
 
     val summary = stringResource(R.string.review_area, city.trim(), km, Integer.bitCount(zones))
+    SideEffect { if (canContinue) draft?.let {
+        val codes = listOf("CENTRE", "AIRPORT", "HARBOUR", "UNIVERSITY", "STATION", "SUBURBS")
+        it.fields.put("serviceArea", org.json.JSONObject().put("city", city.trim()).put("radiusKm", km)
+            .put("zones", org.json.JSONArray(codes.filterIndexed { index, _ -> zones and (1 shl index) != 0 }))
+            .put("acceptOutside", outside))
+    } }
     LaunchedEffect(canContinue) { onValid(canContinue) }
     LaunchedEffect(summary) { onSummary(summary) }
     Column(modifier) {

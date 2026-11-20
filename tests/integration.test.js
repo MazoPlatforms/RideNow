@@ -1320,6 +1320,12 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
       assert.equal(await page.locator('#notice.error:visible').count(),0,path);
       assert(!/[\u0B80-\u0BFF]/.test(await page.locator('body').innerText()),path+' contains non-English UI');
     }
+    await page.goto(base+'/admin/drivers/');
+    await page.getByRole('button',{name:'Review',exact:true}).waitFor();
+    await page.getByLabel('Onboarding status').selectOption('APPROVED');
+    await page.getByRole('button',{name:'Review',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:'Open verified document'}).first().waitFor();
+    await page.getByRole('dialog').getByRole('button',{name:'Close dialog'}).click();
     await page.goto(base+'/admin/users/');
     await page.locator('#search').fill('browser-admin@example.test');
     await page.getByRole('button',{name:'Details',exact:true}).click();
@@ -1406,4 +1412,104 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
     assert.equal((await context.cookies()).some(c=>c.name==='ridenow-admin'),false);
   }catch(error){await page.screenshot({path:'/tmp/ridenow-admin-browser-failure.png',fullPage:true});throw error;}
   finally{await context.close();await browser.close();}
+});
+
+test('driver application enforces ownership, scan completion and revision-bound admin decisions', async () => {
+  const applicant = await login();
+  const other = await login();
+  const admin = await login();
+  await pool.query("UPDATE users SET roles=ARRAY['ADMIN'] WHERE id=$1", [admin.user.id]);
+  for (const session of [applicant, other])
+    await request('post', '/v1/drivers/onboarding', session, { name: 'Applicant' }).expect(200);
+  const vehicle = {
+    registration: 'TX 4321', category: 'CAR', capacity: 4, make: 'Toyota',
+    model: 'Yaris', modelYear: 2024, color: 'Blue',
+  };
+  const { body: { id: vehicleId } } = await request('post', '/v1/drivers/vehicles', applicant, vehicle).expect(200);
+  const duplicate = (await request('post', '/v1/drivers/vehicles', other, {
+    ...vehicle, registration: 'tx-4321', capacity: undefined,
+  }).expect(200)).body;
+  assert.notEqual(duplicate.id, vehicleId);
+  assert.equal(duplicate.capacity, 4);
+  const future = new Date(Date.now() + 86400000 * 365).toISOString();
+  const draft = {
+    name: 'Driver Applicant', email: 'driver@example.test', dateOfBirth: '1992-05-14', gender: 'OTHER',
+    consent: { termsVersion: '1', termsAccepted: true, locationAccepted: true },
+    identity: { number: '123456789V' },
+    license: { number: 'DL123456', class: 'B', expiresOn: future.slice(0, 10) },
+    schedule: { workType: 'PART_TIME', days: [1, 5], start: '10:00', end: '14:00', remind: false },
+    serviceArea: { city: 'Kattankudy', radiusKm: 15, zones: ['CENTRE'], acceptOutside: false },
+    bank: { holder: 'Driver Applicant', bank: 'Test bank', branch: 'Branch', number: '12678901234' },
+  };
+  await request('put', '/v1/drivers/application', applicant, { ...draft, dateOfBirth: '2020-01-01' }).expect(400);
+  await request('put', '/v1/drivers/application', applicant, draft).expect(200);
+  const stored = await one(pool, 'SELECT application_encrypted FROM driver_profiles WHERE user_id=$1', [applicant.user.id]);
+  assert(!stored.application_encrypted.includes(draft.bank.number));
+  const own = (await request('get', '/v1/drivers/me', applicant).expect(200)).body;
+  assert.equal(own.application.bank.lastFour, '1234');
+  assert(!JSON.stringify(own).includes(draft.bank.number));
+  assert(!Object.hasOwn(own.profile, 'application_encrypted'));
+
+  const adminPath = `/v1/admin/drivers/${applicant.user.id}`;
+  await request('get', adminPath, other).expect(403);
+  assert.equal((await request('get', adminPath, admin).expect(200)).body.application, null);
+  await request('post', adminPath + '/review', admin, { status: 'APPROVED', vehicleId }).expect(409);
+
+  const files = [
+    ['PROFILE_PHOTO'], ['IDENTITY_FRONT'], ['IDENTITY_BACK'],
+    ['LICENSE_FRONT', null, future], ['LICENSE_BACK', null, future],
+    ['REGISTRATION', vehicleId, future], ['REVENUE_LICENSE', vehicleId, future], ['INSURANCE', vehicleId, future],
+    ...['VEHICLE_FRONT','VEHICLE_REAR','VEHICLE_LEFT','VEHICLE_RIGHT'].map(kind => [kind, vehicleId]),
+  ];
+  await request('post', '/v1/drivers/documents', other, {
+    vehicleId, kind: 'VEHICLE_FRONT', mime: 'image/jpeg', bytes: 100,
+  }).expect(403);
+  const documentIds = [];
+  for (const [kind, owner, expiresAt] of files) {
+    const { body: { documentId } } = await request('post', '/v1/drivers/documents', applicant, {
+      kind, vehicleId: owner ?? undefined, expiresAt, mime: 'image/jpeg', bytes: 100,
+    }).expect(200);
+    documentIds.push(documentId);
+    await request('post', `/v1/drivers/documents/${documentId}/submit`, applicant).expect(200);
+  }
+  const photoSubmit = `/v1/drivers/documents/${documentIds[0]}/submit`;
+  await request('post', photoSubmit, other).expect(404);
+  await request('post', photoSubmit, applicant).expect(200);
+  assert.equal((await one(pool, "SELECT count(*)::int AS total FROM jobs WHERE kind='scan'")).total, files.length);
+  const submit = { vehicleId, documentIds, informationConfirmed: true };
+  await request('post', '/v1/drivers/submit', applicant, submit).expect(409);
+  await pool.query("UPDATE jobs SET run_at=now() WHERE kind='scan'");
+  await processJobs({ pool, storage, logger });
+  await request('get', `/v1/admin/documents/${documentIds[0]}`, admin).expect(404);
+  const submitted = (await request('post', '/v1/drivers/submit', applicant, submit).expect(200)).body;
+  assert.equal(submitted.status, 'PENDING');
+  await request('put', '/v1/drivers/application', applicant, draft).expect(409);
+  await request('post', '/v1/drivers/onboarding', applicant, { name: 'Attempt to change name' }).expect(200);
+  const detail = (await request('get', adminPath, admin).expect(200)).body;
+  assert.equal(detail.application.name, draft.name);
+  assert.equal(detail.application.identity.number, '••••789V');
+  assert.equal(detail.application.bankProvided, true);
+  assert(!JSON.stringify(detail).includes(draft.bank.number));
+  assert(!JSON.stringify(detail).includes(stored.application_encrypted));
+  assert.equal((await request('get', '/v1/admin/drivers?status=PENDING', admin).expect(200)).body.items.length, 1);
+  await request('get', `/v1/admin/documents/${documentIds[0]}`, other).expect(403);
+  const download = (await request('get', `/v1/admin/documents/${documentIds[0]}`, admin).expect(200)).body;
+  assert.deepEqual(Object.keys(download), ['downloadUrl']);
+  const revision = submitted.application_revision;
+  await request('post', adminPath + '/review', admin, { status: 'APPROVED', vehicleId, revision: randomUUID(), expectedStatus: 'PENDING' }).expect(409);
+  await request('post', adminPath + '/review', admin, { status: 'REJECTED', reason: 'Use a clearer photo', revision, expectedStatus: 'PENDING' }).expect(200);
+  const resubmitted = (await request('post', '/v1/drivers/submit', applicant, submit).expect(200)).body;
+  await request('post', adminPath + '/review', admin, { status: 'APPROVED', vehicleId, revision, expectedStatus: 'PENDING' }).expect(409);
+  const newRevision = resubmitted.application_revision;
+  await request('post', adminPath + '/review', admin, { status: 'APPROVED', vehicleId, revision: newRevision, expectedStatus: 'PENDING' }).expect(200);
+  await assert.rejects(pool.query("UPDATE vehicles SET status='APPROVED' WHERE id=$1", [duplicate.id]),
+    { code: '23505' });
+  await putLocation(applicant, pickup, 1);
+  await request('put', '/v1/drivers/availability', applicant, { availability: 'AVAILABLE' }).expect(200);
+  await request('post', adminPath + '/review', admin, { status: 'SUSPENDED', revision: newRevision, reason: 'Safety review', expectedStatus: 'APPROVED' }).expect(200);
+  await request('put', '/v1/drivers/availability', applicant, { availability: 'AVAILABLE' }).expect(409);
+  await request('post', adminPath + '/review', admin, { status: 'APPROVED', vehicleId, revision: newRevision, expectedStatus: 'PENDING' }).expect(409);
+  await request('post', adminPath + '/review', admin, { status: 'APPROVED', vehicleId, revision: newRevision, expectedStatus: 'SUSPENDED' }).expect(200);
+  await pool.query("UPDATE documents SET expires_at=now()-interval '1 day' WHERE id=$1", [documentIds[6]]);
+  await request('put', '/v1/drivers/availability', applicant, { availability: 'AVAILABLE' }).expect(409);
 });

@@ -54,6 +54,7 @@ private val EmailRegex = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifier = Modifier) {
+    val draft = LocalDriverDraft.current
     val c = RideTheme.colors
     val context = LocalContext.current
     val focus = LocalFocusManager.current
@@ -62,7 +63,7 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
     var dob by rememberSaveable { mutableStateOf<Long?>(null) }
     var gender by rememberSaveable { mutableStateOf<Int?>(null) }
     var city by rememberSaveable { mutableStateOf<String?>(null) }
-    var photo by remember { mutableStateOf<Bitmap?>(null) }
+    var photo by remember { mutableStateOf(draft?.photo("PROFILE_PHOTO")) }
     var showSheet by rememberSaveable { mutableStateOf(false) }
     var showDate by rememberSaveable { mutableStateOf(false) }
     var emailFocused by remember { mutableStateOf(false) }
@@ -121,7 +122,14 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
             }
             Spacer(Modifier.height(12.dp))
         }
-        RideButton(stringResource(R.string.personal_continue), onClick = { onDone(name.trim()) }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
+        RideButton(stringResource(R.string.personal_continue), onClick = { draft?.apply {
+                fields.put("name", name.trim()).put("dateOfBirth", pickedDay(requireNotNull(dob)))
+                    .put("gender", listOf("MALE", "FEMALE", "OTHER")[requireNotNull(gender)])
+                if (email.isBlank()) fields.remove("email") else fields.put("email", email.trim())
+                city?.trim()?.takeIf { it.isNotBlank() }?.let { fields.put("city", it.take(100)) }
+                setPhoto("PROFILE_PHOTO", photo)
+            }
+            onDone(name.trim()) }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
     }
 
     if (showSheet) {

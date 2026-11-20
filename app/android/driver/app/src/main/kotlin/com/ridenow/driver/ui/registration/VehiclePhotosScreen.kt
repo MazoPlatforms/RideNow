@@ -26,12 +26,17 @@ private val Slots = listOf(
 /** Form section of the merged step: 6 of 9: front, rear, left and right photos are required; interior and additional are optional. */
 @Composable
 fun VehiclePhotosContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, modifier: Modifier = Modifier) {
+    val draft = LocalDriverDraft.current
     val c = RideTheme.colors
-    val photos = remember { mutableStateListOf<Bitmap?>(null, null, null, null, null, null) }
+    val uploadKinds = listOf("VEHICLE_FRONT", "VEHICLE_REAR", "VEHICLE_LEFT", "VEHICLE_RIGHT", "VEHICLE_INTERIOR", "VEHICLE_EXTRA")
+    val photos = remember { mutableStateListOf(*uploadKinds.map { draft?.photo(it) }.toTypedArray()) }
     val openPicker = rememberPhotoPicker(stringResource(R.string.vphoto_sheet_title)) { i, b -> photos[i] = b }
     val canContinue = Slots.indices.all { Slots[it].optional || photos[it] != null }
 
     val summary = stringResource(R.string.review_photos, photos.count { it != null })
+    SideEffect { if (canContinue) draft?.let {
+        uploadKinds.forEachIndexed { index, kind -> it.setPhoto(kind, photos[index]) }
+    } }
     LaunchedEffect(canContinue) { onValid(canContinue) }
     LaunchedEffect(summary) { onSummary(summary) }
     Column(modifier) {

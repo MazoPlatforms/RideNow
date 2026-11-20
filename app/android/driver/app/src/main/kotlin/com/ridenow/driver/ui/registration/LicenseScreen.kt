@@ -33,16 +33,17 @@ private val Classes = listOf("A1" to R.string.class_a1, "A" to R.string.class_a,
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LicenseContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, modifier: Modifier = Modifier) {
+    val draft = LocalDriverDraft.current
     val c = RideTheme.colors
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
-    var number by rememberSaveable { mutableStateOf("") }
+    var number by remember { mutableStateOf(draft?.fields?.optJSONObject("license")?.optString("number").orEmpty()) }
     var cls by rememberSaveable { mutableStateOf<String?>(null) }
     var expiry by rememberSaveable { mutableStateOf<Long?>(null) }
     var showClass by rememberSaveable { mutableStateOf(false) }
     var showDate by rememberSaveable { mutableStateOf(false) }
     var numberFocused by remember { mutableStateOf(false) }
-    var front by remember { mutableStateOf<Bitmap?>(null) }
-    var back by remember { mutableStateOf<Bitmap?>(null) }
+    var front by remember { mutableStateOf(draft?.photo("LICENSE_FRONT")) }
+    var back by remember { mutableStateOf(draft?.photo("LICENSE_BACK")) }
 
     val numberOk = LicenseRegex.matches(number.trim())
     val showNumberError = number.isNotBlank() && !numberOk && !numberFocused
@@ -50,6 +51,12 @@ fun LicenseContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, modi
     val today = remember { todayUtcMillis() }
     val classText = Classes.firstOrNull { it.first == cls }?.let { it.first + " \u00b7 " + stringResource(it.second) }.orEmpty()
 
+    SideEffect { if (canContinue) draft?.let {
+        val day = pickedDay(requireNotNull(expiry))
+        it.fields.put("license", org.json.JSONObject().put("number", number.trim()).put("class", cls).put("expiresOn", day))
+        it.setPhoto("LICENSE_FRONT", front, day)
+        it.setPhoto("LICENSE_BACK", back, day)
+    } }
     LaunchedEffect(canContinue) { onValid(canContinue) }
     LaunchedEffect(classText) { onSummary(classText) }
     Column(modifier) {

@@ -34,15 +34,16 @@ private val NicRegex = Regex("^(\\d{9}[VvXx]|\\d{12})$")
  */
 @Composable
 fun IdentityContent(onValid: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val draft = LocalDriverDraft.current
     val c = RideTheme.colors
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
-    var nic by rememberSaveable { mutableStateOf("") }
+    var nic by remember { mutableStateOf(draft?.fields?.optJSONObject("identity")?.optString("number").orEmpty()) }
     var issue by rememberSaveable { mutableStateOf<Long?>(null) }
     var expiry by rememberSaveable { mutableStateOf<Long?>(null) }
     var picking by rememberSaveable { mutableStateOf(0) } // 0 none, 1 issue, 2 expiry
     var nicFocused by remember { mutableStateOf(false) }
-    var front by remember { mutableStateOf<Bitmap?>(null) }
-    var back by remember { mutableStateOf<Bitmap?>(null) }
+    var front by remember { mutableStateOf(draft?.photo("IDENTITY_FRONT")) }
+    var back by remember { mutableStateOf(draft?.photo("IDENTITY_BACK")) }
 
     val nicOk = NicRegex.matches(nic.trim())
     val showNicError = nic.isNotBlank() && !nicOk && !nicFocused
@@ -50,6 +51,15 @@ fun IdentityContent(onValid: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val canContinue = nicOk && orderOk && front != null && back != null
     val today = remember { todayUtcMillis() }
 
+    SideEffect { if (canContinue) draft?.let {
+        val data = org.json.JSONObject().put("number", nic.trim())
+        issue?.let { value -> data.put("issuedOn", pickedDay(value)) }
+        val expiryDay = expiry?.let(::pickedDay)
+        expiryDay?.let { value -> data.put("expiresOn", value) }
+        it.fields.put("identity", data)
+        it.setPhoto("IDENTITY_FRONT", front, expiryDay)
+        it.setPhoto("IDENTITY_BACK", back, expiryDay)
+    } }
     LaunchedEffect(canContinue) { onValid(canContinue) }
     Column(modifier) {
             Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

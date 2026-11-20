@@ -27,6 +27,7 @@ import java.util.Locale
 /** Form section of the merged step: 7 of 9: full or part time, days of the week, usual hours and a shift reminder. */
 @Composable
 fun AvailabilityContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, modifier: Modifier = Modifier) {
+    val draft = LocalDriverDraft.current
     val c = RideTheme.colors
     val context = LocalContext.current
     var workType by rememberSaveable { mutableIntStateOf(0) } // 0 full time, 1 part time
@@ -40,6 +41,12 @@ fun AvailabilityContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit,
     val canContinue = days != 0 && !sameTime
 
     val summary = stringResource(R.string.review_avail, stringResource(if (workType == 0) R.string.avail_full else R.string.avail_part), Integer.bitCount(days), formatMinutes(context, start), formatMinutes(context, end))
+    SideEffect { if (canContinue) draft?.let {
+        it.fields.put("schedule", org.json.JSONObject()
+            .put("workType", if (workType == 0) "FULL_TIME" else "PART_TIME")
+            .put("days", org.json.JSONArray((1..7).filter { day -> days and (1 shl (day - 1)) != 0 }))
+            .put("start", clockTime(start)).put("end", clockTime(end)).put("remind", remind))
+    } }
     LaunchedEffect(canContinue) { onValid(canContinue) }
     LaunchedEffect(summary) { onSummary(summary) }
     Column(modifier) {

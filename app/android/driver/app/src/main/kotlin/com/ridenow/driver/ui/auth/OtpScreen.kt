@@ -92,7 +92,7 @@ fun OtpScreen(
 
     val c = RideTheme.colors
     val haptics = LocalHapticFeedback.current
-    var code by rememberSaveable { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
     var errorRes by remember { mutableStateOf(R.string.otp_error) }
     var errorTick by remember { mutableIntStateOf(0) }

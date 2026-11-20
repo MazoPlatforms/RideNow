@@ -43,6 +43,7 @@ private val Swatches = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VehicleScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifier = Modifier) {
+    val draft = LocalDriverDraft.current
     val c = RideTheme.colors
     val focus = LocalFocusManager.current
     val thisYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
@@ -107,7 +108,13 @@ fun VehicleScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifi
             }
             Spacer(Modifier.height(12.dp))
         }
-        RideButton(stringResource(R.string.id_continue), onClick = { onDone("${make.trim()} ${model.trim()} \u00b7 $year") }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
+        val selectedColor = color?.let { stringResource(it) }.orEmpty()
+        RideButton(stringResource(R.string.id_continue), onClick = {
+            draft?.vehicle = org.json.JSONObject().put("registration", plate.trim())
+                .put("category", listOf("CAR", "VAN", "TUK", "BIKE")[Types.indexOf(requireNotNull(type))])
+                .put("make", make.trim()).put("model", model.trim()).put("modelYear", yearValue)
+                .put("color", selectedColor)
+            onDone("${make.trim()} ${model.trim()} \u00b7 $year") }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
     }
 
     if (showColor) ColorSheet(color, onSelect = { color = it; showColor = false }, onDismiss = { showColor = false })

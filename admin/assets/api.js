@@ -21,6 +21,9 @@ const errors = {
  CANNOT_SUSPEND_SELF:'You cannot suspend your own administrator account.',
  MAP_APPROVAL_REQUIRED:'Routing categories must be approved before this area can be activated.',
  FARES_REQUIRED:'Publish at least one fare plan before activating this area.',
+ STALE_APPLICATION_REVIEW:'This application changed. Close the dialog and reopen the latest application.',
+ APPLICATION_DOCUMENTS_NOT_READY:'One or more submitted documents expired or did not pass scanning.',
+ INVALID_REVIEW_TRANSITION:'This decision is no longer available. Refresh the driver list.',
  DOCUMENT_NOT_AVAILABLE:'This document is not available for review until its scan is clean.',
 };
 export async function api(path, {method='GET',body,key}={}) {
@@ -38,7 +41,7 @@ export function el(tag,text,classes){const node=document.createElement(tag);if(t
 export const money = value => new Intl.NumberFormat('en-LK',{style:'currency',currency:'LKR'}).format(Number(value??0)/100);
 export const date = value => value ? new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Colombo'}).format(new Date(value)) : '—';
 export const short = value => value ? String(value).slice(0,8) : '—';
-export function badge(value){const text=String(value??'Unknown');const node=el('span',text.replaceAll('_',' ').toLowerCase(),'badge');const color=['APPROVED','AVAILABLE','CLEAN','COMPLETED','PAID','ACTIVE','ONLINE','true'].includes(text)?'green':['PENDING','SEARCHING','SCHEDULED','DRAFT','REQUESTED'].includes(text)?'amber':['REJECTED','SUSPENDED','INFECTED','CANCELLED','DEAD','DELETED'].includes(text)?'red':['ACCEPTED','ARRIVED','IN_PROGRESS','AT_STOP','RETURNING','EN_ROUTE'].includes(text)?'blue':'slate';node.classList.add('badge-'+color);return node;}
+export function badge(value){const text=String(value??'Unknown');const node=el('span',text.replaceAll('_',' ').toLowerCase(),'badge');const color=['APPROVED','AVAILABLE','CLEAN','COMPLETED','PAID','ACTIVE','ONLINE','true'].includes(text)?'green':['PENDING','SEARCHING','SCHEDULED','DRAFT','REQUESTED'].includes(text)?'amber':['REJECTED','SUSPENDED','INFECTED','FAILED','CANCELLED','DEAD','DELETED'].includes(text)?'red':['ACCEPTED','ARRIVED','IN_PROGRESS','AT_STOP','RETURNING','EN_ROUTE'].includes(text)?'blue':'slate';node.classList.add('badge-'+color);return node;}
 export function action(text,fn,destructive=false){const b=el('button',text,destructive?'btn-danger':'btn-small');b.type='button';b.addEventListener('click',()=>busy(b,fn));return b;}
 export function row(values){const tr=el('tr');for(const value of values){const td=el('td');if(value instanceof Node)td.append(value);else td.textContent=value??'—';tr.append(td);}return tr;}
 export function empty(tbody,columns,message='No records yet.'){tbody.replaceChildren();const tr=el('tr'),td=el('td',message,'empty');td.colSpan=columns;tr.append(td);tbody.append(tr);}

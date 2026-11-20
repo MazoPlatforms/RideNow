@@ -14,7 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -29,6 +28,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ridenow.driver.ui.auth.OtpScreen
 import com.ridenow.driver.ui.auth.PhoneScreen
 import com.ridenow.driver.ui.auth.PhoneAuthApi
+import com.ridenow.driver.ui.auth.PhoneAuthException
+import com.ridenow.driver.ui.registration.DriverOnboardingApi
+import com.ridenow.driver.ui.registration.LocalDriverDraft
+import kotlinx.coroutines.CancellationException
+import org.json.JSONObject
 import kotlinx.coroutines.launch
 import com.ridenow.driver.ui.auth.formatPhoneForDisplay
 import com.ridenow.driver.ui.account.AccountScreen
@@ -37,7 +41,6 @@ import com.ridenow.driver.ui.home.HomeScreen
 import com.ridenow.driver.ui.home.LocalNavBadges
 import com.ridenow.driver.ui.home.MainTab
 import com.ridenow.driver.ui.intro.IntroScreen
-import com.ridenow.driver.ui.registration.ApplicationStatus
 import com.ridenow.driver.ui.registration.ApplicationViewModel
 import com.ridenow.driver.ui.registration.BackgroundLocationScreen
 import com.ridenow.driver.ui.registration.BankAccountScreen
@@ -55,12 +58,10 @@ import com.ridenow.driver.ui.registration.ReviewItem
 import com.ridenow.driver.ui.registration.ReviewScreen
 import com.ridenow.driver.ui.registration.TermsScreen
 import com.ridenow.driver.ui.registration.VehicleScreen
-import com.ridenow.driver.ui.preview.PreviewConfig
 import com.ridenow.driver.ui.splash.SplashScreen
 import com.ridenow.driver.ui.status.ActionRequiredScreen
 import com.ridenow.driver.ui.status.ApprovedScreen
 import com.ridenow.driver.ui.status.RejectedScreen
-import com.ridenow.driver.ui.status.SubmittedScreen
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.theme.ThemeMode
 import com.ridenow.driver.ui.trip.TripCompleteScreen
@@ -140,29 +141,121 @@ private const val STEP_AREA = 10
 
 @Composable
 fun AppRoot(appearance: AppearanceState) {
-    var screen by rememberSaveable { mutableStateOf(Screen.Splash) }
+    val app: ApplicationViewModel = viewModel()
+    var screen by app.currentScreen
     var phone by rememberSaveable { mutableStateOf("") }
     var challengeId by rememberSaveable { mutableStateOf("") }
     // True while the driver is fixing one section from the Review screen: finishing it returns to Review.
     var editing by rememberSaveable { mutableStateOf(false) }
     // Set when Bank account was opened from Home or Account (name of that screen): finishing returns there.
     var bankReturn by rememberSaveable { mutableStateOf<String?>(null) }
-    val app: ApplicationViewModel = viewModel()
     val saveable = rememberSaveableStateHolder()
     val shownPhone = formatPhoneForDisplay(phone.ifBlank { "+1 555 012 3456" })
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("ridenowdriver", 0) }
     val scope = rememberCoroutineScope()
-    suspend fun restoreAuth() {
-        if (prefs.getBoolean("intro_seen", false)) {
-            val restoredPhone = PhoneAuthApi.restoreSession(context)
-            if (restoredPhone != null) {
-                phone = restoredPhone
-                screen = if (prefs.getBoolean("auth_onboarding_complete", false)) Screen.Home else Screen.Terms
-                return
+    val activityError = stringResource(R.string.onboarding_connection_error)
+    val incompleteError = stringResource(R.string.onboarding_incomplete)
+    val scanWaiting = stringResource(R.string.onboarding_scan_wait)
+    val scanFailed = stringResource(R.string.onboarding_scan_failed)
+    val uploadProgress = stringResource(R.string.onboarding_upload_progress)
+    val retryText = stringResource(R.string.onboarding_retry)
+    val signOutText = stringResource(R.string.onboarding_sign_out)
+    val pendingText = stringResource(R.string.onboarding_pending)
+    val rejectedText = stringResource(R.string.onboarding_changes)
+    val suspendedText = stringResource(R.string.onboarding_suspended)
+    val editText = stringResource(R.string.onboarding_edit)
+    var busy by remember { mutableStateOf(false) }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    var reviewStatus by app.onboardingStatus
+    var reviewReason by app.onboardingReason
+
+    suspend fun checkStatus() {
+        val data = DriverOnboardingApi.status(context)
+        val profile = data?.optJSONObject("profile")
+        reviewStatus = profile?.optString("status").orEmpty()
+        reviewReason = profile?.opt("review_reason") as? String ?: ""
+        data?.optJSONObject("application")?.let {
+            app.profileName = it.optString("name")
+            app.profileEmail = it.optString("email")
+            app.bankSaved = it.optJSONObject("bank") != null
+        }
+        val pending = PhoneAuthApi.pendingApplication(context)
+        if (reviewStatus == "APPROVED") {
+            if (pending != null) PhoneAuthApi.savePendingApplication(context, null)
+            app.draft = com.ridenow.driver.ui.registration.DriverDraft()
+            screen = Screen.Home
+        } else if (reviewStatus in setOf("PENDING", "SUSPENDED") || (reviewStatus == "REJECTED" && pending == null)) {
+            if (pending != null) PhoneAuthApi.savePendingApplication(context, null)
+            screen = Screen.Submitted
+        } else if (pending != null) {
+            val ids = pending.getJSONArray("documentIds")
+            val docs = data?.optJSONArray("documents")
+            val byId = (0 until (docs?.length() ?: 0)).associate { index ->
+                val doc = requireNotNull(docs).getJSONObject(index)
+                doc.getString("id") to doc.optString("scan_status")
+            }
+            val statuses = (0 until ids.length()).map { byId[ids.getString(it)] }
+            screen = Screen.Submitted
+            reviewStatus = "SCANNING"
+            if (statuses.any { it == null || it == "FAILED" || it == "INFECTED" }) {
+                PhoneAuthApi.savePendingApplication(context, null)
+                app.draft.clearUploads()
+                reviewStatus = "SCAN_FAILED"
+                feedback = scanFailed
+            } else if (statuses.all { it == "CLEAN" }) {
+                try {
+                    DriverOnboardingApi.submit(context, pending)
+                    PhoneAuthApi.savePendingApplication(context, null)
+                    app.draft = com.ridenow.driver.ui.registration.DriverDraft()
+                    reviewStatus = "PENDING"
+                } catch (error: PhoneAuthException) {
+                    if (error.code !in setOf("APPLICATION_DOCUMENTS_NOT_READY", "APPLICATION_DOCUMENT_EXPIRY_MISMATCH")) throw error
+                    PhoneAuthApi.savePendingApplication(context, null)
+                    app.draft.clearUploads()
+                    reviewStatus = "SCAN_FAILED"
+                    feedback = scanFailed
+                }
+            }
+        } else if (reviewStatus != "SCAN_FAILED") {
+            screen = Screen.Terms
+        }
+    }
+
+    fun runOnboarding(request: suspend () -> Unit) {
+        if (busy) return
+        busy = true
+        feedback = null
+        scope.launch {
+            try {
+                request()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                when {
+                    error is PhoneAuthException && error.status == 401 -> {
+                        app.reset()
+                        phone = ""; challengeId = ""; editing = false; bankReturn = null
+                        Screen.entries.forEach { saveable.removeState(it.name) }
+                        screen = Screen.Welcome
+                    }
+                    error.message == "INCOMPLETE_DRIVER_FORM" -> feedback = incompleteError
+                    else -> feedback = activityError
+                }
+            } finally {
+                busy = false
             }
         }
-        screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro
+    }
+
+    suspend fun restoreAuth() {
+        val restoredPhone = PhoneAuthApi.restoreSession(context)
+        if (restoredPhone == null) {
+            screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro
+        } else {
+            phone = restoredPhone
+            checkStatus()
+        }
     }
     val store = app.store
     val stack = app.stack
@@ -182,12 +275,18 @@ fun AppRoot(appearance: AppearanceState) {
     /** Switches tab and forgets the pushed screens. */
     fun tab(t: MainTab) { stack.clear(); screen = tabScreen(t) }
     fun nowMinute(): Int = java.util.Calendar.getInstance().let { it.get(java.util.Calendar.HOUR_OF_DAY) * 60 + it.get(java.util.Calendar.MINUTE) }
-    fun signOut() {
-        app.reset(); phone = ""; editing = false; bankReturn = null
-        prefs.edit().remove("phone_verified").remove("auth_onboarding_complete").apply()
-        scope.launch { PhoneAuthApi.signOut(context) }
-        prefs.edit().remove("terms_accepted").remove("application_submitted").apply()
-        screen = Screen.Welcome
+    fun signOut() = runOnboarding {
+        try {
+            PhoneAuthApi.signOut(context)
+        } finally {
+            app.reset()
+            phone = ""; challengeId = ""; editing = false; bankReturn = null
+            reviewStatus = ""; reviewReason = ""
+            Screen.entries.forEach { saveable.removeState(it.name) }
+            prefs.edit().remove("phone_verified").remove("auth_onboarding_complete")
+                .remove("terms_accepted").remove("application_submitted").apply()
+            screen = Screen.Welcome
+        }
     }
     fun openNotice(n: Notice) {
         when { n.icon == "wallet" -> go(Screen.Payouts); n.icon == "person" -> tab(MainTab.Home); n.icon == "check" -> tab(MainTab.Rides) }
@@ -229,12 +328,13 @@ fun AppRoot(appearance: AppearanceState) {
         ReviewItem(stringResource(R.string.review_row_vehicle), app.summaries[STEP_VEHICLE] ?: dash),
         ReviewItem(stringResource(R.string.review_row_docs), docsDone),
         ReviewItem(stringResource(R.string.review_row_photos), app.summaries[STEP_PHOTOS] ?: dash),
-        ReviewItem(stringResource(R.string.review_row_avail), "${app.summaries[STEP_AVAILABILITY] ?: dash} \u00b7 ${app.summaries[STEP_AREA] ?: dash}"),
+        ReviewItem(stringResource(R.string.review_row_avail), app.summaries[STEP_AVAILABILITY] ?: dash),
+        ReviewItem(stringResource(R.string.onboarding_service_area), app.summaries[STEP_AREA] ?: dash),
         ReviewItem(stringResource(R.string.review_row_bank), if (app.bankSaved) bankAdded else bankSkipped, warn = !app.bankSaved, add = !app.bankSaved),
     )
     val editTargets = listOf(
         Screen.Terms, Screen.Personal, Screen.Identity, Screen.License, Screen.Vehicle,
-        Screen.VehicleDocs, Screen.VehiclePhotos, Screen.Availability, Screen.Bank,
+        Screen.VehicleDocs, Screen.VehiclePhotos, Screen.Availability, Screen.ServiceArea, Screen.Bank,
     )
 
     /** Goes to [target], or back to Review when a section was opened for editing. */
@@ -253,17 +353,28 @@ fun AppRoot(appearance: AppearanceState) {
     }
 
     LaunchedEffect(Unit) {
-        if (SessionFlags.splashDone && screen == Screen.Splash) {
-            restoreAuth()
+        if (SessionFlags.splashDone && screen == Screen.Splash) runOnboarding { restoreAuth() }
+    }
+    LaunchedEffect(screen, reviewStatus) {
+        if (screen == Screen.Submitted && reviewStatus in setOf("PENDING", "SCANNING")) {
+            while (true) {
+                delay(if (reviewStatus == "SCANNING") 15_000 else 30_000)
+                runOnboarding { checkStatus() }
+            }
         }
     }
     Box(Modifier.fillMaxSize()) {
-        CompositionLocalProvider(LocalNavBadges provides emptySet()) {
+        CompositionLocalProvider(LocalNavBadges provides emptySet(), LocalDriverDraft provides app.draft) {
         Crossfade(targetState = screen, animationSpec = tween(400), label = "root") { current ->
             // Keeps typed text, dates and choices when the driver goes back to a screen.
             saveable.SaveableStateProvider(current.name) {
                 when (current) {
-                    Screen.Splash -> SplashScreen(onFinished = { SessionFlags.splashDone = true; scope.launch { restoreAuth() } })
+                    Screen.Splash -> if (feedback != null) {
+                        com.ridenow.driver.ui.status.OnboardingStateScreen(
+                            title = retryText, message = feedback.orEmpty(), primary = retryText,
+                            onPrimary = { runOnboarding { restoreAuth() } }, secondary = signOutText, onSecondary = ::signOut, busy = busy,
+                        )
+                    } else SplashScreen(onFinished = { SessionFlags.splashDone = true; runOnboarding { restoreAuth() } })
                     Screen.Intro -> IntroScreen(onDone = { prefs.edit().putBoolean("intro_seen", true).commit(); screen = Screen.Welcome })
                     Screen.Welcome -> WelcomeScreen(onGetStarted = { screen = Screen.Phone }, onHaveAccount = { screen = Screen.Phone }, onHelp = { })
                     Screen.Phone -> {
@@ -282,15 +393,15 @@ fun AppRoot(appearance: AppearanceState) {
                             onBack = { screen = Screen.Phone },
                             onResend = { PhoneAuthApi.requestCode(context, phone) },
                             onVerify = { id, code -> PhoneAuthApi.verifyCode(context, phone, id, code) },
-                            onVerified = { prefs.edit().putBoolean("phone_verified", true).apply(); screen = Screen.Terms },
+                            onVerified = { screen = Screen.Splash; runOnboarding { checkStatus() } },
                         )
                     }
                     Screen.Terms -> {
-                        BackHandler { advance(Screen.Otp) }
+                        BackHandler { signOut() }
                         TermsScreen(
-                            onBack = { advance(Screen.Otp) },
-                            onAccept = { prefs.edit().putBoolean("terms_accepted", true).apply(); app.summaries[STEP_TERMS] = accepted; screen = afterTerms() },
-                            onDecline = { editing = false; screen = Screen.Welcome },
+                            onBack = ::signOut,
+                            onAccept = { app.draft.acceptedTerms = true; app.summaries[STEP_TERMS] = accepted; advance(afterTerms()) },
+                            onDecline = ::signOut,
                         )
                     }
                     Screen.Background -> {
@@ -342,28 +453,53 @@ fun AppRoot(appearance: AppearanceState) {
                     }
                     Screen.Bank -> {
                         BackHandler { backFromBank() }
-                        BankAccountScreen(onBack = { backFromBank() }, onSaved = { h, b, br, n -> store.addBank(h, b, br, n); finishBank(true) }, onSkip = { finishBank(false) })
+                        BankAccountScreen(onBack = { backFromBank() }, onSaved = { h, b, br, n ->
+                            if (bankReturn == null) {
+                                app.draft.fields.put("bank", JSONObject().put("holder", h).put("bank", b).put("branch", br).put("number", n))
+                            } else store.addBank(h, b, br, n)
+                            finishBank(true)
+                        }, onSkip = {
+                            if (bankReturn == null) app.draft.fields.remove("bank")
+                            finishBank(false)
+                        })
                     }
                     Screen.Review -> {
-                        BackHandler { screen = Screen.Bank }
+                        BackHandler { if (!busy) screen = Screen.Bank }
                         ReviewScreen(
                             items = reviewItems,
-                            onEdit = { i -> editing = true; screen = editTargets[i] },
-                            onSubmit = { prefs.edit().putBoolean("application_submitted", true).putBoolean("auth_onboarding_complete", true).apply(); screen = Screen.Submitted },
-                            onBack = { screen = Screen.Bank },
+                            onEdit = { i -> if (!busy) { feedback = null; editing = true; screen = editTargets[i] } },
+                            onSubmit = { runOnboarding {
+                                DriverOnboardingApi.queue(context, app.draft) { index, total ->
+                                    feedback = String.format(uploadProgress, index, total)
+                                }
+                                checkStatus()
+                                feedback = null
+                            } },
+                            onBack = { if (!busy) screen = Screen.Bank },
+                            busy = busy, feedback = feedback,
                         )
                     }
                     Screen.Submitted -> {
-                        // UI preview: after a few seconds, jump to Home as if the application had been approved.
-                        var secondsLeft by remember { mutableIntStateOf(PreviewConfig.SUBMITTED_TO_HOME_SECONDS) }
-                        if (PreviewConfig.ENABLED) LaunchedEffect(Unit) {
-                            while (secondsLeft > 0) { delay(1000); secondsLeft-- }
-                            app.approveDemo(); screen = Screen.Home
+                        val canEdit = reviewStatus in setOf("REJECTED", "SCAN_FAILED")
+                        BackHandler { if (!busy) signOut() }
+                        val message = when (reviewStatus) {
+                            "SCANNING" -> scanWaiting
+                            "SCAN_FAILED" -> scanFailed
+                            "SUSPENDED" -> suspendedText
+                            "REJECTED" -> rejectedText
+                            else -> pendingText
                         }
-                        SubmittedScreen(
-                            name = app.summaries[STEP_PERSONAL].orEmpty().substringBefore(" "), reference = app.reference,
-                            onCheckStatus = { app.checkStatus(); screen = screenFor(app.status) }, onSupport = { },
-                            previewSecondsLeft = if (PreviewConfig.ENABLED) secondsLeft else null,
+                        com.ridenow.driver.ui.status.OnboardingStateScreen(
+                            title = stringResource(R.string.onboarding_status_title),
+                            message = listOfNotNull(message, reviewReason.takeIf { it.isNotBlank() }, feedback).distinct().joinToString("\n\n"),
+                            primary = if (canEdit) editText else retryText,
+                            onPrimary = {
+                                if (canEdit) {
+                                    feedback = null; reviewReason = ""; editing = false
+                                    screen = if (app.draft.acceptedTerms && app.draft.vehicle != null) Screen.Review else Screen.Terms
+                                } else runOnboarding { checkStatus() }
+                            },
+                            secondary = signOutText, onSecondary = ::signOut, busy = busy,
                         )
                     }
                     Screen.ActionRequired -> ActionRequiredScreen(
@@ -432,7 +568,7 @@ fun AppRoot(appearance: AppearanceState) {
                     Screen.DriverProfile -> {
                         BackHandler { back() }
                         DriverProfileScreen(
-                            store, driverName, shownPhone, app.profileEmail, app.profileAddress, app.status == ApplicationStatus.Approved,
+                            store, driverName, shownPhone, app.profileEmail, app.profileAddress, reviewStatus == "APPROVED",
                             onBack = { back() }, onEdit = { go(Screen.EditProfile) }, onEditVehicle = { go(Screen.EditVehicle) }, onDocs = { go(Screen.VehicleDocuments) },
                         )
                     }
@@ -564,11 +700,4 @@ private fun tabScreen(tab: MainTab): Screen = when (tab) {
     MainTab.Rides -> Screen.Rides
     MainTab.Support -> Screen.Support
     MainTab.Account -> Screen.Account
-}
-
-private fun screenFor(status: ApplicationStatus): Screen = when (status) {
-    ApplicationStatus.Pending -> Screen.Submitted
-    ApplicationStatus.ActionRequired -> Screen.ActionRequired
-    ApplicationStatus.Rejected -> Screen.Rejected
-    ApplicationStatus.Approved -> Screen.Approved
 }

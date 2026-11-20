@@ -1,0 +1,13 @@
+# Driver onboarding API
+
+Driver phone verification uses the existing WhatsApp OTP endpoints. Start a driver profile with `POST /v1/drivers/onboarding`. The verified phone comes from the authenticated account.
+
+1. Save the form with `PUT /v1/drivers/application`. Include version `1` of the terms, both consent flags, personal and licence details, and preferred schedule and service area. Schedule days are ISO weekdays (Monday = 1). Bank details and personal city are optional. Device notification and location permission prompts are handled by the device.
+2. Create or update a vehicle with `POST /v1/drivers/vehicles`. Provide registration, category, make, model, model year and colour. Passenger capacity defaults to 3 for Tuk, 4 for Car, 6 for Van and 1 for Bike. The service area entered in the application records the driver's preference. Operational service areas are configured separately by admins.
+3. Create each upload with `POST /v1/drivers/documents`. PUT the exact byte count and content type to the returned URL while it is valid, then call `POST /v1/drivers/documents/{id}/submit`. The worker scans after the upload window closes. Poll `GET /v1/drivers/me` for scan status. A failed or infected file requires a new upload. Identity expiry is optional. For ID and driving licence sides with an expiry, use a UTC timestamp whose date matches the application.
+4. Submit with `POST /v1/drivers/submit` and send the chosen vehicle, the exact clean document IDs and confirmation of accuracy. Include the profile photo, both ID sides, both licence sides, registration, revenue licence, insurance and the four outside vehicle photos. Interior, extra photo and emission certificate slots are optional. Use a new idempotency key for each new submission.
+5. Review the application in `/admin/drivers/`. The portal filters by onboarding status and shows the submitted files, review reason and vehicle. Staff need `drivers.review`. Decisions use the application revision and current status, and document downloads use short-lived signed links. A request for changes reopens editing. A suspended driver requires an admin decision to restore access or request a new application.
+
+Bank account numbers are encrypted at rest and masked in driver responses. Admin driver review exposes only whether bank details were provided. Bikes can be registered and reviewed. Dispatch and pricing currently support Tuk, Car and Van.
+
+The production worker needs private object storage and a reachable ClamAV scanner. Verify that a benign sample document moves from pending to clean before opening onboarding to drivers.

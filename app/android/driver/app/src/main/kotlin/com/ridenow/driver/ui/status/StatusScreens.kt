@@ -89,3 +89,14 @@ private fun RejectedPreview() = RideNowTheme(darkTheme = true) { RejectedScreen(
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun ApprovedPreview() = RideNowTheme(darkTheme = false) { ApprovedScreen({}, {}) }
+
+@Composable
+fun OnboardingStateScreen(
+    title: String, message: String, primary: String, onPrimary: () -> Unit,
+    secondary: String, onSecondary: () -> Unit, busy: Boolean,
+) {
+    StatusScaffold(
+        StatusTone.Accent, RideIcons.Clock, title, message,
+        primary, { if (!busy) onPrimary() }, secondary, { if (!busy) onSecondary() },
+    ) {}
+}

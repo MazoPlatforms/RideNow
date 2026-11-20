@@ -1,3 +1,4 @@
+import { approvedDocuments } from './modules/drivers.js';
 import { randomUUID } from 'node:crypto';
 import { one, transaction } from './shared/db.js';
 import { dispatchTick } from './modules/dispatch.js';
@@ -101,7 +102,16 @@ export async function processJobs(deps) {
         { jobId: job.id, kind: job.kind, code: e.code ?? 'PROVIDER_FAILURE' },
         'Job retry',
       );
-      await finishJob(pool, job, e);
+      if (job.kind === 'scan' && job.attempts >= 8) {
+        await transaction(pool, async (db) => {
+          const leased = await one(db, 'SELECT id FROM jobs WHERE id=$1 AND lease_token=$2 FOR UPDATE',
+            [job.id, job.lease_token]);
+          if (!leased) return;
+          await db.query("UPDATE documents SET scan_status='FAILED' WHERE id=$1 AND scan_status='PENDING'",
+            [job.payload.documentId]);
+          await finishJob(db, job, e);
+        });
+      } else await finishJob(pool, job, e);
     }
   }
 }
@@ -112,7 +122,15 @@ export async function maintenance(pool) {
     const state = await one(db, "SELECT updated_at FROM system_state WHERE key='maintenance'");
     if (state && Date.now() - state.updated_at < 60000) return;
     await db.query(
-      "UPDATE driver_profiles d SET availability='OFFLINE' WHERE availability='AVAILABLE' AND (NOT EXISTS(SELECT 1 FROM driver_locations l WHERE l.driver_id=d.user_id AND l.received_at>now()-interval '30 seconds') OR NOT EXISTS(SELECT 1 FROM vehicles v WHERE v.driver_id=d.user_id AND v.status='APPROVED' AND EXISTS(SELECT 1 FROM documents WHERE driver_id=d.user_id AND vehicle_id IS NULL AND kind='IDENTITY' AND scan_status='CLEAN' AND expires_at>now()) AND EXISTS(SELECT 1 FROM documents WHERE driver_id=d.user_id AND vehicle_id IS NULL AND kind='LICENSE' AND scan_status='CLEAN' AND expires_at>now()) AND EXISTS(SELECT 1 FROM documents WHERE vehicle_id=v.id AND kind='REGISTRATION' AND scan_status='CLEAN' AND expires_at>now()) AND EXISTS(SELECT 1 FROM documents WHERE vehicle_id=v.id AND kind='INSURANCE' AND scan_status='CLEAN' AND expires_at>now())))",
+      `UPDATE driver_profiles d SET availability='OFFLINE'
+       WHERE availability='AVAILABLE' AND (
+         NOT EXISTS(SELECT 1 FROM driver_locations l WHERE l.driver_id=d.user_id
+           AND l.received_at>now()-interval '30 seconds')
+         OR NOT EXISTS(SELECT 1 FROM vehicles v JOIN users u ON u.id=v.driver_id
+           WHERE v.driver_id=d.user_id AND v.status='APPROVED' AND v.category<>'BIKE'
+           AND NOT u.suspended AND u.deleted_at IS NULL AND d.status='APPROVED'
+           AND ${approvedDocuments})
+       )`,
     );
     const month = (await one(db, "SELECT date_trunc('month',now())+interval '2 months' AS start"))
       .start;

@@ -99,6 +99,7 @@ test('real versioned S3 upload, immutable review download and scanner protocol f
     const infected = await storage.scan({ ...doc, bytes: second.length });
     assert.equal(infected.status, 'INFECTED');
     assert.notEqual(infected.version, clean.version);
+    assert.throws(() => storage.download(key), { code: 'DOCUMENT_RESCAN_REQUIRED' });
     const saved = await fetch(await storage.download(key, clean.version));
     assert.equal(await saved.text(), first.toString());
     await assert.rejects(storage.scan({ ...doc, bytes: 1 }), {

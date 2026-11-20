@@ -29,7 +29,7 @@ class ReviewItem(val title: String, val summary: String, val warn: Boolean = fal
 
 /** Final step: every section with its summary and an Edit link, then a confirmation and Submit. */
 @Composable
-fun ReviewScreen(items: List<ReviewItem>, onEdit: (Int) -> Unit, onSubmit: () -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun ReviewScreen(items: List<ReviewItem>, onEdit: (Int) -> Unit, onSubmit: () -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier, busy: Boolean = false, feedback: String? = null) {
     val c = RideTheme.colors
     var confirmed by rememberSaveable { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
@@ -42,7 +42,8 @@ fun ReviewScreen(items: List<ReviewItem>, onEdit: (Int) -> Unit, onSubmit: () ->
             }
             Spacer(Modifier.height(12.dp))
         }
-        RideButton(stringResource(R.string.review_submit), onClick = onSubmit, enabled = confirmed, modifier = Modifier.padding(vertical = 12.dp))
+        if (feedback != null) Text(feedback, color = if (busy) c.muted else c.danger, modifier = Modifier.padding(top = 8.dp))
+        RideButton(stringResource(R.string.review_submit), onClick = onSubmit, enabled = confirmed && !busy, modifier = Modifier.padding(vertical = 12.dp))
     }
 }
 

@@ -24,14 +24,93 @@ $$('[data-logout]').forEach(b=>b.addEventListener('click',()=>busy(b,logout)));
 function mutation(path,body,key,method='POST'){return api(path,{method,body,key});}
 function bindForm(id,handler){const form=$('#'+id);if(!form)return;form.addEventListener('submit',event=>{event.preventDefault();busy($('button[type=submit]',form),async()=>{const data=new FormData(form);const payload=JSON.stringify([...data.entries()]);let pending=formRequests.get(form);if(!pending||pending.payload!==payload){pending={payload,key:crypto.randomUUID()};formRequests.set(form,pending);}await handler(Object.fromEntries(data),pending.key,form,data);formRequests.delete(form);});});}
 function actionMutation(label,path,body,after,destructive=false){let key;return action(label,async()=>{if(!await confirmSheet(`${label}? This change will be recorded in the audit log.`,{title:label,confirmText:label,danger:destructive===true}))return;key??=crypto.randomUUID();await mutation(path,body,key,destructive==='PATCH'?'PATCH':'POST');key=null;notice('Change saved.');await after();},destructive===true);}
-async function driverDetails(id){const result=await api(`/v1/admin/drivers/${id}`);const body=el('div',null,'space-y-6');body.append(details({name:result.driver.name,phone:result.driver.phone,status:result.driver.status,availability:result.driver.availability}));
+async function driverDetails(id) {
+ const {driver,application,vehicles,documents}=await api(`/v1/admin/drivers/${id}`);
+ const body=el('div',null,'space-y-6');
+ const feedback=el('p',null,'notice error');
+ feedback.hidden=true;
+ feedback.setAttribute('role','alert');
+ body.append(feedback);
+ function showFeedback(error){
+  feedback.textContent=error.message;
+  feedback.hidden=false;
+ }
+ const revision=driver.application_revision;
+ const selected=new Set(driver.application_document_ids??[]);
+ const reviewable=['PENDING','SUSPENDED'].includes(driver.status)&&!driver.suspended;
+ body.append(details({
+  name:application?.name??driver.name,phone:driver.phone,status:driver.status,
+  availability:driver.availability,submitted:date(driver.submitted_at),review_reason:driver.review_reason,
+ }));
+ if(application){
+  for(const [title,fields] of [
+   ['Personal information',{email:application.email,date_of_birth:application.dateOfBirth,gender:application.gender,city:application.city,bank_details_provided:application.bankProvided?'Yes':'No'}],
+   ['Consent',{terms_version:application.consent.termsVersion,accepted:date(application.consent.acceptedAt)}],
+   ['Identity',application.identity],['Driving licence',application.license],
+   ['Driving schedule',{work_type:application.schedule.workType,days:application.schedule.days.map(day=>['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][day-1]).join(', '),start:application.schedule.start,end:application.schedule.end,reminder:application.schedule.remind?'On':'Off'}],
+   ['Service preferences',{city:application.serviceArea.city,radius_km:application.serviceArea.radiusKm,zones:application.serviceArea.zones.join(', '),accept_outside:application.serviceArea.acceptOutside?'Yes':'No'}],
+  ]) body.append(el('h3',title,'font-semibold'),details(fields));
+ }else if(driver.status==='PENDING'){
+  body.append(el('p','This application was submitted before the full onboarding form. Request an updated application before approval.','text-sm text-slate-500'));
+ }
+ async function decision(status,label,fields={}){
+  if(!await confirmSheet('This decision will be recorded in the audit log.',{title:label,confirmText:label,danger:status!=='APPROVED'}))return;
+  try {
+   await mutation(`/v1/admin/drivers/${id}/review`,{status,...(revision?{revision,expectedStatus:driver.status}:{}),...fields},crypto.randomUUID());
+  } catch(error) {
+   showFeedback(error);
+   return;
+  }
+  $('#detail-dialog').close();
+  notice('Driver review recorded.');
+  await loadRecords(true);
+ }
  body.append(el('h3','Vehicles','font-semibold'));
- if(!result.vehicles.length)body.append(el('p','No vehicles submitted.','text-sm text-slate-500'));
- for(const vehicle of result.vehicles){const box=el('div',null,'rounded-lg border border-slate-200 p-4 space-y-3');box.append(details({registration:vehicle.registration,category:vehicle.category,status:vehicle.status,id:vehicle.id}));box.append(action('Approve driver & vehicle',async()=>{if(!await confirmSheet(`Approve this driver and vehicle ${vehicle.registration}? Clean documents are required.`,{title:'Approve driver',confirmText:'Approve'}))return;await mutation(`/v1/admin/drivers/${id}/review`,{status:'APPROVED',vehicleId:vehicle.id},crypto.randomUUID());$('#detail-dialog').close();notice('Driver and vehicle approved.');await loadRecords(true);}));body.append(box);}
+ if(!vehicles.length)body.append(el('p','No vehicles submitted.','text-sm text-slate-500'));
+ for(const vehicle of vehicles){
+  const box=el('div',null,'rounded-lg border border-slate-200 p-4 space-y-3');
+  box.append(details({registration:vehicle.registration,category:vehicle.category,make:vehicle.make,model:vehicle.model,year:vehicle.model_year,color:vehicle.color,capacity:vehicle.capacity,status:vehicle.status}));
+  const selectedVehicle=revision?vehicle.id===driver.application_vehicle_id:driver.status==='SUSPENDED'&&vehicle.status==='APPROVED';
+  if(reviewable&&selectedVehicle){
+   const label=driver.status==='SUSPENDED'?'Restore driver':'Approve driver & vehicle';
+   box.append(action(label,()=>decision('APPROVED',label,{vehicleId:vehicle.id})));
+  }
+  body.append(box);
+ }
  body.append(el('h3','Documents','font-semibold'));
- if(!result.documents.length)body.append(el('p','No documents submitted.','text-sm text-slate-500'));
- for(const doc of result.documents){const box=el('div',null,'rounded-lg border border-slate-200 p-4');box.append(container(el('span',doc.kind,'font-medium text-sm'),badge(doc.scan_status)));box.append(el('p','Expires '+date(doc.expires_at),'mt-2 text-xs text-slate-500'));if(doc.scan_status==='CLEAN')box.append(action('Open verified document',async()=>{const result=await api(`/v1/admin/documents/${doc.id}`);const link=el('a','Open secure document download','btn-secondary mt-3');link.href=result.downloadUrl;link.target='_blank';link.rel='noopener noreferrer';box.append(link);}));body.append(box);}
- const reason=el('input',null,'input');reason.placeholder='Review reason';reason.maxLength=500;body.append(reason,container(...['REJECTED','SUSPENDED'].map(status=>action(status==='REJECTED'?'Reject driver':'Suspend driver',async()=>{if(!reason.value.trim())throw new Error('Provide a review reason.');if(!await confirmSheet('Apply this driver review decision?',{title:'Review driver',confirmText:status==='REJECTED'?'Reject driver':'Suspend driver',danger:true}))return;await mutation(`/v1/admin/drivers/${id}/review`,{status,reason:reason.value.trim()},crypto.randomUUID());$('#detail-dialog').close();notice('Driver review recorded.');await loadRecords(true);},true))));modal('Driver review',body);
+ const visible=revision?documents.filter(doc=>selected.has(doc.id)):documents;
+ if(!visible.length)body.append(el('p','No documents submitted.','text-sm text-slate-500'));
+ for(const doc of visible){
+  const box=el('div',null,'rounded-lg border border-slate-200 p-4');
+  box.append(container(el('span',doc.kind.replaceAll('_',' '),'font-medium text-sm'),badge(doc.scan_status)));
+  if(doc.expires_at)box.append(el('p','Expires '+date(doc.expires_at),'mt-2 text-xs text-slate-500'));
+  if(doc.scan_status==='CLEAN'&&(selected.has(doc.id)||['APPROVED','SUSPENDED'].includes(driver.status))){
+   box.append(action('Open verified document',async()=>{
+    let downloadUrl;
+    try { ({downloadUrl}=await api(`/v1/admin/documents/${doc.id}`)); }
+    catch(error) { showFeedback(error); return; }
+    const link=el('a','Open secure document download','btn-secondary mt-3');
+    link.href=downloadUrl;
+    link.target='_blank';
+    link.rel='noopener noreferrer';
+    box.append(link);
+   }));
+  }
+  body.append(box);
+ }
+ if(['PENDING','APPROVED','SUSPENDED'].includes(driver.status)){
+  const reason=el('input',null,'input');
+  reason.placeholder='Review reason';
+  reason.setAttribute('aria-label','Review reason');
+  reason.maxLength=500;
+  const decisions=driver.status==='PENDING'?[['REJECTED','Request changes']]:[['REJECTED','Request new application']];
+  if(driver.status==='APPROVED')decisions.push(['SUSPENDED','Suspend driver']);
+  body.append(reason,container(...decisions.map(([status,label])=>action(label,async()=>{
+   if(!reason.value.trim()){showFeedback(new Error('Provide a review reason.'));reason.focus();return;}
+   await decision(status,label,{reason:reason.value.trim()});
+  },true))));
+ }
+ modal('Driver review',body);
 }
 async function userDetails(id){const result=await api(`/v1/admin/users/${id}`);const user=result.user;modal('User details',details({name:user.name,phone:user.phone,email:user.email,roles:user.roles,profile_complete:user.profile_complete,profile_completed_at:user.profile_completed_at,suspended:user.suspended,deleted_at:user.deleted_at,created_at:user.created_at,has_profile_photo:user.has_profile_photo}));}
 function rideDetails(r){const body=el('div',null,'space-y-5');body.append(details(r));if(!['COMPLETED','CANCELLED','NO_DRIVER','NO_SHOW'].includes(r.state)){const form=el('form',null,'space-y-4');form.append(el('h3','Close an interrupted ride','font-semibold'),el('p','Use only for an operational interruption. Enter the final partial fare and a clear reason.','text-sm text-slate-500'));const amount=el('input',null,'input');amount.type='number';amount.min='0';amount.step='.01';amount.required=true;amount.placeholder='Final fare (LKR)';amount.setAttribute('aria-label','Final fare in LKR');const reason=el('input',null,'input');reason.required=true;reason.maxLength=500;reason.placeholder='Reason for interruption';reason.setAttribute('aria-label','Reason for interruption');const button=el('button','Record interruption','btn-danger');button.type='submit';form.append(amount,reason,button);let key;form.addEventListener('submit',e=>{e.preventDefault();busy(button,async()=>{if(!await confirmSheet('Close this ride with the entered final fare?',{title:'Record ride interruption',confirmText:'Record interruption'}))return;key??=crypto.randomUUID();await mutation(`/v1/admin/rides/${r.id}/interrupt`,{amountMinor:decimalMinor(amount.value),reason:reason.value.trim()},key);$('#detail-dialog').close();notice('Ride interruption recorded.');await loadRecords(true);});});body.append(form);}modal('Ride '+short(r.id),body);}
@@ -48,7 +127,7 @@ function renderRecord(r){
 }
 function renderRecords(){const tbody=$('#records');const query=$('#search')?.value.trim().toLowerCase()??'';const subset=records.filter(r=>(page!=='staff'||r.roles.includes('STAFF'))&&(!query||JSON.stringify(r).toLowerCase().includes(query)));tbody.replaceChildren();if(!subset.length)empty(tbody,columns[page],query?'No matching loaded records.':'No records yet. New activity will appear here.');else subset.forEach(r=>tbody.append(renderRecord(r)));$('#record-count').textContent=`${subset.length} shown · ${records.length} loaded`;$('#load-more').hidden=!hasMore;}
 let loadingRecords=false;
-async function loadRecords(reset=false){if(loadingRecords)return;loadingRecords=true;try{if(reset){records=[];cursor=null;hasMore=true;}const url=routes[page]+(page==='areas'?'':`?limit=50${cursor?'&cursor='+encodeURIComponent(cursor):''}`);const result=await api(url);records.push(...result.items);cursor=result.items.at(-1)?.[page==='drivers'?'user_id':'id'];hasMore=page!=='areas'&&result.items.length>=(page==='audit'?100:50);renderRecords();}finally{loadingRecords=false;}}
+async function loadRecords(reset=false){if(loadingRecords)return;loadingRecords=true;try{if(reset){records=[];cursor=null;hasMore=true;}const url=routes[page]+(page==='areas'?'':`?limit=50${cursor?'&cursor='+encodeURIComponent(cursor):''}`);const status=$('#driver-status')?.value;const result=await api(status?url+'&status='+encodeURIComponent(status):url);records.push(...result.items);cursor=result.items.at(-1)?.[page==='drivers'?'user_id':'id'];hasMore=page!=='areas'&&result.items.length>=(page==='audit'?100:50);renderRecords();}finally{loadingRecords=false;}}
 function stat(label,value,foot){const card=el('div',null,'stat-card');card.append(el('p',label,'stat-label'),el('p',new Intl.NumberFormat('en').format(value),'stat-number'),el('p',foot,'stat-foot'));return card;}
 async function overview(){const [data,operations]=await Promise.all([api('/v1/admin/dashboard'),api('/v1/admin/operations')]);const c=data.counts;$('#stats').replaceChildren(stat('Bookings today',c.rides_today,'Since midnight · Asia/Colombo'),stat('Active rides',c.active_rides,'Journeys currently in progress'),stat('Pending driver reviews',c.pending_drivers,'Waiting for an approval decision'),stat('Registered accounts',c.users,'Accounts not marked deleted'));
  const ready=$('#readiness');ready.replaceChildren();const pending=[];if(can('config.manage')&&!c.active_areas)pending.push(['Add your first service area','Define a boundary and activate it after publishing fares.','/admin/areas/']);if(can('config.manage')&&!c.fare_plans)pending.push(['Publish your fare plans','Set explicit LKR fares for each supported vehicle category.','/admin/pricing/']);ready.append(el('h2',pending.length?'Prepare your workspace':'Workspace configuration','mb-2'));if(pending.length){const grid=el('div',null,'mt-4 grid gap-4 sm:grid-cols-2');for(const [title,copy,href] of pending){const a=el('a',null,'rounded-lg border border-slate-200 p-4 hover:border-emerald-300');a.href=href;a.append(el('h3',title,'text-sm font-semibold'),el('p',copy,'mt-2 text-xs leading-5 text-slate-500'),el('span','Get started →','mt-3 block text-xs font-medium text-emerald-800'));grid.append(a);}ready.append(grid);}else ready.append(el('p','Service areas and fare plans are configured. Validate routing, document scanning, and device behavior before a pilot.','text-sm leading-6 text-slate-500'));
@@ -75,4 +154,5 @@ bindForm('adjustment-form',async(data,key,form)=>{if(!await confirmSheet('Record
 bindForm('payout-form',async(data,key,form)=>{await mutation('/v1/admin/finance/payouts',{driverId:data.driverId.trim(),amountMinor:decimalMinor(data.amount),reason:data.reason.trim()},key);form.reset();notice('Payout request created. A different authorized person must approve it.');await loadRecords(true);});
 bindForm('staff-form',async(data,key,form,raw)=>{const result=await mutation('/v1/admin/staff',{phone:data.phone.trim(),name:data.name.trim(),password:data.password,permissions:raw.getAll('permissions')},key);form.reset();const box=$('#staff-secret');box.hidden=false;const secret=el('input',null,'input mt-3 font-mono');secret.readOnly=true;secret.value=result.totpEnrollmentSecret;secret.setAttribute('aria-label','Staff authenticator enrollment secret');box.replaceChildren(el('h2','Staff authenticator enrollment'),el('p','Save this secret securely for the team member. It is not included in the staff list.','mt-2 text-sm text-slate-500'),secret);notice('Staff account created. Save the authenticator secret.');await loadRecords(true);});
 bindForm('profile-form',async(data)=>{await api('/v1/me',{method:'PATCH',body:{name:data.name.trim()}});notice('Profile name updated.');await security();$$('[data-user-name]').forEach(n=>n.textContent=me.name||'Administrator');});
+$('#driver-status')?.addEventListener('change',()=>busy(null,()=>loadRecords(true)));
 await busy(null,async()=>{try{me=await api('/v1/admin-web/session');}catch(error){if(error.status===401||error.status===403){location.replace('/admin/login/');return;}throw error;}$$('[data-user-name]').forEach(n=>n.textContent=me.name||'Team member');$$('[data-user-role]').forEach(n=>n.textContent=me.roles.includes('ADMIN')?'Administrator':'Staff member');$$('[data-permission]').forEach(n=>n.hidden=!can(n.dataset.permission));$$('[data-avatar]').forEach(n=>n.textContent=(me.name||'A').trim().slice(0,1).toUpperCase());$('#workspace-environment').textContent=me.environment==='production'?'Production workspace':'Development workspace';await refresh();});
