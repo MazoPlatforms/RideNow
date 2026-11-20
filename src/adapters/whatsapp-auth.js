@@ -1,4 +1,5 @@
 import { BufferJSON, initAuthCreds, proto } from '@whiskeysockets/baileys';
+import { createHash } from 'node:crypto';
 import { one, transaction } from '../shared/db.js';
 import { encrypt, decrypt } from '../shared/crypto.js';
 
@@ -29,7 +30,11 @@ export function parseWhatsAppSeed(value) {
       code: 'WA_AUTH_CREDS_NOT_PAIRED',
     });
   }
-  return { creds, keys: bundle.creds ? (bundle.keys ?? {}) : {} };
+  return {
+    creds,
+    keys: bundle.creds ? (bundle.keys ?? {}) : {},
+    hasKeyBundle: Boolean(bundle.creds && Object.hasOwn(bundle, 'keys')),
+  };
 }
 
 export async function createWhatsAppAuth(pool, config) {
@@ -45,16 +50,43 @@ export async function createWhatsAppAuth(pool, config) {
   const creds = await transaction(pool, async (db) => {
     await db.query('SELECT pg_advisory_xact_lock(927562)');
     const existing = await read(db, 'creds');
-    if (existing) return existing; // A stale environment export must never overwrite a live session.
-    if (!config.WA_AUTH_CREDS) return initAuthCreds();
+    if (!config.WA_AUTH_CREDS) return existing ?? initAuthCreds();
+
+    const seedHash = createHash('sha256').update(config.WA_AUTH_CREDS).digest('hex');
+    const imported = await one(
+      db,
+      "SELECT value FROM system_state WHERE key='whatsapp.auth_seed_sha256'",
+    );
+    // Render environment secrets are an explicit seed. Import only when that seed changes;
+    // otherwise always restore the database session, which may contain newer Signal keys.
+    if (existing && imported?.value === seedHash) return existing;
+
     const seed = parseWhatsAppSeed(config.WA_AUTH_CREDS);
-    await write(db, 'creds', seed.creds);
     for (const [type, entries] of Object.entries(seed.keys)) {
       if (!entries || typeof entries !== 'object')
         throw Object.assign(new Error('Invalid auth keys'), { code: 'WA_AUTH_KEYS_INVALID' });
+    }
+
+    if (existing) {
+      const previous = await db.query(
+        "SELECT id,value FROM gateway_credentials WHERE id NOT LIKE 'backup:%'",
+      );
+      for (const row of previous.rows)
+        await db.query(
+          'INSERT INTO gateway_credentials(id,value) VALUES($1,$2) ON CONFLICT(id) DO NOTHING',
+          [`backup:${seedHash.slice(0, 16)}:${row.id}`, row.value],
+        );
+    }
+    if (seed.hasKeyBundle)
+      await db.query("DELETE FROM gateway_credentials WHERE id <> 'creds' AND id NOT LIKE 'backup:%'");
+    await write(db, 'creds', seed.creds);
+    for (const [type, entries] of Object.entries(seed.keys))
       for (const [id, value] of Object.entries(entries))
         if (value) await write(db, `${type}:${id}`, value);
-    }
+    await db.query(
+      "INSERT INTO system_state(key,value) VALUES('whatsapp.auth_seed_sha256',$1::jsonb) ON CONFLICT(key) DO UPDATE SET value=$1::jsonb,updated_at=now()",
+      [JSON.stringify(seedHash)],
+    );
     return seed.creds;
   });
   let pending = Promise.resolve();

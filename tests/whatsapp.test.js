@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { BufferJSON, initAuthCreds } from '@whiskeysockets/baileys';
-import { parseWhatsAppSeed } from '../src/adapters/whatsapp-auth.js';
+import { createWhatsAppAuth, parseWhatsAppSeed } from '../src/adapters/whatsapp-auth.js';
 import { deliverWhatsAppOtp, trackWhatsAppReceipts } from '../src/adapters/whatsapp-otp.js';
 import { encrypt } from '../src/shared/crypto.js';
 
@@ -40,6 +40,76 @@ test('paired Baileys JSON restores binary keys without exposing malformed secret
       (e) => e.code.startsWith('WA_AUTH_CREDS_') && !e.message.includes(input),
     );
   }
+});
+test('changed WhatsApp seed is imported once, old state is backed up, and raw creds preserve Signal keys', async () => {
+  const credentials = new Map(),
+    state = new Map();
+  const runQuery = async (sql, args = []) => {
+    const q = sql.replace(/\s+/g, ' ').trim();
+    if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(q) || q.startsWith('SELECT pg_advisory_xact_lock'))
+      return { rows: [] };
+    if (q === 'SELECT value FROM gateway_credentials WHERE id=$1') {
+      const value = credentials.get(args[0]);
+      return { rows: value === undefined ? [] : [{ value }] };
+    }
+    if (q.includes("SELECT value FROM system_state WHERE key='whatsapp.auth_seed_sha256'")) {
+      const value = state.get('whatsapp.auth_seed_sha256');
+      return { rows: value === undefined ? [] : [{ value }] };
+    }
+    if (q.includes("SELECT id,value FROM gateway_credentials WHERE id NOT LIKE 'backup:%'"))
+      return { rows: [...credentials].filter(([id]) => !id.startsWith('backup:')).map(([id, value]) => ({ id, value })) };
+    if (q.startsWith('INSERT INTO gateway_credentials')) {
+      if (q.includes('DO NOTHING')) {
+        if (!credentials.has(args[0])) credentials.set(args[0], args[1]);
+      } else credentials.set(args[0], args[1]);
+      return { rows: [] };
+    }
+    if (q.startsWith("DELETE FROM gateway_credentials WHERE id <> 'creds'")) {
+      for (const id of credentials.keys())
+        if (id !== 'creds' && !id.startsWith('backup:')) credentials.delete(id);
+      return { rows: [] };
+    }
+    if (q.startsWith("INSERT INTO system_state(key,value) VALUES('whatsapp.auth_seed_sha256'")) {
+      state.set('whatsapp.auth_seed_sha256', JSON.parse(args[0]));
+      return { rows: [] };
+    }
+    throw new Error(`Unhandled fake SQL: ${q}`);
+  };
+  const pool = { query: runQuery, connect: async () => ({ query: runQuery, release() {} }) };
+  const config = { ENCRYPTION_KEY: 'ab'.repeat(32) };
+  const firstSeed = testCredentials();
+  const firstExport = JSON.stringify(firstSeed, BufferJSON.replacer);
+  let auth = await createWhatsAppAuth(pool, { ...config, WA_AUTH_CREDS: firstExport });
+  await auth.state.keys.set({ session: { peer: Buffer.from('existing-signal-key') } });
+  auth.state.creds.me.name = 'newer persisted runtime state';
+  await auth.saveCreds();
+
+  auth = await createWhatsAppAuth(pool, { ...config, WA_AUTH_CREDS: firstExport });
+  assert.equal(auth.state.creds.me.name, 'newer persisted runtime state');
+  assert((await auth.state.keys.get('session', ['peer'])).peer.equals(Buffer.from('existing-signal-key')));
+
+  const replacement = testCredentials();
+  replacement.me = { id: '94770000002@s.whatsapp.net', name: 'replacement' };
+  auth = await createWhatsAppAuth(pool, {
+    ...config,
+    WA_AUTH_CREDS: JSON.stringify(replacement, BufferJSON.replacer),
+  });
+  assert.equal(auth.state.creds.me.id, replacement.me.id);
+  assert((await auth.state.keys.get('session', ['peer'])).peer.equals(Buffer.from('existing-signal-key')));
+  assert([...credentials.keys()].some((id) => id.startsWith('backup:')));
+
+  const bundled = testCredentials();
+  bundled.me = { id: '94770000003@s.whatsapp.net', name: 'full bundle' };
+  auth = await createWhatsAppAuth(pool, {
+    ...config,
+    WA_AUTH_CREDS: JSON.stringify(
+      { creds: bundled, keys: { session: { fresh: Buffer.from('fresh-key') } } },
+      BufferJSON.replacer,
+    ),
+  });
+  assert.equal(auth.state.creds.me.id, bundled.me.id);
+  assert.equal((await auth.state.keys.get('session', ['peer'])).peer, null);
+  assert((await auth.state.keys.get('session', ['fresh'])).fresh.equals(Buffer.from('fresh-key')));
 });
 test('one OTP job produces exactly one provider send and skips expired challenges', async () => {
   const config = { ENCRYPTION_KEY: 'ab'.repeat(32) },

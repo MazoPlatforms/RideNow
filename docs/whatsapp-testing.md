@@ -29,6 +29,6 @@ The `whatsapp-smoke-report` artifact contains only results, not OTPs, recipients
 
 ## Persistent gateway
 
-When the database is initially empty, `npm run whatsapp` imports `WA_AUTH_CREDS`. Existing sessions are not replaced by an environment export. New credentials and Signal keys are encrypted and stored in the same database. A normal multi-file Baileys session may include key files in addition to `creds.json`; exporting only credentials is not a substitute for a full session backup. The importer also accepts an optional `{creds,keys}` bundle.
+`npm run whatsapp` imports `WA_AUTH_CREDS` when the database is empty and reimports it once when its contents change. A SHA-256 fingerprint (not the secret) prevents routine restarts from overwriting newer database session state. Before replacement, existing encrypted rows are retained under backup IDs. A raw `creds.json` updates the credentials while preserving stored Signal keys; a `{creds,keys}` bundle replaces both. Prefer a complete bundle when rotating to a different paired session. Keep the same `ENCRYPTION_KEY` so the existing encrypted state and backup remain readable.
 
 The CI session database is temporary and does not provide a continuously running gateway. A persistent gateway requires persistent PostgreSQL and the same `ENCRYPTION_KEY`.

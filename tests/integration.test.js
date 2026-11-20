@@ -936,13 +936,14 @@ test('drivers cannot match or accept their own rider booking', async () => {
   assert.equal(result.body.code, 'CANNOT_DRIVE_OWN_RIDE');
 });
 
-test('WhatsApp credentials import is encrypted, retains Signal keys and never replaces an existing session', async () => {
+test('WhatsApp credentials import is encrypted and an unchanged environment seed keeps persisted session keys', async () => {
   const { initAuthCreds, BufferJSON } = await import('@whiskeysockets/baileys');
   const { createWhatsAppAuth } = await import('../src/adapters/whatsapp-auth.js');
   const seed = { ...initAuthCreds(), registered: true, me: { id: '94770000001@s.whatsapp.net' } };
+  const seedExport = JSON.stringify(seed, BufferJSON.replacer);
   const state = await createWhatsAppAuth(pool, {
     ...config,
-    WA_AUTH_CREDS: JSON.stringify(seed, BufferJSON.replacer),
+    WA_AUTH_CREDS: seedExport,
   });
   assert(state.state.creds.noiseKey.private.equals(seed.noiseKey.private));
   await state.state.keys.set({ session: { 'synthetic-contact': Buffer.from('ratchet-state') } });
@@ -951,7 +952,7 @@ test('WhatsApp credentials import is encrypted, retains Signal keys and never re
   assert(!persisted.value.includes(seed.me.id));
   const restored = await createWhatsAppAuth(pool, {
     ...config,
-    WA_AUTH_CREDS: 'stale-or-invalid-export',
+    WA_AUTH_CREDS: seedExport,
   });
   assert.equal(restored.state.creds.me.id, seed.me.id);
   assert(

@@ -34,7 +34,7 @@ GitHub production environment secrets do not transfer automatically to Render. A
 | `JWT_SECRET` | Existing signing secret |
 | `OTP_PEPPER` | Existing separate OTP secret |
 | `ENCRYPTION_KEY` | Same 64-character hex key; changing it prevents reading old credentials |
-| `WA_AUTH_CREDS` | Previously paired Baileys JSON; imported only into an empty auth database |
+| `WA_AUTH_CREDS` | Previously paired Baileys JSON; imported on first use and once when its contents change (existing encrypted auth rows are backed up first) |
 | `S3_ACCESS_KEY`, `S3_SECRET_KEY` | R2 credentials |
 
 Common configuration:
