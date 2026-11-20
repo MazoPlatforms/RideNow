@@ -101,6 +101,31 @@ jobs:
           fi
           printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > app/android/rider/local.properties
           echo "::add-mask::$MAPS_API_KEY"
+      - name: Prepare Rider build copy for Kotlin compilation
+        run: |
+          mkdir -p "$RUNNER_TEMP/rider-build"
+          cp -a app/android/rider/. "$RUNNER_TEMP/rider-build/"
+          export RIDER_BUILD="$RUNNER_TEMP/rider-build"
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import os
+
+          kotlin_root = Path(os.environ["RIDER_BUILD"]) / "app/src/main/kotlin"
+          setter_names = ("setMode", "setAccent", "setMapStyle", "setSystemFont", "setTextSize")
+          rename_counts = {name: 0 for name in setter_names}
+          for kotlin_file in kotlin_root.rglob("*.kt"):
+              source = kotlin_file.read_text()
+              for name in setter_names:
+                  replacement = "update" + name.removeprefix("set")
+                  count = source.count(name + "(")
+                  if count:
+                      source = source.replace(name + "(", replacement + "(")
+                      rename_counts[name] += count
+              kotlin_file.write_text(source)
+          if any(count == 0 for count in rename_counts.values()):
+              raise SystemExit(f"Expected all appearance setters in temporary Rider source: {rename_counts}")
+          print(f"Adjusted appearance setter names in the temporary Rider build copy: {rename_counts}")
+          PYCODE
       - name: Prepare Driver build copy for Kotlin compilation
         run: |
           mkdir -p "$RUNNER_TEMP/driver-build"
@@ -209,11 +234,11 @@ jobs:
       - name: Build Rider and Driver debug APKs
         run: |
           set -o pipefail
-          app/android/rider/gradlew --no-daemon --stacktrace --project-dir app/android/rider :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
+          "$RUNNER_TEMP/rider-build/gradlew" --no-daemon --stacktrace --project-dir "$RUNNER_TEMP/rider-build" :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
           "$RUNNER_TEMP/driver-build/gradlew" --no-daemon --stacktrace --project-dir "$RUNNER_TEMP/driver-build" :app:assembleDebug 2>&1 | tee -a "$RUNNER_TEMP/android-build.log"
       - name: Verify APKs and source archives
         run: |
-          rider_apk=app/android/rider/app/build/outputs/apk/debug/app-debug.apk
+          rider_apk="$RUNNER_TEMP/rider-build/app/build/outputs/apk/debug/app-debug.apk"
           driver_apk="$RUNNER_TEMP/driver-build/app/build/outputs/apk/debug/app-debug.apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$rider_apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$driver_apk"
@@ -263,7 +288,7 @@ jobs:
           RideNow Rider and Driver Android APKs built from commit ${GITHUB_SHA}.
 
           - Both APKs are debug-signed previews for installation and testing, not production or Play Store releases.
-          - The Rider source ZIP is generated from the current tracked Rider source. The Driver ZIP and source are included unchanged. For compilation only, Actions applies Kotlin compatibility fixes and missing Compose imports in a temporary Driver build copy; repository source is untouched.
+          - The Rider source ZIP is generated from the current tracked Rider source. The Driver ZIP and source are included unchanged. For compilation only, Actions applies Kotlin compatibility fixes to temporary Rider and Driver build copies; repository source is untouched.
           - Gradle 8.9 wrappers are generated only in GitHub Actions and are not committed.
           - Debug signing keys may differ between runs; uninstall an older preview if Android rejects an update.
           - Minimum Android version: Android 8.0 (API 26).
