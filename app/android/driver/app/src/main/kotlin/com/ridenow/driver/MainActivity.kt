@@ -26,6 +26,15 @@ class MainActivity : ComponentActivity() {
         // System splash hands off instantly to the animated Compose splash (same background colour).
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Edge to edge from the first frame, so the keyboard is handled only by Compose's imePadding().
+        enableEdgeToEdge()
+        // On Android 11+ the keyboard height arrives as a window inset. The system must not also resize or pan the window,
+        // otherwise the form moves twice and leaves a gap above the keyboard. Older versions only send the inset after a
+        // resize, so the manifest keeps adjustResize for them.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+        }
+        com.ridenow.driver.ui.util.NotificationChannels.ensure(applicationContext)
         migrateAppLanguageToSystem(this)
         setContent {
             val appearance = remember { AppearanceState(this@MainActivity) }

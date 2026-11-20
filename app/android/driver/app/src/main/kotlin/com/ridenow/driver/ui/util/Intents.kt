@@ -24,3 +24,12 @@ fun shareText(context: Context, title: String, text: String) {
 fun openAppSettings(context: Context) = context.safeStart(
     Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
 )
+
+fun openAppNotificationSettings(context: Context) = context.safeStart(
+    Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName),
+)
+
+fun openChannelSettings(context: Context, channelId: String) = context.safeStart(
+    Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName).putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, channelId),
+)

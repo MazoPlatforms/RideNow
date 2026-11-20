@@ -7,7 +7,6 @@ import androidx.compose.ui.res.stringResource
 
 import androidx.activity.compose.BackHandler
 import com.ridenow.app.ui.more.*
-import com.ridenow.app.ui.theme.AccentPrefs
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -179,7 +178,6 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         Unit
     }
 
-    LaunchedEffect(Unit) { AccentPrefs.name = prefs.getString("accent", "Default") ?: "Default" }
     val moreNav = MoreNav(
         back = { screen = stubBack }, exit = { screen = stubBack }, open = { open(it) }, home = { screen = Screen.Home }, options = { screen = Screen.Options },
         schedule = { scheduleFrom = Screen.Options; screen = Screen.Schedule }, finding = { screen = Screen.Finding }, trip = { screen = Screen.Trip },

@@ -93,7 +93,7 @@ fun EditProfileScreen(
         GroupCard {
             LANGS.forEachIndexed { i, l ->
                 if (i > 0) RowDivider()
-                Row(Modifier.fillMaxWidth().height(52.dp).selectable(l == lang, role = Role.RadioButton) { lang = l; close() }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).selectable(l == lang, role = Role.RadioButton) { lang = l; close() }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(l, color = c.fg, fontSize = 15.sp, modifier = Modifier.weight(1f)); RadioDot(l == lang)
                 }
             }

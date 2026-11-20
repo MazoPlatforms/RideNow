@@ -233,41 +233,6 @@ fun ThemePreview(mode: ThemeMode, modifier: Modifier = Modifier) {
     }
 }
 
-// ---------------------------------------------------------------- Flags
-
-/** Small flag badge for the language list. Drawn in simple shapes. */
-@Composable
-fun FlagBadge(code: String, modifier: Modifier = Modifier, size: Dp = 44.dp) {
-    Canvas(modifier.size(size).clip(RoundedCornerShape(10.dp))) {
-        val w = this.size.width; val h = this.size.height
-        fun band(color: Color, i: Int, n: Int, vertical: Boolean) {
-            if (vertical) drawRect(color, Offset(w * i / n, 0f), Size(w / n + 1f, h)) else drawRect(color, Offset(0f, h * i / n), Size(w, h / n + 1f))
-        }
-        when (code) {
-            "en" -> {
-                drawRect(Color(0xFF1F3A93))
-                drawLine(Color.White, Offset(0f, 0f), Offset(w, h), h * 0.2f); drawLine(Color.White, Offset(w, 0f), Offset(0f, h), h * 0.2f)
-                drawLine(Color(0xFFD1202F), Offset(0f, 0f), Offset(w, h), h * 0.07f); drawLine(Color(0xFFD1202F), Offset(w, 0f), Offset(0f, h), h * 0.07f)
-                drawRect(Color.White, Offset(w * 0.4f, 0f), Size(w * 0.2f, h)); drawRect(Color.White, Offset(0f, h * 0.4f), Size(w, h * 0.2f))
-                drawRect(Color(0xFFD1202F), Offset(w * 0.45f, 0f), Size(w * 0.1f, h)); drawRect(Color(0xFFD1202F), Offset(0f, h * 0.45f), Size(w, h * 0.1f))
-            }
-            "si", "ta" -> {
-                drawRect(Color(0xFFF2B705))
-                drawRect(Color(0xFF8D153A), Offset(w * 0.38f, h * 0.1f), Size(w * 0.54f, h * 0.8f))
-                drawRect(Color(0xFF00534E), Offset(w * 0.1f, h * 0.1f), Size(w * 0.13f, h * 0.8f)); drawRect(Color(0xFFEB7400), Offset(w * 0.23f, h * 0.1f), Size(w * 0.13f, h * 0.8f))
-                drawCircle(Color(0xFFF2B705), h * 0.13f, Offset(w * 0.65f, h * 0.5f))
-            }
-            "ar" -> { drawRect(Color(0xFF006C35)); drawRoundRect(Color.White, Offset(w * 0.22f, h * 0.45f), Size(w * 0.56f, h * 0.06f), CornerRadius(2f)); drawRoundRect(Color.White, Offset(w * 0.3f, h * 0.3f), Size(w * 0.4f, h * 0.07f), CornerRadius(2f)) }
-            "es" -> { drawRect(Color(0xFFC60B1E)); drawRect(Color(0xFFFFC400), Offset(0f, h * 0.25f), Size(w, h * 0.5f)) }
-            "fr" -> { band(Color(0xFF0055A4), 0, 3, true); band(Color.White, 1, 3, true); band(Color(0xFFEF4135), 2, 3, true) }
-            "de" -> { band(Color(0xFF111111), 0, 3, false); band(Color(0xFFDD0000), 1, 3, false); band(Color(0xFFFFCE00), 2, 3, false) }
-            "ja" -> { drawRect(Color.White); drawCircle(Color(0xFFBC002D), h * 0.24f, Offset(w / 2f, h / 2f)) }
-            "hi" -> { band(Color(0xFFFF9933), 0, 3, false); band(Color.White, 1, 3, false); band(Color(0xFF138808), 2, 3, false); drawCircle(Color(0xFF000080), h * 0.09f, Offset(w / 2f, h / 2f), style = Stroke(1.5.dp.toPx())) }
-            else -> drawRect(Color(0xFF9AA3AE))
-        }
-    }
-}
-
 // ---------------------------------------------------------------- Chart
 
 private fun niceMax(max: Float): Float {
@@ -283,7 +248,7 @@ fun BarChart(values: List<Float>, xLabels: List<String>, modifier: Modifier = Mo
     val max = remember(values) { niceMax(values.maxOrNull() ?: 0f) }
     val nf = remember { NumberFormat.getIntegerInstance(Locale.US) }
     Row(modifier.fillMaxWidth()) {
-        Column(Modifier.height(140.dp).width(40.dp), verticalArrangement = Arrangement.SpaceBetween) {
+        Column(Modifier.height(140.dp).width(48.dp), verticalArrangement = Arrangement.SpaceBetween) {
             for (i in 4 downTo 0) Text(nf.format((max / 4f * i).toLong()), color = c.muted, fontSize = 10.sp, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth().padding(end = 6.dp))
         }
         Column(Modifier.weight(1f)) {

@@ -368,7 +368,6 @@
     <string name="trip_decline">"Refuser"</string>
     <string name="trip_pickup_label">"Prise en charge"</string>
     <string name="trip_drop_label">"Destination"</string>
-    <string name="trip_rating_desc">"Note %1$s"</string>
     <string name="trip_req_seconds_desc">"%1$d secondes pour accepter"</string>
     <string name="trip_phase_pickup">"En route vers le passager"</string>
     <string name="trip_phase_pickup_sub">"Prenez %1$s à %2$s"</string>

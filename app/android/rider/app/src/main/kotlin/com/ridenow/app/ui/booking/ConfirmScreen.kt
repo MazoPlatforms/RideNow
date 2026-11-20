@@ -58,6 +58,9 @@ fun ConfirmScreen(
     route: RouteInfo?, from: LatLng, to: LatLng?, modifier: Modifier = Modifier,
 ) {
     val textValueKmValueMin = stringResource(R.string.text_value_km_value_min)
+    val miles = com.ridenow.app.ui.util.rememberUseMiles()
+    val kmText = route?.km ?: TripKm
+    val chipText = if (miles) stringResource(R.string.text_value_mi_value_min).format(com.ridenow.app.ui.util.kmToMiles(kmText), route?.minutes ?: TripMinutes) else textValueKmValueMin.format(kmText, route?.minutes ?: TripMinutes)
     val textValueValueSeats = stringResource(R.string.text_value_value_seats)
 
     val c = RideTheme.colors
@@ -80,7 +83,7 @@ fun ConfirmScreen(
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(80), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(130.dp).clip(RoundedCornerShape(20.dp)).border(1.dp, c.line, RoundedCornerShape(20.dp))) {
-                RouteMap(Modifier.fillMaxSize(), from, to, route, textValueKmValueMin.format(route?.km ?: TripKm, route?.minutes ?: TripMinutes), topPadding = 0.dp)
+                RouteMap(Modifier.fillMaxSize(), from, to, route, chipText, topPadding = 0.dp)
             }
             Card {
                 Row2(stringResource(R.string.confirm_pickup), stringResource(R.string.search_current), dot = Dot.Pickup)
@@ -99,7 +102,7 @@ fun ConfirmScreen(
             Card {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                     FareLine(stringResource(R.string.confirm_base), base)
-                    FareLine(stringResource(R.string.confirm_distance, route?.km ?: TripKm), dist)
+                    FareLine(if (miles) stringResource(R.string.confirm_distance_mi, com.ridenow.app.ui.util.kmToMiles(kmText)) else stringResource(R.string.confirm_distance, kmText), dist)
                     FareLine(stringResource(R.string.confirm_duration, route?.minutes ?: TripMinutes), time)
                     FareLine(stringResource(R.string.confirm_taxes), taxes)
                     HorizontalDivider(color = c.line)

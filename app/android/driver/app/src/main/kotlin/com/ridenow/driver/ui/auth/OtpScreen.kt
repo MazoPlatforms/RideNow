@@ -119,9 +119,9 @@ fun OtpScreen(phone: String, onBack: () -> Unit, onVerified: () -> Unit, modifie
         ) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
 
         Row(Modifier.padding(top = 10.dp).fillMaxWidth().entrance(0), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            repeat(3) { i ->
+            repeat(2) { i ->
                 Box(Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(c.line)) {
-                    if (i < 2) Box(Modifier.fillMaxSize().background(c.accent))
+                    Box(Modifier.fillMaxSize().background(c.accent))
                 }
             }
         }

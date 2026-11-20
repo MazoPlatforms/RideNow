@@ -7,12 +7,11 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 
 /** RideNow brand yellow, sampled from the supplied logo. */
 val BrandYellow = Color(0xFFFEC604)
@@ -46,23 +45,41 @@ object RideTheme {
     val colors: RideColors @Composable @ReadOnlyComposable get() = LocalRideColors.current
 }
 
-/** One entry in Settings > App color. Light mode uses a deeper shade so text keeps its contrast. */
-class AccentChoice(val name: String, val dark: Color, val light: Color)
-val AccentChoices = listOf(
-    AccentChoice("Mint", Color(0xFF3DDC97), Color(0xFF0B6B45)), AccentChoice("Default", BrandYellow, Color(0xFF8A5A00)),
-    AccentChoice("Aqua", Color(0xFF3CC8E6), Color(0xFF0A6C80)), AccentChoice("Violet", Color(0xFFA98BFF), Color(0xFF5B3BC4)),
-    AccentChoice("Amber", Color(0xFFFFA726), Color(0xFF8A4B00)), AccentChoice("Coral", Color(0xFFFF7A66), Color(0xFFB03A28)),
-)
-object AccentPrefs { var name by mutableStateOf("Default") }
+/** Accent colours the rider can pick in Appearance. [fill] is the swatch and the accent on dark; [onLight] keeps text readable on light. */
+enum class AccentChoice(val fill: Color, val onLight: Color, val onFill: Color, val labelRes: Int) {
+    Yellow(BrandYellow, Color(0xFF8A5A00), Ink, com.ridenow.app.R.string.accent_yellow),
+    Blue(Color(0xFF3B8BEB), Color(0xFF1F5FBF), Color.White, com.ridenow.app.R.string.accent_blue),
+    Green(Color(0xFF22B35A), Color(0xFF0F7A3A), Color.White, com.ridenow.app.R.string.accent_green),
+    Red(Color(0xFFF0383D), Color(0xFFB3261E), Color.White, com.ridenow.app.R.string.accent_red),
+    Purple(Color(0xFF8E4CE8), Color(0xFF6A2FC0), Color.White, com.ridenow.app.R.string.accent_purple),
+    Orange(Color(0xFFFF8A1F), Color(0xFF9A4A00), Ink, com.ridenow.app.R.string.accent_orange),
+}
+
+/** Map appearance used by every map in the app. */
+enum class MapStyle(val labelRes: Int) {
+    Default(com.ridenow.app.R.string.map_default), Dark(com.ridenow.app.R.string.map_dark), Satellite(com.ridenow.app.R.string.map_satellite),
+}
+
+/** Text size choices used when "Use system font size" is off. */
+enum class TextSize(val scale: Float, val labelRes: Int) {
+    Normal(1f, com.ridenow.app.R.string.text_size_normal), Large(1.15f, com.ridenow.app.R.string.text_size_large), Larger(1.3f, com.ridenow.app.R.string.text_size_larger),
+}
+
+/** The map style chosen in Appearance. Read by every map. */
+val LocalMapStyle = staticCompositionLocalOf { MapStyle.Default }
 
 @Composable
-fun RideNowTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun RideNowTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(), accent: AccentChoice = AccentChoice.Yellow,
+    mapStyle: MapStyle = MapStyle.Default, fontScale: Float? = null, content: @Composable () -> Unit,
+) {
     val base = if (darkTheme) DarkRideColors else LightRideColors
-    val pick = AccentChoices.firstOrNull { it.name == AccentPrefs.name && it.name != "Default" }
-    val c = if (pick == null) base else base.copy(accent = if (darkTheme) pick.dark else pick.light, onAccent = if (darkTheme) Ink else Color.White)
+    val c = if (accent == AccentChoice.Yellow) base else base.copy(accent = if (darkTheme) accent.fill else accent.onLight, onAccent = if (darkTheme) accent.onFill else Color.White)
     val scheme = if (darkTheme) darkColorScheme(primary = c.accent, background = c.bg, surface = c.bg, onBackground = c.fg, onSurface = c.fg)
     else lightColorScheme(primary = c.accent, background = c.bg, surface = c.bg, onBackground = c.fg, onSurface = c.fg)
-    CompositionLocalProvider(LocalRideColors provides c) { MaterialTheme(colorScheme = scheme, content = content) }
+    val density = LocalDensity.current
+    val scaled = if (fontScale == null) density else Density(density.density, fontScale)
+    CompositionLocalProvider(LocalRideColors provides c, LocalMapStyle provides mapStyle, LocalDensity provides scaled) { MaterialTheme(colorScheme = scheme, content = content) }
 }
 
 /** Appearance setting: follow the phone, or force light or dark. */

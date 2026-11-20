@@ -368,7 +368,6 @@
     <string name="trip_decline">"ارفض"</string>
     <string name="trip_pickup_label">"يلتقط"</string>
     <string name="trip_drop_label">"الانزال"</string>
-    <string name="trip_rating_desc">"التقييم %1$s"</string>
     <string name="trip_req_seconds_desc">"%1$d ثانية متبقية للقبول"</string>
     <string name="trip_phase_pickup">"التوجه إلى بيك اب"</string>
     <string name="trip_phase_pickup_sub">"التقط %1$s من %2$s"</string>

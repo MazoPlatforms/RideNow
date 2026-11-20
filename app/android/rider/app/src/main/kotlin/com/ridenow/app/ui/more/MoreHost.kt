@@ -14,9 +14,10 @@ object MoreRoutes {
         "Your route", "Vehicle info", "High demand", "Pick up later", "Passenger", "Repeat", "Reminder", "Pick another date", "Set stop location", "Stop on map",
         "No drivers available", "Driver cancelled", "Driver arrived", "Ride cancelled", "Change drop-off", "Emergency call", "In-app call", "Chat with driver",
         "Trusted contact tracking", "Live trip notification", "Pay in cash", "Ride details", "Receipt PDF", "Scheduled ride details", "Edit scheduled ride", "Cancel scheduled ride",
-        "Change phone number", "Verify new number", "Current city", "Transaction History", "Notification settings", "App color", "Map style", "Language",
+        "Change phone number", "Verify new number", "Current city", "Transaction History", "Notification settings", "Appearance", "Language",
         "Privacy & Security", "Manage Devices", "Two-step verification", "App data and permissions", "Location data", "Download my data",
         "Delete account", "Confirm deletion", "Account deleted", "Help Center", "Report a safety issue",
+        "Support tickets", "New ticket", "Ticket conversation",
     )
     fun handles(label: String) = label in names || label.startsWith("Help topic:") || label.startsWith("Help article:")
 }
@@ -27,7 +28,14 @@ fun MoreHost(start: String, ctx: MoreCtx, root: MoreNav) {
     var stack by rememberSaveable { mutableStateOf(arrayListOf(start)) }
     val label = stack.last()
     val push = { l: String -> stack = ArrayList(stack + l) }
-    val pop = { if (stack.size > 1) stack = ArrayList(stack.dropLast(1)) else root.exit() }
+    // Leaving a ticket conversation that was just created also skips the empty "New ticket" form behind it.
+    val pop = {
+        if (stack.size > 1) {
+            var rest = stack.dropLast(1)
+            if (stack.last() == "Ticket conversation" && rest.lastOrNull() == "New ticket") rest = rest.dropLast(1)
+            if (rest.isEmpty()) root.exit() else stack = ArrayList(rest)
+        } else root.exit()
+    }
     // Always handled: on the first screen, pop() hands control back to the app shell instead of exiting.
     BackHandler { pop() }
     val nav = MoreNav(
@@ -84,8 +92,7 @@ private fun MoreScreen(label: String, ctx: MoreCtx, nav: MoreNav) {
             "Current city" -> CityPickerScreen(nav.exit)
             "Transaction History" -> TransactionHistoryScreen(nav.exit)
             "Notification settings" -> NotificationSettingsScreen(nav.exit)
-            "App color" -> AppColorScreen(nav.exit)
-            "Map style" -> MapStyleScreen(nav.exit)
+            "Appearance" -> com.ridenow.app.ui.settings.AppearanceScreen(nav.exit)
             "Language" -> LanguageScreen(nav.exit)
             "Privacy & Security" -> PrivacyHubScreen(nav.exit, nav.open)
             "Manage Devices" -> ManageDevicesScreen(nav.back)
@@ -96,6 +103,11 @@ private fun MoreScreen(label: String, ctx: MoreCtx, nav: MoreNav) {
             "Delete account" -> DeleteAccountScreen(nav.back) { nav.open("Confirm deletion") }
             "Confirm deletion" -> ConfirmDeletionScreen(ctx.phone, nav.back) { nav.open("Account deleted") }
             "Account deleted" -> AccountDeletedScreen(nav.signedOut)
+            // Support tickets
+            "Support tickets" -> com.ridenow.app.ui.support.TicketsScreen(nav.back, { com.ridenow.app.ui.support.TicketStore.selectedId = it.id; nav.open("Ticket conversation") }, { nav.open("New ticket") })
+            "New ticket" -> com.ridenow.app.ui.support.NewTicketScreen(nav.back, { com.ridenow.app.ui.support.TicketStore.selectedId = it.id; nav.open("Ticket conversation") })
+            "Ticket conversation" -> com.ridenow.app.ui.support.TicketStore.tickets.firstOrNull { it.id == com.ridenow.app.ui.support.TicketStore.selectedId }
+                ?.let { com.ridenow.app.ui.support.TicketConversationScreen(it, nav.back) } ?: nav.back()
             // Help
             "Help Center" -> HelpCenterScreen(nav.exit, nav.open)
             "Report a safety issue" -> ReportSafetyScreen(nav.back, nav.safety)

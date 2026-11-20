@@ -18,6 +18,8 @@ import com.ridenow.driver.ui.components.*
 import com.ridenow.driver.ui.data.DriverStore
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.util.openAppSettings
+import com.ridenow.driver.ui.util.openAppNotificationSettings
+import com.ridenow.driver.ui.util.openChannelSettings
 import com.ridenow.driver.ui.util.rememberBoolPref
 
 private class NType(val key: String, val icon: List<String>, val title: Int, val sub: Int, val default: Boolean, val more: Boolean)
@@ -33,15 +35,16 @@ private val TYPES = listOf(
 )
 
 @Composable
-private fun PrefToggle(icon: List<String>, title: String, sub: String?, key: String, default: Boolean, onMore: (() -> Unit)? = null) {
+private fun PrefToggle(icon: List<String>, title: String, sub: String?, key: String, default: Boolean, onMore: (() -> Unit)? = null, reserveMore: Boolean = false) {
     val p = rememberBoolPref(key, default)
-    ToggleRow(icon, title, p.value, { p.value = it }, subtitle = sub, onMore = onMore)
+    ToggleRow(icon, title, p.value, { p.value = it }, subtitle = sub, onMore = onMore, reserveMore = reserveMore)
 }
 
 /** Notification settings: push on/off, a switch per type with sound and vibration options, and in-app notifications. */
 @Composable
 fun NotificationSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
+    val context = LocalContext.current
     val push = rememberBoolPref("push_enabled", true)
     var sheet by remember { mutableStateOf<NType?>(null) }
     SubScreen(str(R.string.ns_title), onBack, modifier) {
@@ -52,34 +55,32 @@ fun NotificationSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier
         GroupCard {
             TYPES.forEachIndexed { i, t ->
                 if (i > 0) RowDivider()
-                PrefToggle(t.icon, str(t.title), str(t.sub), "n_" + t.key, t.default, if (t.more) ({ sheet = t }) else null)
+                PrefToggle(t.icon, str(t.title), str(t.sub), "n_" + t.key, t.default, if (t.more) ({ sheet = t }) else null, reserveMore = true)
             }
         }
         SectionTitle(str(R.string.ns_in_app))
-        GroupCard(Modifier.padding(bottom = 16.dp)) { PrefToggle(RideIcons.Msg, str(R.string.ns_show_in_app), str(R.string.ns_show_in_app_sub), "n_in_app", true) }
+        GroupCard { PrefToggle(RideIcons.Msg, str(R.string.ns_show_in_app), str(R.string.ns_show_in_app_sub), "n_in_app", true) }
+        SectionTitle(str(R.string.ns_system))
+        GroupCard(Modifier.padding(bottom = 16.dp)) { NavRow(RideIcons.Gear, str(R.string.ns_system_settings), { openAppNotificationSettings(context) }, subtitle = str(R.string.ns_system_settings_sub)) }
     }
     sheet?.let { t ->
         RideSheet(str(t.title), { sheet = null }, str(t.sub)) { close ->
-            GroupCard {
-                PrefToggle(RideIcons.Bell, str(R.string.ns_sound), null, "n_${t.key}_sound", true); RowDivider()
-                PrefToggle(RideIcons.Phone, str(R.string.ns_vibrate), null, "n_${t.key}_vibrate", true)
-            }
-            Spacer(Modifier.height(14.dp)); RideButton(str(R.string.dialog_ok), { close() })
+            SoftButton(str(R.string.ns_channel_open), { openChannelSettings(context, t.key); close() }, icon = RideIcons.Gear)
+            Spacer(Modifier.height(10.dp)); RideButton(str(R.string.dialog_ok), { close() })
         }
     }
 }
 
 /** Privacy and security: privacy controls, app lock, sessions and data. Smaller choices open in sheets. */
 @Composable
-fun PrivacySecurityScreen(onBack: () -> Unit, onPersonalData: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+fun PrivacySecurityScreen(
+    onBack: () -> Unit, onPersonalData: () -> Unit, onDelete: () -> Unit, onDevices: () -> Unit, onTwoStep: () -> Unit, onDownload: () -> Unit, modifier: Modifier = Modifier,
+) {
     val c = RideTheme.colors
     val context = LocalContext.current
     val appLock = rememberBoolPref("app_lock", false)
-    val twoFactor = rememberBoolPref("two_factor", false)
     var sheet by remember { mutableStateOf("") }
-    var download by remember { mutableStateOf(false) }
     val needLock = str(R.string.lock_need_screen_lock)
-    val requested = str(R.string.priv_download_done)
 
     @Composable fun Item(icon: List<String>, title: Int, sub: Int, onClick: () -> Unit) = NavRow(icon, str(title), onClick, subtitle = str(sub))
 
@@ -95,13 +96,13 @@ fun PrivacySecurityScreen(onBack: () -> Unit, onPersonalData: () -> Unit, onDele
         SectionTitle(str(R.string.priv_security))
         GroupCard {
             ToggleRow(RideIcons.Lock, str(R.string.lock_title), appLock.value, { on -> if (on && !deviceHasLock(context)) toast(context, needLock) else appLock.value = on }, subtitle = str(R.string.lock_sub)); RowDivider()
-            Item(RideIcons.Shield, R.string.priv_2fa, R.string.priv_2fa_sub) { sheet = "2fa" }; RowDivider()
-            Item(RideIcons.Key, R.string.priv_sessions, R.string.priv_sessions_sub) { sheet = "sessions" }; RowDivider()
+            Item(RideIcons.Shield, R.string.priv_2fa, R.string.priv_2fa_sub, onTwoStep); RowDivider()
+            Item(RideIcons.Key, R.string.priv_sessions, R.string.priv_sessions_sub, onDevices); RowDivider()
             Item(RideIcons.Phone, R.string.priv_trusted, R.string.priv_trusted_sub) { sheet = "trusted" }
         }
         SectionTitle(str(R.string.priv_data))
         GroupCard(Modifier.padding(bottom = 16.dp)) {
-            Item(RideIcons.Download, R.string.priv_download, R.string.priv_download_sub) { download = true }; RowDivider()
+            Item(RideIcons.Download, R.string.priv_download, R.string.priv_download_sub, onDownload); RowDivider()
             Item(RideIcons.Trash, R.string.priv_delete, R.string.priv_delete_sub, onDelete)
         }
     }
@@ -120,19 +121,6 @@ fun PrivacySecurityScreen(onBack: () -> Unit, onPersonalData: () -> Unit, onDele
             }
             Spacer(Modifier.height(14.dp)); RideButton(str(R.string.dialog_ok), { close() })
         }
-        "2fa" -> RideSheet(str(R.string.priv_2fa), { sheet = "" }, str(R.string.priv_2fa_text)) { close ->
-            GroupCard { ToggleRow(RideIcons.Shield, str(R.string.priv_2fa_toggle), twoFactor.value, { twoFactor.value = it }) }
-            Spacer(Modifier.height(14.dp)); RideButton(str(R.string.dialog_ok), { close() })
-        }
-        "sessions" -> RideSheet(str(R.string.priv_sessions), { sheet = "" }, str(R.string.priv_sessions_text)) { close ->
-            GroupCard {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    RideIcon(RideIcons.Phone, c.fg); Column(Modifier.weight(1f).padding(horizontal = 12.dp)) { Text(android.os.Build.MODEL, color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold); Text(str(R.string.priv_this_device), color = c.muted, fontSize = 12.sp) }
-                    StatusChip(str(R.string.priv_active_now), Tone.Good, dot = true)
-                }
-            }
-            Spacer(Modifier.height(14.dp)); SoftButton(str(R.string.priv_signout_others), { toast(context, requested); close() })
-        }
         "trusted" -> RideSheet(str(R.string.priv_trusted), { sheet = "" }, str(R.string.priv_trusted_text)) { close ->
             GroupCard {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -143,12 +131,6 @@ fun PrivacySecurityScreen(onBack: () -> Unit, onPersonalData: () -> Unit, onDele
             Spacer(Modifier.height(14.dp)); RideButton(str(R.string.dialog_ok), { close() })
         }
     }
-    if (download) AlertDialog(
-        onDismissRequest = { download = false }, containerColor = c.bg,
-        title = { Text(str(R.string.priv_download), color = c.fg) }, text = { Text(str(R.string.priv_download_text), color = c.muted) },
-        confirmButton = { TextButton(onClick = { download = false; toast(context, requested) }) { Text(str(R.string.priv_download_confirm), color = c.accent) } },
-        dismissButton = { TextButton(onClick = { download = false }) { Text(str(R.string.dialog_cancel), color = c.fg) } },
-    )
 }
 
 /** Accepted payment methods for fares. */
@@ -180,8 +162,8 @@ fun DeleteAccountScreen(onBack: () -> Unit, onDownload: () -> Unit, onGoOffline:
     SubScreen(
         str(R.string.del_title), onBack, modifier,
         bottom = {
-            Box(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(28.dp)).background(Color_Red).clickable(role = androidx.compose.ui.semantics.Role.Button) { confirm = true }, contentAlignment = Alignment.Center) {
-                Text(str(R.string.del_button), color = androidx.compose.ui.graphics.Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Box(Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(28.dp)).background(Color_Red).clickable(role = androidx.compose.ui.semantics.Role.Button) { confirm = true }, contentAlignment = Alignment.Center) {
+                Text(str(R.string.del_button), color = androidx.compose.ui.graphics.Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp))
             }
             Text(str(R.string.del_irreversible), color = c.muted, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
         },

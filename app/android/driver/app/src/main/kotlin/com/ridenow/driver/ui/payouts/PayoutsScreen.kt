@@ -58,10 +58,10 @@ fun PayoutsScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -> Unit, on
                 ) { Text(str(R.string.pay_withdraw), color = c.onFill, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
             }
         }
-        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Figure(str(R.string.pay_week), Money.fmt(store.weekTotal), if (store.sample) "+12%" else null, Modifier.weight(1f))
-            Figure(str(R.string.pay_month), Money.fmt(store.monthTotal), if (store.sample) "+8%" else null, Modifier.weight(1f))
-            Figure(str(R.string.pay_total), Money.fmt(store.allTotal), null, Modifier.weight(1f))
+        Row(Modifier.padding(top = 12.dp).height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Figure(str(R.string.pay_week), store.weekTotal, if (store.sample) "+12%" else null, Modifier.weight(1f))
+            Figure(str(R.string.pay_month), store.monthTotal, if (store.sample) "+8%" else null, Modifier.weight(1f))
+            Figure(str(R.string.pay_total), store.allTotal, null, Modifier.weight(1f))
         }
         FilterPills(listOf(str(R.string.filter_all), str(R.string.pay_earnings), str(R.string.pay_payouts), str(R.string.pay_adjustments)), filter, { filter = it }, Modifier.padding(top = 16.dp))
         if (list.isEmpty()) EmptyState(RideIcons.Receipt, str(R.string.pay_empty_title), str(R.string.pay_empty_text))
@@ -76,8 +76,8 @@ fun PayoutsScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -> Unit, on
                     Row(Modifier.fillMaxWidth().clickable(role = Role.Button) { detail = t }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconTile(iconFor(t.kind), toneFor(t.kind), size = 44.dp)
                         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                            Text(t.title, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            Text(t.sub, color = c.muted, fontSize = 12.sp, maxLines = 1)
+                            Text(t.title, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                            Text(t.sub, color = c.muted, fontSize = 12.sp, maxLines = 2)
                             Text(Calendars.timeLabel(t.minute), color = c.muted, fontSize = 12.sp)
                         }
                         Text(Money.signed(t.amount), color = if (t.amount < 0) c.danger else c.good, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -104,12 +104,15 @@ fun PayoutsScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -> Unit, on
 }
 
 @Composable
-private fun Figure(label: String, value: String, delta: String?, modifier: Modifier) {
+private fun Figure(label: String, amount: Int, delta: String?, modifier: Modifier) {
     val c = RideTheme.colors
     Column(modifier.clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(12.dp)) {
-        Text(label, color = c.muted, fontSize = 12.sp)
-        Text(value, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
+        Text(label, color = c.muted, fontSize = 12.sp, maxLines = 2, lineHeight = 15.sp)
+        // Currency on its own line so large totals such as 482,150 always fit.
+        Text(Money.CURRENCY, color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+        Text(Money.fmt(amount).removePrefix(Money.CURRENCY).trim(), color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
         if (delta != null) Text("\u2197 $delta", color = c.good, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
+        else Spacer(Modifier.height(17.dp))
     }
 }
 

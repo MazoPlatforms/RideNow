@@ -369,7 +369,6 @@
     <string name="trip_decline">Decline</string>
     <string name="trip_pickup_label">Pickup</string>
     <string name="trip_drop_label">Drop-off</string>
-    <string name="trip_rating_desc">Rating %1$s</string>
     <string name="trip_req_seconds_desc">%1$d seconds left to accept</string>
     <string name="trip_phase_pickup">Heading to pickup</string>
     <string name="trip_phase_pickup_sub">Pick up %1$s at %2$s</string>

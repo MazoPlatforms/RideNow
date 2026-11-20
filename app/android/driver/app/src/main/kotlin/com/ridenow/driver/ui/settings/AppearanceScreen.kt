@@ -38,7 +38,7 @@ private fun SelectCard(selected: Boolean, label: String, onClick: () -> Unit, mo
     ) {
         Box(Modifier.fillMaxWidth().height(92.dp), content = content)
         Row(Modifier.padding(top = 8.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = if (selected) c.accent else c.fg, fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)
+            Text(label, color = if (selected) c.accent else c.fg, fontSize = 13.sp, lineHeight = 16.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)
         }
     }
 }
@@ -95,7 +95,7 @@ fun AppearanceScreen(state: AppearanceState, onBack: () -> Unit, modifier: Modif
             TextSize.entries.forEachIndexed { i, t ->
                 if (i > 0) RowDivider()
                 val on = !state.systemFont && state.textSize == t
-                Row(Modifier.fillMaxWidth().height(56.dp).selectable(on, role = Role.RadioButton) { state.setTextSize(t); state.setSystemFont(false); close() }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).selectable(on, role = Role.RadioButton) { state.setTextSize(t); state.setSystemFont(false); close() }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(str(t.labelRes), color = c.fg, fontSize = (15 * t.scale).sp, modifier = Modifier.weight(1f)); RadioDot(on)
                 }
             }
@@ -105,7 +105,7 @@ fun AppearanceScreen(state: AppearanceState, onBack: () -> Unit, modifier: Modif
         GroupCard {
             AppIconChoice.entries.forEachIndexed { i, ch ->
                 if (i > 0) RowDivider()
-                Row(Modifier.fillMaxWidth().height(64.dp).selectable(icon == ch, role = Role.RadioButton) { setAppIcon(context, ch); icon = ch; close() }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).selectable(icon == ch, role = Role.RadioButton) { setAppIcon(context, ch); icon = ch; close() }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(androidx.compose.ui.res.colorResource(ch.colorRes)), contentAlignment = Alignment.Center) { LogoMark(30.dp) }
                     Text(str(ch.labelRes), color = c.fg, fontSize = 15.sp, modifier = Modifier.weight(1f).padding(start = 14.dp)); RadioDot(icon == ch)
                 }

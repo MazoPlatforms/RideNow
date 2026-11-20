@@ -49,7 +49,7 @@ private fun StopLine(title: String, sub: String?, time: String?) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Column(Modifier.weight(1f)) {
             Text(title, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
-            if (sub != null) Text(sub, color = c.muted, fontSize = 12.sp, maxLines = 1)
+            if (sub != null) Text(sub, color = c.muted, fontSize = 12.sp, maxLines = 2)
         }
         if (time != null) Text(time, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
     }
@@ -81,19 +81,15 @@ private fun Line(label: String, value: String) {
     Row { Text(label, color = c.muted, fontSize = 13.sp, modifier = Modifier.weight(1f)); Text(value, color = c.muted, fontSize = 13.sp) }
 }
 
-/** Rider avatar, name, rating and call / message buttons. */
+/** Rider avatar, name and call / message buttons. */
 @Composable
-fun RiderRow(r: RideRecord, modifier: Modifier = Modifier, showRating: Boolean = true, extra: (@Composable RowScope.() -> Unit)? = null) {
+fun RiderRow(r: RideRecord, modifier: Modifier = Modifier, extra: (@Composable RowScope.() -> Unit)? = null) {
     val c = RideTheme.colors
     val context = LocalContext.current
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Avatar(initialsOf(r.rider), 48.dp)
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(r.rider, color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            if (showRating) Row(verticalAlignment = Alignment.CenterVertically) {
-                RideIcon(RideIcons.Star, c.fill, size = 13.dp)
-                Text(" ${r.riderRating}  " + str(R.string.rider_rides, r.riderRides), color = c.muted, fontSize = 12.sp)
-            }
         }
         CircleButton(RideIcons.Call, str(R.string.trip_call), { openDial(context, r.riderPhone) }, size = 42.dp)
         Spacer(Modifier.width(8.dp))

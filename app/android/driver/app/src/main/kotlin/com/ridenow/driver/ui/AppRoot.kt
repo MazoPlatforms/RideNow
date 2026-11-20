@@ -85,6 +85,9 @@ import com.ridenow.driver.ui.settings.DeleteAccountScreen
 import com.ridenow.driver.ui.settings.NotificationSettingsScreen
 import com.ridenow.driver.ui.settings.PaymentMethodsScreen
 import com.ridenow.driver.ui.settings.PrivacySecurityScreen
+import com.ridenow.driver.ui.settings.ManageDevicesScreen
+import com.ridenow.driver.ui.settings.TwoStepScreen
+import com.ridenow.driver.ui.settings.DownloadDataScreen
 import com.ridenow.driver.ui.settings.SettingsScreen
 import com.ridenow.driver.ui.support.EmergencyAssistScreen
 import com.ridenow.driver.ui.support.FaqScreen
@@ -96,6 +99,12 @@ import com.ridenow.driver.ui.support.ShareTripScreen
 import com.ridenow.driver.ui.support.SupportCenterScreen
 import com.ridenow.driver.ui.support.TicketConversationScreen
 import com.ridenow.driver.ui.support.TicketsScreen
+import com.ridenow.driver.ui.system.LocationOffScreen
+import com.ridenow.driver.ui.system.NoInternetScreen
+import com.ridenow.driver.ui.system.NotificationsOffScreen
+import com.ridenow.driver.ui.system.rememberLocationEnabled
+import com.ridenow.driver.ui.system.rememberNotificationsEnabled
+import com.ridenow.driver.ui.system.rememberOnline
 import com.ridenow.driver.ui.theme.AppearanceState
 import com.ridenow.driver.ui.theme.MapStyle
 import com.ridenow.driver.ui.trip.CompletedTrip
@@ -108,7 +117,7 @@ enum class Screen {
     VehicleDocs, VehiclePhotos, Availability, ServiceArea, Bank, Review, Submitted,
     ActionRequired, Rejected, Approved, Home, Earnings, Rides, Support, Account, Trip, TripComplete, DriverProfile, EditProfile,
     NotificationCenter, EarningsDetails, RideDetails, VehicleDetails, EditVehicle, VehicleDocuments, Payouts, BankManage, BankForm,
-    Settings, Appearance, LanguageSettings, NotificationSettings, Privacy, DeleteAccount, PaymentMethods,
+    Settings, Appearance, LanguageSettings, NotificationSettings, Privacy, DeleteAccount, PaymentMethods, ManageDevices, TwoStep, DownloadData,
     Faq, Tickets, Conversation, NewTicket, HelpSafety, SafetyCenter, Emergency, ShareTrip, ReportIssue, Legal, LegalDoc,
 }
 
@@ -338,7 +347,12 @@ fun AppRoot(appearance: AppearanceState) {
                     Screen.Home -> HomeScreen(
                         online = app.online, bankSaved = app.bankSaved, driverName = driverName,
                         onlineSince = app.onlineSince, bankedMillis = app.bankedMillis,
-                        onToggle = { if (app.online) app.goOffline() else if (app.bankSaved) app.goOnline() else { bankReturn = Screen.Home.name; screen = Screen.Bank } },
+                        onToggle = {
+                            if (app.online) app.goOffline()
+                            else if (!app.bankSaved) { bankReturn = Screen.Home.name; screen = Screen.Bank }
+                            else if (!locationOn) locDismissed = false
+                            else app.goOnline()
+                        },
                         onAddBank = { bankReturn = Screen.Home.name; screen = Screen.Bank },
                         onTab = { tab(it) },
                         earnings = app.earnings, trips = app.history.size, request = app.request,
@@ -452,7 +466,13 @@ fun AppRoot(appearance: AppearanceState) {
                     Screen.Appearance -> { BackHandler { back() }; AppearanceScreen(appearance, { back() }) }
                     Screen.LanguageSettings -> { BackHandler { back() }; LanguageScreen { back() } }
                     Screen.NotificationSettings -> { BackHandler { back() }; NotificationSettingsScreen({ back() }) }
-                    Screen.Privacy -> { BackHandler { back() }; PrivacySecurityScreen({ back() }, onPersonalData = { go(Screen.DriverProfile) }, onDelete = { go(Screen.DeleteAccount) }) }
+                    Screen.Privacy -> {
+                        BackHandler { back() }
+                        PrivacySecurityScreen({ back() }, onPersonalData = { go(Screen.DriverProfile) }, onDelete = { go(Screen.DeleteAccount) }, onDevices = { go(Screen.ManageDevices) }, onTwoStep = { go(Screen.TwoStep) }, onDownload = { go(Screen.DownloadData) })
+                    }
+                    Screen.ManageDevices -> { BackHandler { back() }; ManageDevicesScreen({ back() }) }
+                    Screen.TwoStep -> { BackHandler { back() }; TwoStepScreen(shownPhone, { back() }) }
+                    Screen.DownloadData -> { BackHandler { back() }; DownloadDataScreen({ back() }) }
                     Screen.PaymentMethods -> { BackHandler { back() }; PaymentMethodsScreen(store, { back() }, { go(Screen.BankManage) }) }
                     Screen.DeleteAccount -> {
                         BackHandler { back() }
@@ -493,6 +513,18 @@ fun AppRoot(appearance: AppearanceState) {
                 }
             }
         }
+        }
+        // Full-screen states shown over everything, in this order of priority.
+        val inApp = screen in setOf(Screen.Home, Screen.Earnings, Screen.Rides, Screen.Support, Screen.Account, Screen.Trip)
+        if (!hasInternet && !offlineSkip && screen != Screen.Splash && screen != Screen.Intro) {
+            BackHandler { }
+            NoInternetScreen(onRetry = { netKey++ }, onOpenRides = { offlineSkip = true; tab(MainTab.Rides) })
+        } else if (inApp && !locationOn && !locDismissed) {
+            BackHandler { locDismissed = true }
+            LocationOffScreen(onNotNow = { locDismissed = true })
+        } else if (inApp && !notificationsOn && !ntfDismissed) {
+            BackHandler { ntfDismissed = true }
+            NotificationsOffScreen(onNotNow = { ntfDismissed = true })
         }
     }
 }

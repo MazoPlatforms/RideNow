@@ -368,7 +368,6 @@
     <string name="trip_decline">"ප්‍රතික්ෂේප කරන්න"</string>
     <string name="trip_pickup_label">"අවුලා ගන්න"</string>
     <string name="trip_drop_label">"අතහැර දැමීම"</string>
-    <string name="trip_rating_desc">"ශ්‍රේණිගත කිරීම %1$s"</string>
     <string name="trip_req_seconds_desc">"පිළිගැනීමට තත්පර %1$d ඉතිරිව ඇත"</string>
     <string name="trip_phase_pickup">"පිකප් වෙත ගමන් කරයි"</string>
     <string name="trip_phase_pickup_sub">"%2$s හිදී %1$s ලබා ගන්න"</string>

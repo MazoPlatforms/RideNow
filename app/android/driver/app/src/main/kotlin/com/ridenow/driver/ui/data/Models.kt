@@ -15,7 +15,7 @@ enum class RideStatus { Completed, Cancelled }
 class RideRecord(
     val id: String, val ref: String, val ageDays: Int, val startMin: Int, val durationMin: Int, val km: Double,
     val pickup: String, val pickupSub: String, val drop: String, val dropSub: String,
-    val rider: String, val riderRating: Double, val riderRides: Int, val riderPhone: String,
+    val rider: String, val riderPhone: String,
     val status: RideStatus, val surge: Int = 0, val promo: Int = 0,
 ) {
     val base: Int get() = BASE_FARE

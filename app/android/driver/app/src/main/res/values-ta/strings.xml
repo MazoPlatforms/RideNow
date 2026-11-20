@@ -368,7 +368,6 @@
     <string name="trip_decline">"நிராகரிக்கவும்"</string>
     <string name="trip_pickup_label">"பிக்கப்"</string>
     <string name="trip_drop_label">"கைவிடுதல்"</string>
-    <string name="trip_rating_desc">"மதிப்பீடு %1$s"</string>
     <string name="trip_req_seconds_desc">"ஏற்க %1$d வினாடிகள் உள்ளன"</string>
     <string name="trip_phase_pickup">"பிக்கப்பிற்கு செல்கிறது"</string>
     <string name="trip_phase_pickup_sub">"%2$s இல் %1$s ஐப் பெறவும்"</string>

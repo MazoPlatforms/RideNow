@@ -26,7 +26,7 @@ fun RideChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Mod
     Box(
         modifier.heightIn(min = 48.dp).clip(shape).background(if (selected) c.accent.copy(alpha = 0.14f) else Color.Transparent)
             .border(1.dp, if (selected) c.accent else c.border, shape)
-            .selectable(selected, role = Role.RadioButton, onClick = onClick).padding(horizontal = 16.dp),
+            .selectable(selected, role = Role.RadioButton, onClick = onClick).padding(horizontal = 14.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, color = if (selected) c.accent else c.fg, fontSize = 14.sp) }
+    ) { Text(text, color = if (selected) c.accent else c.fg, fontSize = 14.sp, lineHeight = 18.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
 }

@@ -84,7 +84,7 @@ class DriverStore {
         val minutes = (km * 3.5).toInt().coerceAtLeast(8)
         val ride = RideRecord(
             id, "#RN" + (700000 + counter++), 0, startMin, minutes, km, trip.pickup, trip.pickup, trip.drop, trip.drop,
-            trip.rider, 4.8, 40, "+94 77 000 0000", RideStatus.Completed,
+            trip.rider, "+94 77 000 0000", RideStatus.Completed,
         )
         rides.add(0, ride)
         sessionEarned += ride.fare
@@ -117,7 +117,7 @@ class DriverStore {
             VehicleDoc(DocType.Photos, null, DocStatus.Verified, photos = 4),
         ))
 
-        val riders = listOf(Triple("Ahmed R.", 4.8, 128), Triple("Nimal S.", 4.9, 86), Triple("Priya K.", 4.7, 42), Triple("Fathima A.", 5.0, 203), Triple("Kumar T.", 4.6, 31), Triple("Sara M.", 4.8, 77))
+        val riders = listOf("Ahmed R.", "Nimal S.", "Priya K.", "Fathima A.", "Kumar T.", "Sara M.")
         val places = listOf(
             "Main Street, Kallady" to "Main Street, Kallady, Batticaloa", "Batticaloa Town, Bus Stand" to "Bus Stand, Batticaloa Town",
             "Kattankudy Junction" to "Kattankudy Junction, Kattankudy", "Eravur" to "Eravur Town, Batticaloa",
@@ -139,7 +139,7 @@ class DriverStore {
             val rider = riders[i % riders.size]
             rides.add(RideRecord(
                 "r$i", "#RN" + (728364 - i * 137), s.age, s.start, s.dur, s.km, places[s.a].first, places[s.a].second, places[s.b].first, places[s.b].second,
-                rider.first, rider.second, rider.third, "+94 77 000 0000", if (s.cancelled) RideStatus.Cancelled else RideStatus.Completed, s.surge, s.promo,
+                rider, "+94 77 000 0000", if (s.cancelled) RideStatus.Cancelled else RideStatus.Completed, s.surge, s.promo,
             ))
         }
         txns.addAll(listOf(

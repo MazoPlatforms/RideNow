@@ -35,7 +35,6 @@ import com.ridenow.app.ui.components.RideIcons
 import com.ridenow.app.ui.components.RideTextField
 import com.ridenow.app.ui.components.RowDivider
 import com.ridenow.app.ui.components.ScreenTop
-import com.ridenow.app.ui.settings.AppearanceSheet
 import com.ridenow.app.ui.theme.BrandYellow
 import com.ridenow.app.ui.theme.Ink
 import com.ridenow.app.ui.theme.RideNowTheme
@@ -90,7 +89,6 @@ fun ProfileScreen(
     val c = RideTheme.colors
     val language = Locale.forLanguageTag(getAppLanguage(LocalContext.current))
     val languageName = language.getDisplayLanguage(language).replaceFirstChar { it.titlecaseChar() }
-    var sheet by rememberSaveable { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         ScreenTop(textSettingsProfile, onBack)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
@@ -111,7 +109,7 @@ fun ProfileScreen(
                 NavRow(RideIcons.Person, textPersonalInformation, onEdit, subtitle = textNamePhoneEmail); RowDivider()
                 NavRow(RideIcons.Bell, textMenuNotifications, { onOpen("Notification settings") }, subtitle = textManageYourPreferences); RowDivider()
                 NavRow(RideIcons.Globe, textSettingsLanguage, { onOpen("Language") }, subtitle = languageName); RowDivider()
-                NavRow(RideIcons.Moon, stringResource(R.string.settings_appearance), { sheet = true }, subtitle = stringResource(mode.labelRes))
+                NavRow(RideIcons.Moon, stringResource(R.string.settings_appearance), { onOpen("Appearance") }, subtitle = stringResource(mode.labelRes))
             }
             GroupCard(Modifier.padding(top = 10.dp)) {
                 NavRow(RideIcons.Shield, textSettingsPrivacy, { onOpen("Privacy & Security") }, subtitle = textSettingsPrivacySub); RowDivider()
@@ -124,7 +122,6 @@ fun ProfileScreen(
             ) { RideIcon(RideIcons.Logout, c.danger); Spacer(Modifier.width(10.dp)); Text(textLogOut, color = c.danger, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
         }
     }
-    if (sheet) AppearanceSheet(mode, onMode) { sheet = false }
 }
 
 @Composable

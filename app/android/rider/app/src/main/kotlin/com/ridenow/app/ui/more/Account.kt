@@ -45,8 +45,7 @@ import androidx.compose.ui.unit.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.core.content.ContextCompat
 import com.ridenow.app.ui.components.*
-import com.ridenow.app.ui.theme.AccentChoices
-import com.ridenow.app.ui.theme.AccentPrefs
+import com.ridenow.app.ui.theme.LocalAppearance
 import com.ridenow.app.ui.theme.RideTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -313,57 +312,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
     }
 }
 
-// ---------- App color, Map style, Language ----------
-
-@Composable
-fun AppColorScreen(onBack: () -> Unit) {
-    val textAppColor = stringResource(R.string.text_app_color)
-    val textChooseYourPreferredAccentColor = stringResource(R.string.text_choose_your_preferred_accent_color)
-    val textApply = stringResource(R.string.text_apply)
-
-    val c = RideTheme.colors
-    val context = LocalContext.current
-    var sel by rememberSaveable { mutableStateOf(AccentPrefs.name) }
-    MoreScaffold(textAppColor, onBack, subtitle = textChooseYourPreferredAccentColor, bottom = {
-        RideButton(textApply, { AccentPrefs.name = sel; context.prefs().edit().putString("accent", sel).apply(); onBack() })
-    }) {
-        AccentChoices.chunked(3).forEach { row ->
-            Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                row.forEach { a ->
-                    val on = sel == a.name
-                    val swatch = if (c.isDark) a.dark else a.light
-                    Column(
-                        Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(c.field).border(if (on) 2.dp else 1.dp, if (on) swatch else c.border, RoundedCornerShape(20.dp))
-                            .selectable(on, role = Role.RadioButton) { sel = a.name }.padding(vertical = 18.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Box(Modifier.size(44.dp).clip(CircleShape).background(swatch), contentAlignment = Alignment.Center) { if (on) RideIcon(RideIcons.Check, if (c.isDark) Color(0xFF0A0C10) else Color.White) }
-                        Text(localizedLabel(a.name), color = c.fg, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
-                    }
-                }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
-}
-
-@Composable
-fun MapStyleScreen(onBack: () -> Unit) {
-    val textBalancedDetail = stringResource(R.string.text_balanced_detail)
-    val textRealImagery = stringResource(R.string.text_real_imagery)
-    val textFewerLabelsLessClutter = stringResource(R.string.text_fewer_labels_less_clutter)
-    val textHighlightsStationsAndLines = stringResource(R.string.text_highlights_stations_and_lines)
-    val textMapStyle = stringResource(R.string.text_map_style)
-    val textAdjustHowMapsLookInTheApp = stringResource(R.string.text_adjust_how_maps_look_in_the_app)
-    val textApply = stringResource(R.string.text_apply)
-
-    val context = LocalContext.current
-    val opts = listOf("Default" to textBalancedDetail, "Satellite" to textRealImagery, "Minimal" to textFewerLabelsLessClutter, "Transit" to textHighlightsStationsAndLines)
-    var sel by rememberSaveable { mutableStateOf(context.prefs().getString("map_style", "Default") ?: "Default") }
-    MoreScaffold(textMapStyle, onBack, subtitle = textAdjustHowMapsLookInTheApp, bottom = { RideButton(textApply, { context.prefs().edit().putString("map_style", sel).apply(); onBack() }) }) {
-        GroupCard(Modifier.padding(top = 16.dp)) { opts.forEachIndexed { i, (n, s) -> if (i > 0) RowDivider(); Column(Modifier.padding(horizontal = 16.dp)) { RadioRow(localizedLabel(n), sel == n, { sel = n }, s) } } }
-    }
-}
+// ---------- Language ----------
 
 @Composable
 fun LanguageScreen(onBack: () -> Unit) {
@@ -739,13 +688,14 @@ fun ConfirmDeletionScreen(phone: String, onBack: () -> Unit, onDeleted: () -> Un
 
     val c = RideTheme.colors
     val context = LocalContext.current
+    val appearance = LocalAppearance.current
     var code by rememberSaveable { mutableStateOf("") }
     var round by remember { mutableIntStateOf(0) }
     val left = key(round) { rememberCountdown(24) }
     MoreScaffold(textConfirmDeletion, onBack, subtitle = textEnterTheCodeSentToValueToDeleteYourAccount.format(phone), bottom = {
         DangerButton(textDeleteAccount2, {
             val seen = context.prefs().getBoolean("intro_seen", false)
-            context.prefs().edit().clear().putBoolean("intro_seen", seen).apply(); AccentPrefs.name = "Default"; onDeleted()
+            context.prefs().edit().clear().putBoolean("intro_seen", seen).apply(); appearance?.reload(); onDeleted()
         }, enabled = code.length == 6)
         RideButton(textKeepMyAccount, onBack, Modifier.padding(top = 8.dp), style = RideButtonStyle.Text)
     }) {

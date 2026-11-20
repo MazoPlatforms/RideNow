@@ -58,6 +58,10 @@ fun RideOptionsScreen(
 ) {
     val textValueKmValueMin = stringResource(R.string.text_value_km_value_min)
     val textValueKm = stringResource(R.string.text_value_km)
+    val miles = com.ridenow.app.ui.util.rememberUseMiles()
+    val kmText = route?.km ?: TripKm
+    val distText = if (miles) stringResource(R.string.text_value_mi).format(com.ridenow.app.ui.util.kmToMiles(kmText)) else textValueKm.format(kmText)
+    val chipText = if (miles) stringResource(R.string.text_value_mi_value_min).format(com.ridenow.app.ui.util.kmToMiles(kmText), route?.minutes ?: TripMinutes) else textValueKmValueMin.format(kmText, route?.minutes ?: TripMinutes)
     val textValueMin = stringResource(R.string.text_value_min)
     val textValueBags = stringResource(R.string.text_value_bags)
 
@@ -66,7 +70,7 @@ fun RideOptionsScreen(
     var selected by rememberSaveable { mutableIntStateOf(initial) }
     val v = Vehicles[selected]
     Box(modifier.fillMaxSize().background(c.bg)) {
-        RouteMap(Modifier.fillMaxSize(), from, to, route, textValueKmValueMin.format(route?.km ?: TripKm, route?.minutes ?: TripMinutes), bottomPadding = 430.dp)
+        RouteMap(Modifier.fillMaxSize(), from, to, route, chipText, bottomPadding = 430.dp)
 
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -94,7 +98,7 @@ fun RideOptionsScreen(
                 Vehicles.forEachIndexed { i, veh -> VehicleRow(veh, returnTrip, i == selected) { selected = i } }
             }
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Stat(stringResource(R.string.ride_distance), textValueKm.format(route?.km ?: TripKm), Modifier.weight(1f))
+                Stat(stringResource(R.string.ride_distance), distText, Modifier.weight(1f))
                 Stat(stringResource(R.string.ride_time), textValueMin.format(route?.minutes ?: TripMinutes), Modifier.weight(1f))
                 Stat(stringResource(R.string.ride_seats), "${v.seats}", Modifier.weight(1f))
                 Stat(stringResource(R.string.ride_luggage), textValueBags.format(v.luggage), Modifier.weight(1f))

@@ -50,7 +50,7 @@ fun EarningsDetailsScreen(ride: RideRecord, sample: Boolean, onBack: () -> Unit,
         SectionTitle(str(R.string.ride_details))
         GroupCard { Box(Modifier.padding(16.dp)) { RideStops(ride, subtitles = true) } }
         SectionTitle(str(R.string.rider_title))
-        RiderRow(ride, Modifier.padding(bottom = 16.dp), showRating = false)
+        RiderRow(ride, Modifier.padding(bottom = 16.dp))
     }
 }
 
@@ -59,6 +59,6 @@ private fun Stat(icon: List<String>, value: String, label: String, modifier: Mod
     val c = RideTheme.colors
     Row(modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(40.dp).clip(CircleShape).background(c.line), contentAlignment = Alignment.Center) { RideIcon(icon, c.fg) }
-        Column(Modifier.padding(start = 10.dp)) { Text(value, color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold); Text(label, color = c.muted, fontSize = 12.sp) }
+        Column(Modifier.weight(1f).padding(start = 10.dp)) { Text(value, color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold); Text(label, color = c.muted, fontSize = 12.sp) }
     }
 }

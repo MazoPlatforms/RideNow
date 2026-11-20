@@ -115,10 +115,10 @@ fun TicketConversationScreen(ticket: Ticket, onBack: () -> Unit, modifier: Modif
     }
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
-        Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(36.dp)) { BackButton(onBack) }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(ticket.title, color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(ticket.title, color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 Text(ticket.id, color = c.muted, fontSize = 12.sp)
             }
             Box(Modifier.width(36.dp))

@@ -131,9 +131,9 @@ private fun Mini(icon: List<String>, value: String, label: String, modifier: Mod
     val c = RideTheme.colors
     Row(modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         RideIcon(icon, c.fg, size = 22.dp)
-        Column(Modifier.padding(start = 8.dp)) {
-            Text(value, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(label, color = c.muted, fontSize = 11.sp, maxLines = 1)
+        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+            Text(value, color = c.fg, fontSize = 14.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold)
+            Text(label, color = c.muted, fontSize = 11.sp, lineHeight = 14.sp)
         }
     }
 }

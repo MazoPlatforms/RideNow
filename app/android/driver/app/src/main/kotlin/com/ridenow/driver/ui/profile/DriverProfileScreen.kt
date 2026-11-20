@@ -35,18 +35,8 @@ fun DriverProfileScreen(
     val c = RideTheme.colors
     val none = str(R.string.profile_none)
     val v = store.vehicle
-    var menu by remember { mutableStateOf(false) }
     SubScreen(
         str(R.string.profile_title), onBack, modifier,
-        trailing = {
-            Box {
-                CircleButton(RideIcons.More, str(R.string.menu_more), { menu = true }, filled = false)
-                DropdownMenu(menu, { menu = false }, containerColor = c.field) {
-                    DropdownMenuItem(text = { Text(str(R.string.edit_profile_title), color = c.fg) }, onClick = { menu = false; onEdit() })
-                    DropdownMenuItem(text = { Text(str(R.string.docs_title), color = c.fg) }, onClick = { menu = false; onDocs() })
-                }
-            }
-        },
     ) {
         Row(Modifier.padding(top = 8.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
             Box {
@@ -55,8 +45,14 @@ fun DriverProfileScreen(
             }
             Column(Modifier.weight(1f).padding(start = 16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(name.ifBlank { none }, color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f, fill = false).clickable(onClick = onEdit))
-                    RideIcon(RideIcons.Chevron, c.fg, size = 16.dp, modifier = Modifier.padding(start = 4.dp))
+                    Text(name.ifBlank { none }, color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 2, modifier = Modifier.weight(1f, fill = false).clickable(onClick = onEdit))
+                    val statusText = str(if (active) R.string.profile_status_active else R.string.profile_status_pending)
+                    val statusColor = if (active) c.good else c.warn
+                    Box(
+                        Modifier.padding(start = 8.dp).size(22.dp).clip(CircleShape).background(statusColor.copy(alpha = 0.18f)).semantics { contentDescription = statusText },
+                        contentAlignment = Alignment.Center,
+                    ) { RideIcon(if (active) RideIcons.Check else RideIcons.Clock, statusColor, size = 13.dp) }
+                    RideIcon(RideIcons.Chevron, c.fg, size = 16.dp, modifier = Modifier.padding(start = 6.dp))
                 }
                 if (store.rating > 0) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                     RideIcon(RideIcons.Star, c.fill, size = 15.dp)
@@ -65,7 +61,6 @@ fun DriverProfileScreen(
                 }
                 if (store.memberSince.isNotEmpty()) Text(str(R.string.profile_member_since, store.memberSince), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
             }
-            StatusChip(str(if (active) R.string.profile_status_active else R.string.profile_status_pending), if (active) Tone.Good else Tone.Warn, dot = true)
         }
         SectionTitle(str(R.string.profile_section_personal), action = str(R.string.profile_edit), actionIcon = RideIcons.Pencil, onAction = onEdit)
         GroupCard {
@@ -84,30 +79,27 @@ fun DriverProfileScreen(
         }
         SectionTitle(str(R.string.docs_section), action = str(R.string.view_all), onAction = onDocs)
         val shown = store.docs.filter { it.type != DocType.Photos }.take(4)
-        Column(Modifier.padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            shown.chunked(2).forEach { pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    pair.forEach { d -> DocCard(d, onDocs, Modifier.weight(1f)) }
-                    if (pair.size == 1) Spacer(Modifier.weight(1f))
-                }
+        GroupCard(Modifier.padding(bottom = 20.dp)) {
+            shown.forEachIndexed { i, d ->
+                if (i > 0) RowDivider()
+                DocRow(d, onDocs)
             }
         }
     }
 }
 
+/** One document per full-width row, so long titles in any language have room and the status chip never squeezes the text. */
 @Composable
-private fun DocCard(d: VehicleDoc, onClick: () -> Unit, modifier: Modifier) {
+private fun DocRow(d: VehicleDoc, onClick: () -> Unit) {
     val c = RideTheme.colors
-    Row(
-        modifier.clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).clickable(role = Role.Button, onClick = onClick).padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RideIcon(docIcon(d.type), c.fg, size = 22.dp)
-        Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-            Text(docTitle(d.type), color = c.fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, lineHeight = 17.sp)
-            DocStatusChip(d.status, Modifier.padding(top = 4.dp))
+    Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        RideIcon(docIcon(d.type), c.accent, size = 22.dp)
+        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+            Text(docTitle(d.type), color = c.fg, fontSize = 15.sp, lineHeight = 20.sp)
+            d.expiry?.let { Text(str(R.string.doc_expires, it), color = c.muted, fontSize = 12.sp, lineHeight = 17.sp) }
         }
-        RideIcon(RideIcons.Chevron, c.muted, size = 14.dp)
+        DocStatusChip(d.status)
+        RideIcon(RideIcons.Chevron, c.muted, size = 16.dp, modifier = Modifier.padding(start = 8.dp))
     }
 }
 

@@ -9,6 +9,8 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,7 +50,7 @@ fun RideButton(
     val primary = style == RideButtonStyle.Primary
     val outline = style == RideButtonStyle.Outline
     Box(
-        modifier.fillMaxWidth().height(if (primary || outline) 56.dp else 48.dp)
+        modifier.fillMaxWidth().heightIn(min = if (primary || outline) 56.dp else 48.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(28.dp))
             .background(if (primary) (if (enabled) c.fill else c.line) else Color.Transparent)
@@ -67,6 +69,8 @@ fun RideButton(
                 color = if (primary) (if (enabled) c.onFill else c.muted) else c.fg,
                 fontSize = if (primary || outline) 16.sp else 15.sp,
                 fontWeight = if (primary || outline) FontWeight.SemiBold else FontWeight.Normal,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 20.sp,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
             )
         }
     }

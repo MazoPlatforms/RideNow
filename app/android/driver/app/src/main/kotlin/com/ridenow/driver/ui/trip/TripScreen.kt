@@ -70,7 +70,6 @@ fun TripScreen(trip: TripRequest, phase: TripPhase, onAdvance: () -> Unit, onCan
                 RiderAvatar(trip.initials)
                 Column(Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(trip.rider, color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    Text("\u2605 " + String.format("%.1f", trip.rating), color = c.muted, fontSize = 12.sp)
                 }
                 CircleAction(RideIcons.Call, stringResource(R.string.trip_call))
                 Spacer(Modifier.width(8.dp))

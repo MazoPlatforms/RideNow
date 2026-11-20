@@ -95,8 +95,8 @@ fun EmergencyAssistScreen(onBack: () -> Unit, onReport: () -> Unit, modifier: Mo
     SubScreen(str(R.string.hs_emergency), onBack, modifier) {
         InfoBanner(RideIcons.Siren, str(R.string.em_banner_title), str(R.string.em_banner_text), Modifier.padding(top = 4.dp), Tone.Danger)
         Spacer(Modifier.height(18.dp))
-        Box(Modifier.fillMaxWidth().height(64.dp).clip(RoundedCornerShape(32.dp)).background(androidx.compose.ui.graphics.Color(0xFFE5282B)).clickable(role = Role.Button) { openDial(context, number) }, contentAlignment = Alignment.Center) {
-            Row(verticalAlignment = Alignment.CenterVertically) { RideIcon(RideIcons.Call, androidx.compose.ui.graphics.Color.White, size = 22.dp); Text(str(R.string.em_call, number), color = androidx.compose.ui.graphics.Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp)) }
+        Box(Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(RoundedCornerShape(32.dp)).background(androidx.compose.ui.graphics.Color(0xFFE5282B)).clickable(role = Role.Button) { openDial(context, number) }, contentAlignment = Alignment.Center) {
+            Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { RideIcon(RideIcons.Call, androidx.compose.ui.graphics.Color.White, size = 22.dp); Text(str(R.string.em_call, number), color = androidx.compose.ui.graphics.Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(1f, fill = false).padding(start = 10.dp, end = 12.dp, top = 14.dp, bottom = 14.dp)) }
         }
         Spacer(Modifier.height(12.dp))
         SoftButton(str(R.string.em_send_help), { shareText(context, str(R.string.hs_emergency).let { "RideNow" }, help) }, icon = RideIcons.Share)

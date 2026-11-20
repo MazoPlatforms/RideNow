@@ -86,8 +86,8 @@ fun MainNavBar(selected: MainTab, onTab: (MainTab) -> Unit, modifier: Modifier =
                     )
                 }
                 Text(
-                    label, color = if (active) c.accent else c.muted, fontSize = 11.sp, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, softWrap = false,
+                    label, color = if (active) c.accent else c.muted, fontSize = 11.sp, maxLines = 2, lineHeight = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    overflow = TextOverflow.Ellipsis,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                     modifier = Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp),
                 )

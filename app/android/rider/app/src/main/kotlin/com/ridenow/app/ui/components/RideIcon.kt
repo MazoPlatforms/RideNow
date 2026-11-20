@@ -67,6 +67,10 @@ object RideIcons {
     val Doc = listOf("M5 2.5h7l3 3V17.5H5z", "M12 2.5v3h3M8 9h4M8 12h4")
     val WifiOff = listOf("M2.5 8a11 11 0 0 1 15 0M5 11a7 7 0 0 1 10 0M8 14a3 3 0 0 1 4 0M3 3l14 14")
     val Alert = listOf("M10 3l8 14H2z", "M10 8v4M10 14.5v.01")
+    val Paperclip = listOf("M15 9l-5.5 5.5a3 3 0 0 1-4.2-4.2L11 4.6a2 2 0 0 1 2.8 2.8L8.3 13")
+    val Send = listOf("M17 3L3 9l5 2 2 5z", "M8 11l9-8")
+    val Grid = listOf("M3.5,3.5h5v5h-5zM11.5,3.5h5v5h-5zM3.5,11.5h5v5h-5zM11.5,11.5h5v5h-5z")
+    val TextSize = listOf("M3 16l4-11 4 11M4.5 12h5M13 16l2.5-6.5L18 16M13.9 14h3.2")
     val Card = listOf("M4.5,4.5h11a2.5,2.5 0 0 1 2.5,2.5v6a2.5,2.5 0 0 1 -2.5,2.5h-11a2.5,2.5 0 0 1 -2.5,-2.5v-6a2.5,2.5 0 0 1 2.5,-2.5z", "M2 8.5h16")
 }
 

@@ -368,7 +368,6 @@
     <string name="trip_decline">"Ablehnen"</string>
     <string name="trip_pickup_label">"Abholen"</string>
     <string name="trip_drop_label">"Abgabe"</string>
-    <string name="trip_rating_desc">"Bewertung %1$s"</string>
     <string name="trip_req_seconds_desc">"%1$d verbleibende Sekunden zum Akzeptieren"</string>
     <string name="trip_phase_pickup">"Auf dem Weg zur Abholung"</string>
     <string name="trip_phase_pickup_sub">"Holen Sie %1$s bei %2$s ab"</string>

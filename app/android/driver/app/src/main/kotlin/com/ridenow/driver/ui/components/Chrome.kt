@@ -136,10 +136,10 @@ fun BackButton(onBack: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 fun SubTopBar(title: String, onBack: () -> Unit, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
     val c = RideTheme.colors
-    Row(modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.width(36.dp)) { BackButton(onBack) }
         Text(
-            title, color = c.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+            title, color = c.fg, fontSize = 17.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f).padding(horizontal = 8.dp).semantics { heading() },
         )
         Box(Modifier.width(36.dp), contentAlignment = Alignment.CenterEnd) { trailing?.invoke() }
@@ -229,7 +229,7 @@ fun SearchField(value: String, onChange: (String) -> Unit, hint: String, modifie
     ) {
         RideIcon(RideIcons.Search, c.fg, size = 20.dp)
         Box(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            if (value.isEmpty()) Text(hint, color = c.muted, fontSize = 15.sp, maxLines = 1)
+            if (value.isEmpty()) Text(hint, color = c.muted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             BasicTextField(
                 value, onChange, singleLine = true, textStyle = TextStyle(color = c.fg, fontSize = 15.sp), cursorBrush = SolidColor(c.accent),
                 keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search), modifier = Modifier.fillMaxWidth(),
@@ -249,7 +249,7 @@ fun StatusChip(text: String, tone: Tone, modifier: Modifier = Modifier, dot: Boo
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (dot) { Box(Modifier.size(7.dp).clip(CircleShape).background(color)); Spacer(Modifier.width(6.dp)) }
-        Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(text, color = color, fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
     }
 }
 
@@ -305,7 +305,7 @@ fun DetailRow(icon: List<String>, label: String, value: String, modifier: Modifi
 
 /** Title with optional text, a switch and an optional chevron that opens more options. */
 @Composable
-fun ToggleRow(icon: List<String>, title: String, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, subtitle: String? = null, onMore: (() -> Unit)? = null) {
+fun ToggleRow(icon: List<String>, title: String, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, subtitle: String? = null, onMore: (() -> Unit)? = null, reserveMore: Boolean = false) {
     val c = RideTheme.colors
     Row(modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         RideIcon(icon, c.accent, size = 20.dp)
@@ -315,6 +315,7 @@ fun ToggleRow(icon: List<String>, title: String, checked: Boolean, onChange: (Bo
         }
         RideSwitch(checked, title, onChange)
         if (onMore != null) Box(Modifier.size(36.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onMore).semantics { contentDescription = title }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Chevron, c.muted, size = 18.dp) }
+        else if (reserveMore) Spacer(Modifier.size(36.dp))
     }
 }
 
@@ -340,12 +341,12 @@ fun SoftButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
     val c = RideTheme.colors
     val color = if (danger) c.danger else c.fg
     Row(
-        modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(26.dp)).background(if (danger) c.danger.copy(alpha = 0.14f) else c.field)
+        modifier.fillMaxWidth().heightIn(min = 52.dp).clip(RoundedCornerShape(26.dp)).background(if (danger) c.danger.copy(alpha = 0.14f) else c.field)
             .border(1.dp, if (danger) c.danger.copy(alpha = 0.3f) else c.border, RoundedCornerShape(26.dp)).clickable(role = Role.Button, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
     ) {
         if (icon != null) { RideIcon(icon, color, size = 18.dp); Spacer(Modifier.width(10.dp)) }
-        Text(text, color = color, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(text, color = color, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.weight(1f, fill = false).padding(vertical = 12.dp, horizontal = 8.dp))
     }
 }
 

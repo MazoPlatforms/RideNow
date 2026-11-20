@@ -33,6 +33,8 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberMarkerState
+import com.ridenow.app.ui.theme.LocalMapStyle
+import com.ridenow.app.ui.theme.MapStyle
 import com.ridenow.app.ui.theme.RideTheme
 
 enum class PinKind { Pickup, Drop, Vehicle }
@@ -58,11 +60,13 @@ fun RideMap(
     myLocation: Boolean = false, padding: PaddingValues = PaddingValues(), onLoaded: () -> Unit = {},
 ) {
     val c = RideTheme.colors
-    val mapKind = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("ridenow", 0).getString("map_style", "Default")
-    val style = remember(c.isDark) { MapStyleOptions(if (c.isDark) DarkStyle else LightStyle) }
+    val mapKind = LocalMapStyle.current
+    // Default follows the app theme; Dark is always dark; Satellite uses the satellite imagery with no custom style.
+    val dark = mapKind == MapStyle.Dark || (mapKind == MapStyle.Default && c.isDark)
+    val style = remember(dark) { MapStyleOptions(if (dark) DarkStyle else LightStyle) }
     GoogleMap(
         modifier, cameraPositionState = camera, contentPadding = padding, onMapLoaded = onLoaded,
-        properties = MapProperties(isMyLocationEnabled = myLocation, mapStyleOptions = style.takeIf { mapKind != "Satellite" }, mapType = if (mapKind == "Satellite") com.google.maps.android.compose.MapType.SATELLITE else com.google.maps.android.compose.MapType.NORMAL),
+        properties = MapProperties(isMyLocationEnabled = myLocation, mapStyleOptions = style.takeIf { mapKind != MapStyle.Satellite }, mapType = if (mapKind == MapStyle.Satellite) com.google.maps.android.compose.MapType.SATELLITE else com.google.maps.android.compose.MapType.NORMAL),
         uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = false, compassEnabled = false, mapToolbarEnabled = false),
     ) {
         val d = LocalDensity.current.density

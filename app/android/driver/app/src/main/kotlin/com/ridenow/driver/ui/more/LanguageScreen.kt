@@ -87,8 +87,7 @@ fun LanguageScreen(onBack: () -> Unit) {
                         .selectable(on, role = Role.RadioButton) { sel = code }.padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    FlagBadge(code)
-                    Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+                    Column(Modifier.weight(1f).padding(end = 14.dp)) {
                         Text(stringResource(nativeRes), color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                         if (code != "en") Text(stringResource(englishRes), color = c.muted, fontSize = 13.sp)
                     }

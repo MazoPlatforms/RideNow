@@ -49,7 +49,6 @@ fun TripRequestOverlay(request: TripRequest, onAccept: () -> Unit, onDecline: ()
     }
     val money = remember(request.fare) { com.ridenow.driver.ui.util.Money.fmt(request.fare) }
     val countdownDesc = stringResource(R.string.trip_req_seconds_desc, left)
-    val ratingText = String.format("%.1f", request.rating)
 
     Box(modifier.fillMaxSize().background(c.bg.copy(alpha = 0.6f)).pointerInput(Unit) { detectTapGestures { } }, contentAlignment = Alignment.BottomCenter) {
         val shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
@@ -71,7 +70,6 @@ fun TripRequestOverlay(request: TripRequest, onAccept: () -> Unit, onDecline: ()
                 RiderAvatar(request.initials)
                 Column(Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(request.rider, color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    Text("\u2605 $ratingText", color = c.muted, fontSize = 12.sp)
                 }
                 Text(money, color = c.fg, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
             }

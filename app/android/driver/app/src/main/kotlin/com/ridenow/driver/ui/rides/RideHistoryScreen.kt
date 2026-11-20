@@ -75,7 +75,7 @@ private fun Options(ids: List<Int>, selected: Int, onSelect: (Int) -> Unit) {
     GroupCard {
         ids.forEachIndexed { i, id ->
             if (i > 0) RowDivider()
-            Row(Modifier.fillMaxWidth().height(52.dp).selectable(i == selected, role = Role.RadioButton) { onSelect(i) }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).selectable(i == selected, role = Role.RadioButton) { onSelect(i) }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(str(id), color = RideTheme.colors.fg, fontSize = 15.sp, modifier = Modifier.weight(1f)); RadioDot(i == selected)
             }
         }
@@ -92,8 +92,8 @@ private fun RideCard(r: RideRecord, sample: Boolean, onOpen: (RideRecord) -> Uni
         RouteDots(58.dp, Modifier.padding(end = 12.dp))
         Column(Modifier.weight(1f)) {
             Text(Calendars.timeLabel(r.startMin), color = c.muted, fontSize = 12.sp)
-            Text(r.pickup, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
-            Text(r.drop, color = c.muted, fontSize = 13.sp, maxLines = 1, modifier = Modifier.padding(top = 10.dp))
+            Text(r.pickup, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, modifier = Modifier.padding(top = 2.dp))
+            Text(r.drop, color = c.muted, fontSize = 13.sp, maxLines = 2, modifier = Modifier.padding(top = 10.dp))
         }
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(start = 8.dp)) {
             Text(Money.fmt(r.fare), color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.Bold)

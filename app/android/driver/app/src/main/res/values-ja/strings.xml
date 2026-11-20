@@ -368,7 +368,6 @@
     <string name="trip_decline">"辞退"</string>
     <string name="trip_pickup_label">"選び出す"</string>
     <string name="trip_drop_label">"ドロップオフ"</string>
-    <string name="trip_rating_desc">"評価 %1$s"</string>
     <string name="trip_req_seconds_desc">"受け入れまで残り %1$d 秒"</string>
     <string name="trip_phase_pickup">"ピックアップに向かう"</string>
     <string name="trip_phase_pickup_sub">"%2$sで%1$sを受け取ります"</string>

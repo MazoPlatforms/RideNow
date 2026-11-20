@@ -368,7 +368,6 @@
     <string name="trip_decline">"अस्वीकार करें"</string>
     <string name="trip_pickup_label">"उठाना"</string>
     <string name="trip_drop_label">"बाहर निकलना"</string>
-    <string name="trip_rating_desc">"रेटिंग %1$s"</string>
     <string name="trip_req_seconds_desc">"स्वीकार करने में %1$d सेकंड शेष हैं"</string>
     <string name="trip_phase_pickup">"लेने के लिए जा रहे हैं"</string>
     <string name="trip_phase_pickup_sub">"%2$s पर %1$s उठाएं"</string>

@@ -51,13 +51,13 @@ fun SupportCenterScreen(
         }
         Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             HelpContent.topics.chunked(2).forEachIndexed { row, pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     pair.forEachIndexed { col, t ->
                         Column(
-                            Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(18.dp)).clickable(role = Role.Button) { onTopic(row * 2 + col) }.padding(14.dp),
+                            Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(18.dp)).clickable(role = Role.Button) { onTopic(row * 2 + col) }.padding(14.dp),
                         ) {
                             Row(verticalAlignment = Alignment.Top) { RideIcon(t.icon, c.accent, size = 26.dp); Spacer(Modifier.weight(1f)); RideIcon(RideIcons.Chevron, c.fg, size = 16.dp) }
-                            Text(str(t.title), color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                            Text(str(t.title), color = c.fg, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
                             Text(str(t.sub), color = c.muted, fontSize = 12.sp, lineHeight = 16.sp)
                         }
                     }
