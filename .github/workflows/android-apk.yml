@@ -304,7 +304,7 @@ jobs:
           RideNow Rider and Driver Android APKs built from commit ${GITHUB_SHA}.
 
           - Both APKs are debug-signed previews for installation and testing, not production or Play Store releases.
-- The Rider source ZIP is generated from the current tracked Rider source. The Driver ZIP and source are included unchanged. For compilation only, Actions applies Kotlin compatibility and missing runtime-state fixes to temporary Rider and Driver build copies; repository source is untouched.
+          - The Rider source ZIP is generated from the current tracked Rider source. The Driver ZIP and source are included unchanged. For compilation only, Actions applies Kotlin compatibility and missing runtime-state fixes to temporary Rider and Driver build copies; repository source is untouched.
           - Gradle 8.9 wrappers are generated only in GitHub Actions and are not committed.
           - Debug signing keys may differ between runs; uninstall an older preview if Android rejects an update.
           - Minimum Android version: Android 8.0 (API 26).
