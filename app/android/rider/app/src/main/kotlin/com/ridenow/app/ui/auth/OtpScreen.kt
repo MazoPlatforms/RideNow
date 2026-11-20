@@ -72,12 +72,21 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 
 private const val CODE_LENGTH = 6
 
-/** Step 2 of 3. Demo rule: any code is accepted except 000000, which shows the error state. */
+/** Step 2 of 3. The six-digit WhatsApp code must be accepted by the RideNow backend. */
 @Composable
-fun OtpScreen(phone: String, onBack: () -> Unit, onVerified: () -> Unit, modifier: Modifier = Modifier) {
+fun OtpScreen(
+    phone: String,
+    challengeId: String,
+    onBack: () -> Unit,
+    onResend: suspend () -> String,
+    onVerify: suspend (String, String) -> Unit,
+    onVerified: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val textSearchBack = stringResource(R.string.search_back)
     val text6DigitVerificationCode = stringResource(R.string.text_text_6_digit_verification_code)
 
@@ -87,18 +96,46 @@ fun OtpScreen(phone: String, onBack: () -> Unit, onVerified: () -> Unit, modifie
     var error by remember { mutableStateOf(false) }
     var errorTick by remember { mutableIntStateOf(0) }
     var verifying by remember { mutableStateOf(false) }
+    var resending by remember { mutableStateOf(false) }
+    var activeChallengeId by rememberSaveable(challengeId) { mutableStateOf(challengeId) }
     var resendKey by remember { mutableIntStateOf(0) }
-    var seconds by remember { mutableIntStateOf(24) }
+    var seconds by remember { mutableIntStateOf(60) }
     var focused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val shake = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) { delay(400); focusRequester.requestFocus() }
-    LaunchedEffect(resendKey) { seconds = 24; while (seconds > 0) { delay(1000); seconds-- } }
+    LaunchedEffect(resendKey) { seconds = 60; while (seconds > 0) { delay(1000); seconds-- } }
     LaunchedEffect(verifying) {
         if (verifying) {
-            delay(900)
-            if (code == "000000") { error = true; errorTick++; verifying = false; code = "" } else onVerified()
+            try {
+                onVerify(activeChallengeId, code)
+                onVerified()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                error = true
+                errorTick++
+                verifying = false
+                code = ""
+            }
+        }
+    }
+    LaunchedEffect(resending) {
+        if (resending) {
+            try {
+                activeChallengeId = onResend()
+                code = ""
+                error = false
+                resendKey++
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                error = true
+                errorTick++
+            } finally {
+                resending = false
+            }
         }
     }
     LaunchedEffect(errorTick) {
@@ -151,7 +188,8 @@ fun OtpScreen(phone: String, onBack: () -> Unit, onVerified: () -> Unit, modifie
             singleLine = true,
             textStyle = TextStyle(color = Color.Transparent),
             cursorBrush = SolidColor(Color.Transparent),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+            // Number keypad allows system OTP suggestions and pasted WhatsApp codes; the app verifies server-side.
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { if (code.length == CODE_LENGTH) verifying = true }),
             decorationBox = { inner ->
                 Box(Modifier.alpha(0f).size(1.dp)) { inner() }
@@ -180,7 +218,7 @@ fun OtpScreen(phone: String, onBack: () -> Unit, onVerified: () -> Unit, modifie
             } else {
                 Text(
                     stringResource(R.string.otp_resend), color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable(role = Role.Button) { code = ""; error = false; resendKey++ }.padding(vertical = 12.dp),
+                    modifier = Modifier.clickable(role = Role.Button, enabled = !resending && !verifying) { resending = true }.padding(vertical = 12.dp),
                 )
             }
         }
@@ -195,8 +233,8 @@ fun OtpScreen(phone: String, onBack: () -> Unit, onVerified: () -> Unit, modifie
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun OtpDarkPreview() = RideNowTheme(darkTheme = true) { OtpScreen("+1 555 012 3456", {}, {}) }
+private fun OtpDarkPreview() = RideNowTheme(darkTheme = true) { OtpScreen("+1 555 012 3456", "", {}, { "" }, { _, _ -> }, {}) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun OtpLightPreview() = RideNowTheme(darkTheme = false) { OtpScreen("+1 555 012 3456", {}, {}) }
+private fun OtpLightPreview() = RideNowTheme(darkTheme = false) { OtpScreen("+1 555 012 3456", "", {}, { "" }, { _, _ -> }, {}) }

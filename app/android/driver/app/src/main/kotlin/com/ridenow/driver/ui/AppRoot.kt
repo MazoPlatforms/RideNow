@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -27,6 +28,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ridenow.driver.ui.auth.OtpScreen
 import com.ridenow.driver.ui.auth.PhoneScreen
+import com.ridenow.driver.ui.auth.PhoneAuthApi
+import kotlinx.coroutines.launch
 import com.ridenow.driver.ui.auth.formatPhoneForDisplay
 import com.ridenow.driver.ui.account.AccountScreen
 import com.ridenow.driver.ui.earnings.EarningsScreen
@@ -139,6 +142,7 @@ private const val STEP_AREA = 10
 fun AppRoot(appearance: AppearanceState) {
     var screen by rememberSaveable { mutableStateOf(Screen.Splash) }
     var phone by rememberSaveable { mutableStateOf("") }
+    var challengeId by rememberSaveable { mutableStateOf("") }
     // True while the driver is fixing one section from the Review screen: finishing it returns to Review.
     var editing by rememberSaveable { mutableStateOf(false) }
     // Set when Bank account was opened from Home or Account (name of that screen): finishing returns there.
@@ -148,6 +152,18 @@ fun AppRoot(appearance: AppearanceState) {
     val shownPhone = formatPhoneForDisplay(phone.ifBlank { "+1 555 012 3456" })
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("ridenowdriver", 0) }
+    val scope = rememberCoroutineScope()
+    suspend fun restoreAuth() {
+        if (prefs.getBoolean("intro_seen", false)) {
+            val restoredPhone = PhoneAuthApi.restoreSession(context)
+            if (restoredPhone != null) {
+                phone = restoredPhone
+                screen = if (prefs.getBoolean("auth_onboarding_complete", false)) Screen.Home else Screen.Terms
+                return
+            }
+        }
+        screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro
+    }
     val store = app.store
     val stack = app.stack
     val driverName = app.profileName.ifBlank { app.summaries[STEP_PERSONAL].orEmpty() }
@@ -168,6 +184,8 @@ fun AppRoot(appearance: AppearanceState) {
     fun nowMinute(): Int = java.util.Calendar.getInstance().let { it.get(java.util.Calendar.HOUR_OF_DAY) * 60 + it.get(java.util.Calendar.MINUTE) }
     fun signOut() {
         app.reset(); phone = ""; editing = false; bankReturn = null
+        prefs.edit().remove("phone_verified").remove("auth_onboarding_complete").apply()
+        scope.launch { PhoneAuthApi.signOut(context) }
         prefs.edit().remove("terms_accepted").remove("application_submitted").apply()
         screen = Screen.Welcome
     }
@@ -236,7 +254,7 @@ fun AppRoot(appearance: AppearanceState) {
 
     LaunchedEffect(Unit) {
         if (SessionFlags.splashDone && screen == Screen.Splash) {
-            screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro
+            restoreAuth()
         }
     }
     Box(Modifier.fillMaxSize()) {
@@ -245,16 +263,27 @@ fun AppRoot(appearance: AppearanceState) {
             // Keeps typed text, dates and choices when the driver goes back to a screen.
             saveable.SaveableStateProvider(current.name) {
                 when (current) {
-                    Screen.Splash -> SplashScreen(onFinished = { SessionFlags.splashDone = true; screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro })
+                    Screen.Splash -> SplashScreen(onFinished = { SessionFlags.splashDone = true; scope.launch { restoreAuth() } })
                     Screen.Intro -> IntroScreen(onDone = { prefs.edit().putBoolean("intro_seen", true).commit(); screen = Screen.Welcome })
                     Screen.Welcome -> WelcomeScreen(onGetStarted = { screen = Screen.Phone }, onHaveAccount = { screen = Screen.Phone }, onHelp = { })
                     Screen.Phone -> {
                         BackHandler { screen = Screen.Welcome }
-                        PhoneScreen(onBack = { screen = Screen.Welcome }, onCodeSent = { phone = it; screen = Screen.Otp })
+                        PhoneScreen(onBack = { screen = Screen.Welcome }, onCodeSent = { submittedPhone ->
+                            phone = submittedPhone
+                            challengeId = PhoneAuthApi.requestCode(context, submittedPhone)
+                            screen = Screen.Otp
+                        })
                     }
                     Screen.Otp -> {
                         BackHandler { screen = Screen.Phone }
-                        OtpScreen(phone = shownPhone, onBack = { screen = Screen.Phone }, onVerified = { screen = Screen.Terms })
+                        OtpScreen(
+                            phone = shownPhone,
+                            challengeId = challengeId,
+                            onBack = { screen = Screen.Phone },
+                            onResend = { PhoneAuthApi.requestCode(context, phone) },
+                            onVerify = { id, code -> PhoneAuthApi.verifyCode(context, phone, id, code) },
+                            onVerified = { prefs.edit().putBoolean("phone_verified", true).apply(); screen = Screen.Terms },
+                        )
                     }
                     Screen.Terms -> {
                         BackHandler { advance(Screen.Otp) }
@@ -320,7 +349,7 @@ fun AppRoot(appearance: AppearanceState) {
                         ReviewScreen(
                             items = reviewItems,
                             onEdit = { i -> editing = true; screen = editTargets[i] },
-                            onSubmit = { prefs.edit().putBoolean("application_submitted", true).apply(); screen = Screen.Submitted },
+                            onSubmit = { prefs.edit().putBoolean("application_submitted", true).putBoolean("auth_onboarding_complete", true).apply(); screen = Screen.Submitted },
                             onBack = { screen = Screen.Bank },
                         )
                     }

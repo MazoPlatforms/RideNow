@@ -34,6 +34,7 @@ import com.ridenow.app.ui.auth.formatPhoneForDisplay
 import com.ridenow.app.ui.auth.DetailsScreen
 import com.ridenow.app.ui.auth.OtpScreen
 import com.ridenow.app.ui.auth.PhoneScreen
+import com.ridenow.app.ui.auth.PhoneAuthApi
 import com.ridenow.app.ui.booking.ConfirmScreen
 import com.ridenow.app.ui.booking.FindingDriverScreen
 import com.ridenow.app.ui.booking.RideOptionsScreen
@@ -109,6 +110,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
 
     var screen by rememberSaveable { mutableStateOf(Screen.Splash) }
     var phone by rememberSaveable { mutableStateOf("") }
+    var challengeId by rememberSaveable { mutableStateOf("") }
     var name by rememberSaveable { mutableStateOf(textAlexMorgan) }
     var email by rememberSaveable { mutableStateOf("") }
     var stub by rememberSaveable { mutableStateOf("") }
@@ -141,9 +143,20 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     }
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("ridenow", 0) }
+    suspend fun restoreAuth() {
+        if (prefs.getBoolean("intro_seen", false)) {
+            val restoredPhone = PhoneAuthApi.restoreSession(context)
+            if (restoredPhone != null) {
+                phone = restoredPhone
+                screen = if (prefs.getBoolean("auth_onboarding_complete", false)) Screen.Home else Screen.Details
+                return
+            }
+        }
+        screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro
+    }
     LaunchedEffect(Unit) {
         if (SessionFlags.splashDone && screen == Screen.Splash) {
-            screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro
+            restoreAuth()
         }
     }
     var netKey by remember { mutableIntStateOf(0) }
@@ -188,19 +201,30 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     Box(Modifier.fillMaxSize()) {
     Crossfade(targetState = screen, animationSpec = tween(400), label = "root") { current ->
         when (current) {
-            Screen.Splash -> SplashScreen(onFinished = { SessionFlags.splashDone = true; screen = if (prefs.getBoolean("intro_seen", false)) Screen.Welcome else Screen.Intro })
+            Screen.Splash -> SplashScreen(onFinished = { SessionFlags.splashDone = true; scope.launch { restoreAuth() } })
             Screen.Intro -> IntroScreen(onDone = { prefs.edit().putBoolean("intro_seen", true).commit(); screen = Screen.Welcome })
-            Screen.Loading -> LoadingScreen(onDone = { screen = Screen.Home })
+            Screen.Loading -> LoadingScreen(onDone = { prefs.edit().putBoolean("auth_onboarding_complete", true).apply(); screen = Screen.Home })
             Screen.Expired -> SessionExpiredScreen(name, shownPhone, onSendCode = { screen = Screen.Phone }, onOther = { phone = ""; screen = Screen.Phone })
             Screen.ServerError -> ServerErrorScreen("8F3K-2Q-500", onRetry = { screen = Screen.Home }, onContact = { nav(Screen.Support) })
             Screen.Welcome -> WelcomeScreen(onGetStarted = { screen = Screen.Phone }, onHaveAccount = { screen = Screen.Phone }, onHelp = { })
             Screen.Phone -> {
                 BackHandler { screen = Screen.Welcome }
-                PhoneScreen(onBack = { screen = Screen.Welcome }, onCodeSent = { phone = it; screen = Screen.Otp })
+                PhoneScreen(onBack = { screen = Screen.Welcome }, onCodeSent = { submittedPhone ->
+                    phone = submittedPhone
+                    challengeId = PhoneAuthApi.requestCode(context, submittedPhone)
+                    screen = Screen.Otp
+                })
             }
             Screen.Otp -> {
                 BackHandler { screen = Screen.Phone }
-                OtpScreen(phone = shownPhone, onBack = { screen = Screen.Phone }, onVerified = { screen = Screen.Details })
+                OtpScreen(
+                    phone = shownPhone,
+                    challengeId = challengeId,
+                    onBack = { screen = Screen.Phone },
+                    onResend = { PhoneAuthApi.requestCode(context, phone) },
+                    onVerify = { id, code -> PhoneAuthApi.verifyCode(context, phone, id, code) },
+                    onVerified = { prefs.edit().putBoolean("phone_verified", true).apply(); screen = Screen.Details },
+                )
             }
             Screen.Details -> {
                 BackHandler { screen = Screen.Otp }
@@ -224,7 +248,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 MenuDrawer(
                     open = drawer, name = name, phone = shownPhone, onClose = { drawer = false },
                     onProfile = { go("Profile") }, onItem = { go(it) },
-                    onSignOut = { drawer = false; phone = ""; screen = Screen.Welcome },
+                    onSignOut = { drawer = false; phone = ""; prefs.edit().remove("phone_verified").remove("auth_onboarding_complete").apply(); scope.launch { PhoneAuthApi.signOut(context) }; screen = Screen.Welcome },
                 )
             }
             Screen.Search -> {
@@ -287,7 +311,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 BackHandler { screen = Screen.Home }
                 ProfileScreen(
                     name, shownPhone, themeMode, onThemeMode, onBack = { screen = Screen.Home }, onEdit = { screen = Screen.EditProfile },
-                    onOpen = { go(it) }, onLogout = { phone = ""; screen = Screen.Welcome },
+                    onOpen = { go(it) }, onLogout = { phone = ""; prefs.edit().remove("phone_verified").remove("auth_onboarding_complete").apply(); scope.launch { PhoneAuthApi.signOut(context) }; screen = Screen.Welcome },
                 )
             }
             Screen.EditProfile -> {

@@ -68,10 +68,11 @@ import com.ridenow.driver.ui.theme.RideNowTheme
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.util.entrance
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 
 /** Step 1 of 3: ask for the rider's mobile number. [onCodeSent] receives the number in +E.164 style. */
 @Composable
-fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modifier = Modifier) {
+fun PhoneScreen(onBack: () -> Unit, onCodeSent: suspend (String) -> Unit, modifier: Modifier = Modifier) {
     val textSearchBack = stringResource(R.string.search_back)
     val textCountryCodeValueValue = stringResource(R.string.text_country_code_value_value)
 
@@ -82,6 +83,7 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modi
     var digits by rememberSaveable { mutableStateOf("") }
     var showPicker by rememberSaveable { mutableStateOf(false) }
     var sending by remember { mutableStateOf(false) }
+    var sendError by remember { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
     val country = Countries.byIso(iso)
     val valid = digits.length >= country.min
@@ -104,7 +106,17 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modi
     }
     LaunchedEffect(Unit) { delay(400); focusRequester.requestFocus() }
     LaunchedEffect(sending) {
-        if (sending) { delay(900); onCodeSent(country.dial + digits) }
+        if (sending) {
+            sendError = false
+            try {
+                onCodeSent(country.dial + digits)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                sendError = true
+                sending = false
+            }
+        }
     }
     fun send() { if (valid && !sending) sending = true }
 
@@ -179,6 +191,7 @@ fun PhoneScreen(onBack: () -> Unit, onCodeSent: (String) -> Unit, modifier: Modi
 
         Spacer(Modifier.weight(1f))
         Column(Modifier.entrance(240).padding(bottom = 12.dp)) {
+            if (sendError) Text(stringResource(R.string.phone_error), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(bottom = 10.dp))
             RideButton(stringResource(R.string.phone_send), onClick = { send() }, enabled = valid, loading = sending)
             Text(
                 stringResource(R.string.phone_terms), color = c.muted, fontSize = 12.sp, lineHeight = 18.sp,
