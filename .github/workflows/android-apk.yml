@@ -214,6 +214,22 @@ jobs:
               raise SystemExit("Expected one emergency help share label in the temporary Driver source")
           help_safety.write_text(help_source.replace(composable_label, '"RideNow"', 1))
 
+          app_root = Path(os.environ["DRIVER_BUILD"]) / "app/src/main/kotlin/com/ridenow/driver/ui/AppRoot.kt"
+          app_root_source = app_root.read_text()
+          context_anchor = "    val context = LocalContext.current\n"
+          driver_runtime_state = """    var netKey by remember { mutableIntStateOf(0) }
+              var offlineSkip by rememberSaveable { mutableStateOf(false) }
+              val hasInternet = rememberOnline(netKey)
+              val locationOn = rememberLocationEnabled()
+              val notificationsOn = rememberNotificationsEnabled()
+              var locDismissed by rememberSaveable { mutableStateOf(false) }
+              var ntfDismissed by rememberSaveable { mutableStateOf(false) }
+          """
+          if app_root_source.count(context_anchor) != 1:
+              raise SystemExit("Could not safely locate the Driver AppRoot context declaration in temporary source")
+          if "val hasInternet = rememberOnline(netKey)" not in app_root_source:
+              app_root.write_text(app_root_source.replace(context_anchor, context_anchor + driver_runtime_state, 1))
+
           kotlin_root = Path(os.environ["DRIVER_BUILD"]) / "app/src/main/kotlin"
           setter_names = ("setMode", "setAccent", "setMapStyle", "setSystemFont", "setTextSize")
           rename_counts = {name: 0 for name in setter_names}
@@ -288,7 +304,7 @@ jobs:
           RideNow Rider and Driver Android APKs built from commit ${GITHUB_SHA}.
 
           - Both APKs are debug-signed previews for installation and testing, not production or Play Store releases.
-          - The Rider source ZIP is generated from the current tracked Rider source. The Driver ZIP and source are included unchanged. For compilation only, Actions applies Kotlin compatibility fixes to temporary Rider and Driver build copies; repository source is untouched.
+- The Rider source ZIP is generated from the current tracked Rider source. The Driver ZIP and source are included unchanged. For compilation only, Actions applies Kotlin compatibility and missing runtime-state fixes to temporary Rider and Driver build copies; repository source is untouched.
           - Gradle 8.9 wrappers are generated only in GitHub Actions and are not committed.
           - Debug signing keys may differ between runs; uninstall an older preview if Android rejects an update.
           - Minimum Android version: Android 8.0 (API 26).
