@@ -38,6 +38,7 @@
     <string name="details_name">Nombre completo</string>
     <string name="details_email">Correo electrónico (opcional)</string>
     <string name="details_email_error">Introduce una dirección de correo válida</string>
+    <string name="profile_save_error">No se pudo guardar tu perfil. Comprueba la conexión y vuelve a intentarlo.</string>
     <string name="details_email_hint">Solo se usa para los recibos. Puedes añadirlo más tarde en Ajustes.</string>
     <string name="details_continue">Continuar</string>
     <string name="photo_title">Foto de perfil</string>

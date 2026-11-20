@@ -34,6 +34,7 @@
     <string name="details_name">"Vollständiger Name"</string>
     <string name="details_email">"E-Mail (optional)"</string>
     <string name="details_email_error">"Geben Sie eine gültige E-Mail-Adresse ein"</string>
+    <string name="profile_save_error">Dein Profil konnte nicht gespeichert werden. Prüfe deine Verbindung und versuche es erneut.</string>
     <string name="details_email_hint">"Wird nur für Belege verwendet. Sie können es später in den Einstellungen hinzufügen."</string>
     <string name="details_continue">"Weiter"</string>
     <string name="photo_title">"Profilfoto"</string>

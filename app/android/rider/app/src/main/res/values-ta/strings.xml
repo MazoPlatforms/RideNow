@@ -34,6 +34,7 @@
     <string name="details_name">"முழு பெயர்"</string>
     <string name="details_email">"மின்னஞ்சல் (விரும்பினால்)"</string>
     <string name="details_email_error">"சரியான மின்னஞ்சல் முகவரியை உள்ளிடவும்"</string>
+    <string name="profile_save_error">சுயவிவரத்தைச் சேமிக்க முடியவில்லை. இணைய இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.</string>
     <string name="details_email_hint">"ரசீதுகளுக்கு மட்டுமே பயன்படுத்தப்படுகிறது. நீங்கள் அதை அமைப்புகளில் பின்னர் சேர்க்கலாம்."</string>
     <string name="details_continue">"தொடரவும்"</string>
     <string name="photo_title">"சுயவிவரப் புகைப்படம்"</string>

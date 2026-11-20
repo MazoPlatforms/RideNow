@@ -34,6 +34,7 @@
     <string name="details_name">Nom complet</string>
     <string name="details_email">E-mail (facultatif)</string>
     <string name="details_email_error">Saisissez une adresse e-mail valide</string>
+    <string name="profile_save_error">Impossible d’enregistrer votre profil. Vérifiez votre connexion et réessayez.</string>
     <string name="details_email_hint">Utilisée uniquement pour les reçus. Vous pourrez l\'ajouter plus tard dans les paramètres.</string>
     <string name="details_continue">Continuer</string>
     <string name="photo_title">Photo de profil</string>

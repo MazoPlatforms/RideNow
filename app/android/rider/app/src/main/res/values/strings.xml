@@ -43,6 +43,7 @@
     <string name="details_name">Full name</string>
     <string name="details_email">Email (optional)</string>
     <string name="details_email_error">Enter a valid email address</string>
+    <string name="profile_save_error">We couldn’t save your profile. Check your connection and try again.</string>
     <string name="details_email_hint">Used only for receipts. You can add it later in settings.</string>
     <string name="details_continue">Continue</string>
     <string name="photo_title">Profile photo</string>

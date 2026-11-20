@@ -34,6 +34,7 @@
     <string name="details_name">"සම්පූර්ණ නම"</string>
     <string name="details_email">"විද්‍යුත් තැපෑල (විකල්ප)"</string>
     <string name="details_email_error">"වලංගු විද්‍යුත් තැපැල් ලිපිනයක් ඇතුළත් කරන්න"</string>
+    <string name="profile_save_error">ඔබේ පැතිකඩ සුරැකීමට නොහැකි විය. සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.</string>
     <string name="details_email_hint">"රිසිට්පත් සඳහා පමණක් භාවිතා වේ. ඔබට එය පසුව සැකසීම් තුළ එක් කළ හැක."</string>
     <string name="details_continue">"දිගටම කරගෙන යන්න"</string>
     <string name="photo_title">"පැතිකඩ ඡායාරූපය"</string>

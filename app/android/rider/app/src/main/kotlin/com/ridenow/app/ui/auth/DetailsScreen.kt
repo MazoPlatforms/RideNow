@@ -88,7 +88,7 @@ private val EmailRegex = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$")
 /** Step 3 of 3: photo, full name and optional email. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailsScreen(onBack: () -> Unit, onDone: (name: String, email: String) -> Unit, modifier: Modifier = Modifier) {
+fun DetailsScreen(onBack: () -> Unit, onDone: suspend (name: String, email: String, photo: Bitmap?) -> Unit, modifier: Modifier = Modifier) {
     val textSearchBack = stringResource(R.string.search_back)
 
     val c = RideTheme.colors
@@ -99,6 +99,9 @@ fun DetailsScreen(onBack: () -> Unit, onDone: (name: String, email: String) -> U
     var photo by remember { mutableStateOf<Bitmap?>(null) }
     var showSheet by rememberSaveable { mutableStateOf(false) }
     var emailFocused by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { if (it != null) photo = it }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -107,7 +110,16 @@ fun DetailsScreen(onBack: () -> Unit, onDone: (name: String, email: String) -> U
 
     val emailOk = email.isBlank() || EmailRegex.matches(email.trim())
     val canContinue = name.trim().length >= 2 && emailOk
-    fun submit() { if (canContinue) onDone(name.trim(), email.trim()) }
+    fun submit() {
+        if (!canContinue || saving) return
+        scope.launch {
+            saving = true
+            saveFailed = false
+            try { onDone(name.trim(), email.trim(), photo) }
+            catch (_: Exception) { saveFailed = true }
+            finally { saving = false }
+        }
+    }
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
@@ -156,7 +168,8 @@ fun DetailsScreen(onBack: () -> Unit, onDone: (name: String, email: String) -> U
                 modifier = Modifier.padding(top = 12.dp, bottom = 12.dp),
             )
         }
-        RideButton(stringResource(R.string.details_continue), onClick = { submit() }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))
+        if (saveFailed) Text(stringResource(R.string.profile_save_error), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
+        RideButton(stringResource(R.string.details_continue), onClick = { submit() }, enabled = canContinue && !saving, loading = saving, modifier = Modifier.padding(vertical = 12.dp))
     }
 
     if (showSheet) {
@@ -245,8 +258,8 @@ private fun decodeSampled(context: android.content.Context, uri: Uri): Bitmap? =
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun DetailsDarkPreview() = RideNowTheme(darkTheme = true) { DetailsScreen({}, { _, _ -> }) }
+private fun DetailsDarkPreview() = RideNowTheme(darkTheme = true) { DetailsScreen({}, { _, _, _ -> }) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun DetailsLightPreview() = RideNowTheme(darkTheme = false) { DetailsScreen({}, { _, _ -> }) }
+private fun DetailsLightPreview() = RideNowTheme(darkTheme = false) { DetailsScreen({}, { _, _, _ -> }) }

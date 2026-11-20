@@ -34,6 +34,7 @@
     <string name="details_name">"الاسم الكامل"</string>
     <string name="details_email">"(اختياري)"</string>
     <string name="details_email_error">"أدخل عنوان بريد إلكتروني صالحًا"</string>
+    <string name="profile_save_error">تعذر حفظ ملفك الشخصي. تحقق من الاتصال وحاول مرة أخرى.</string>
     <string name="details_email_hint">"يستخدم للإيصالات فقط. ويمكنك إضافته لاحقًا في الإعدادات."</string>
     <string name="details_continue">"يكمل"</string>
     <string name="photo_title">"الصورة الشخصية"</string>

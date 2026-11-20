@@ -34,6 +34,7 @@
     <string name="details_name">"पूरा नाम"</string>
     <string name="details_email">"ईमेल (वैकल्पिक)"</string>
     <string name="details_email_error">"एक वैध ईमेल पता दर्ज करें"</string>
+    <string name="profile_save_error">आपकी प्रोफ़ाइल सेव नहीं हो सकी। कनेक्शन जाँचें और फिर कोशिश करें।</string>
     <string name="details_email_hint">"केवल रसीदों के लिए उपयोग किया जाता है। आप इसे बाद में सेटिंग में जोड़ सकते हैं."</string>
     <string name="details_continue">"जारी रखें"</string>
     <string name="photo_title">"प्रोफ़ाइल फ़ोटो"</string>

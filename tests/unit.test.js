@@ -66,10 +66,15 @@ test('profile photos are decoded, bounded, and re-encoded as metadata-free JPEGs
   assert(Math.max(compactMetadata.width, compactMetadata.height) <= 320);
   assert(compactJpeg.length < largePng.length / 4);
 });
-test('Sri Lankan mobile normalization rejects other countries', () => {
+test('phone normalization accepts valid international numbers and preserves Sri Lankan local input', () => {
   assert.equal(normalizePhone('077 123 4567'), '+94771234567');
   assert.equal(normalizePhone('+94 (77) 123-4567'), '+94771234567');
-  assert.throws(() => normalizePhone('+917712345678'));
+  assert.equal(normalizePhone('+1 (415) 555-2671'), '+14155552671');
+  assert.equal(normalizePhone('0044 7911 123456'), '+447911123456');
+  assert.equal(normalizePhone('+91 98765 43210'), '+919876543210');
+  assert.equal(normalizePhone('447911123456'), '+447911123456');
+  for (const value of ['+999123456789', '+1415555267', '+447911123456 ext 4', 'not a phone'])
+    assert.throws(() => normalizePhone(value), { code: 'INVALID_PHONE_NUMBER' });
 });
 test('credential encryption authenticates ciphertext', () => {
   const key = 'ab'.repeat(32),

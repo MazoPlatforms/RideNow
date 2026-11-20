@@ -206,6 +206,50 @@ test('PostGIS and real API authentication; OTP failures persist and single use h
   await api.post('/v1/auth/otp/verify').send({ challengeId: c.challengeId, code }).expect(401);
   await api.post('/v1/auth/otp/request').send({ phone: '0771234567' }).expect(429);
 });
+test('international phone OTP verification creates a Rider account and profile', async () => {
+  const challenge = (
+    await api.post('/v1/auth/otp/request').send({ phone: '+1 (415) 555-2671' }).expect(202)
+  ).body;
+  const job = await one(pool, "SELECT payload FROM jobs WHERE payload->>'challengeId'=$1", [
+    challenge.challengeId,
+  ]);
+  const code = decrypt(job.payload.encryptedCode, config.ENCRYPTION_KEY);
+  const session = (
+    await api.post('/v1/auth/otp/verify').send({ challengeId: challenge.challengeId, code }).expect(200)
+  ).body;
+  assert.equal(session.user.phone, '+14155552671');
+  assert.equal(session.user.email, '');
+  assert.equal(session.user.profileComplete, false);
+  const profile = (await request('get', '/v1/me', session).expect(200)).body;
+  assert.equal(profile.phone, '+14155552671');
+  assert.deepEqual(profile.roles, ['RIDER']);
+  assert.equal(profile.name, '');
+  assert.equal(profile.profileComplete, false);
+  assert.ok(session.accessToken);
+  assert.ok(session.refreshToken);
+
+  const saved = await request('patch', '/v1/me', session, {
+    name: 'International Rider',
+    email: 'international@example.test',
+  }).expect(200);
+  assert.equal(saved.body.name, 'International Rider');
+  assert.equal(saved.body.email, 'international@example.test');
+  assert.equal(saved.body.profileComplete, true);
+  assert.ok(saved.body.profileCompletedAt);
+  const cleared = await request('patch', '/v1/me', session, {
+    name: 'International Rider',
+    email: '',
+  }).expect(200);
+  assert.equal(cleared.body.email, '');
+  assert.equal(cleared.body.profileComplete, true);
+  await pool.query("UPDATE otp_challenges SET created_at=now()-interval '2 minutes' WHERE phone=$1", ['+14155552671']);
+  const loginChallenge = (await api.post('/v1/auth/otp/request').send({ phone: '+14155552671' }).expect(202)).body;
+  const loginJob = await one(pool, "SELECT payload FROM jobs WHERE payload->>'challengeId'=$1", [loginChallenge.challengeId]);
+  const loginCode = decrypt(loginJob.payload.encryptedCode, config.ENCRYPTION_KEY);
+  const nextDeviceSession = (await api.post('/v1/auth/otp/verify').send({ challengeId: loginChallenge.challengeId, code: loginCode }).expect(200)).body;
+  assert.equal(nextDeviceSession.user.profileComplete, true);
+  assert.equal((await one(pool, 'SELECT count(*)::int AS n FROM users WHERE phone=$1', ['+14155552671'])).n, 1);
+});
 test('rider profile creation stores name, email and only a normalized private profile photo', async () => {
   const session = await login();
   const saved = await request('patch', '/v1/me', session, {
@@ -1176,6 +1220,19 @@ test('staff web sign-in uses granted permissions and cannot use administrator re
 test('admin dashboard read APIs report actual records and respect permissions', async () => {
   const a=await login(),d=await driver();
   await pool.query("UPDATE users SET roles=ARRAY['ADMIN'] WHERE id=$1",[a.user.id]);
+  await request('patch','/v1/me',a,{name:'Admin Updated Rider',email:'updated-rider@example.test'}).expect(200);
+  const usersResponse=await request('get','/v1/admin/users',a).expect(200);
+  assert.match(usersResponse.headers['cache-control'],/no-store/);
+  const listed=usersResponse.body.items.find(user=>user.id===a.user.id);
+  assert.equal(listed.name,'Admin Updated Rider');
+  assert.equal(listed.email,'updated-rider@example.test');
+  const userDetail=(await request('get',`/v1/admin/users/${a.user.id}`,a).expect(200)).body.user;
+  assert.equal(userDetail.phone,a.user.phone);
+  assert.equal(userDetail.name,'Admin Updated Rider');
+  assert.equal(userDetail.email,'updated-rider@example.test');
+  assert.equal(userDetail.profile_complete,true);
+  assert.equal(userDetail.has_profile_photo,false);
+  assert.equal(Object.hasOwn(userDetail,'password_hash'),false);
   const dashboard=(await request('get','/v1/admin/dashboard',a).expect(200)).body;
   assert.equal(dashboard.counts.users,2);
   const detail=(await request('get',`/v1/admin/drivers/${d.user.id}`,a).expect(200)).body;
@@ -1190,6 +1247,7 @@ test('admin dashboard read APIs report actual records and respect permissions', 
 test('admin browser staged sign-in, management pages, forms and logout', {skip:process.env.ADMIN_BROWSER_TEST!=='1'}, async () => {
   const {chromium}=await import('@playwright/test');
   const a=await webAdmin();
+  await pool.query("UPDATE users SET name='Admin browser user',email='browser-admin@example.test' WHERE id=$1",[a.user.id]);
   await driver();
   const chromiumPath=process.env.CHROMIUM_PATH??(existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined);
   const browser=await chromium.launch({...(chromiumPath?{executablePath:chromiumPath}:{}),args:['--no-sandbox']});
@@ -1262,6 +1320,11 @@ test('admin browser staged sign-in, management pages, forms and logout', {skip:p
       assert.equal(await page.locator('#notice.error:visible').count(),0,path);
       assert(!/[\u0B80-\u0BFF]/.test(await page.locator('body').innerText()),path+' contains non-English UI');
     }
+    await page.goto(base+'/admin/users/');
+    await page.locator('#search').fill('browser-admin@example.test');
+    await page.getByRole('button',{name:'Details',exact:true}).click();
+    await page.getByRole('dialog').getByText('browser-admin@example.test',{exact:true}).waitFor();
+    await page.getByRole('dialog').getByText('Admin browser user',{exact:true}).waitFor();
     await page.goto(base+'/admin/areas/');
     await page.getByLabel('Area name',{exact:true}).fill('Browser test area');
     await page.getByLabel('Boundary coordinates',{exact:false}).fill(JSON.stringify({type:'Polygon',coordinates:[[[81.69,7.70],[81.71,7.70],[81.71,7.72],[81.69,7.72],[81.69,7.70]]]}));

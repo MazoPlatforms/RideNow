@@ -43,16 +43,20 @@ import com.ridenow.app.ui.theme.ThemeMode
 import com.ridenow.app.ui.util.entrance
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 
 fun initialsOf(name: String): String =
     name.trim().split(" ").filter { it.isNotBlank() }.take(2).joinToString("") { it.first().uppercase() }.ifEmpty { "R" }
 
 @Composable
-private fun Avatar(name: String, size: Dp, badge: Boolean = false) {
+private fun Avatar(name: String, size: Dp, badge: Boolean = false, photo: Bitmap? = null) {
     val c = RideTheme.colors
     Box(Modifier.size(size)) {
         Box(Modifier.fillMaxSize().clip(CircleShape).background(c.accent.copy(alpha = 0.14f)).border(1.5.dp, c.accent, CircleShape), contentAlignment = Alignment.Center) {
-            Text(initialsOf(name), color = c.accent, fontSize = (size.value * 0.32f).sp, fontWeight = FontWeight.SemiBold)
+            if (photo != null) Image(photo.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            else Text(initialsOf(name), color = c.accent, fontSize = (size.value * 0.32f).sp, fontWeight = FontWeight.SemiBold)
         }
         if (badge) Box(Modifier.align(Alignment.BottomEnd).size(size * 0.34f).clip(CircleShape).background(BrandYellow).border(3.dp, c.bg, CircleShape), contentAlignment = Alignment.Center) {
             RideIcon(RideIcons.Camera, Ink, size = size * 0.17f)
@@ -64,7 +68,7 @@ private fun Avatar(name: String, size: Dp, badge: Boolean = false) {
 @Composable
 fun ProfileScreen(
     name: String, phone: String, mode: ThemeMode, onMode: (ThemeMode) -> Unit, onBack: () -> Unit, onEdit: () -> Unit,
-    onOpen: (String) -> Unit, onLogout: () -> Unit, modifier: Modifier = Modifier,
+    onOpen: (String) -> Unit, onLogout: () -> Unit, photo: Bitmap? = null, modifier: Modifier = Modifier,
 ) {
     val textSettingsProfile = stringResource(R.string.settings_profile)
     val textMenuSaved = stringResource(R.string.menu_saved)
@@ -96,7 +100,7 @@ fun ProfileScreen(
                 Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp)).clickable(role = Role.Button, onClick = onEdit).padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Avatar(name, 56.dp, badge = true); Spacer(Modifier.width(14.dp))
+                Avatar(name, 56.dp, badge = true, photo = photo); Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) { Text(name, color = c.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold); Text(phone, color = c.muted, fontSize = 13.sp) }
                 RideIcon(listOf("M7 4l6 6-6 6"), c.muted, size = 18.dp)
             }
@@ -138,7 +142,7 @@ private val Genders = listOf("Female", "Male", "Non-binary", "Prefer not to say"
 /** Edit profile with the optional extras: gender, date of birth and city. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> Unit, onSave: (String, String) -> Unit, onChangePhone: () -> Unit, modifier: Modifier = Modifier) {
+fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> Unit, onSave: suspend (String, String) -> Unit, onChangePhone: () -> Unit, photo: Bitmap? = null, modifier: Modifier = Modifier) {
     val textEditProfile = stringResource(R.string.text_edit_profile)
     val textKeepYourInformationUpToDate = stringResource(R.string.text_keep_your_information_up_to_date)
     val textDetailsName = stringResource(R.string.details_name)
@@ -161,12 +165,15 @@ fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> 
     var dob by rememberSaveable { mutableStateOf("") }
     var city by rememberSaveable { mutableStateOf("") }
     var genderSheet by rememberSaveable { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val emailOk = e.isBlank() || Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]{2,}$").matches(e.trim())
     val canSave = n.trim().length >= 2 && emailOk
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         ScreenTop(textEditProfile, onBack, subtitle = textKeepYourInformationUpToDate)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
-            Box(Modifier.fillMaxWidth().padding(vertical = 18.dp), contentAlignment = Alignment.Center) { Avatar(n, 88.dp, badge = true) }
+            Box(Modifier.fillMaxWidth().padding(vertical = 18.dp), contentAlignment = Alignment.Center) { Avatar(n, 88.dp, badge = true, photo = photo) }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 RideTextField(n, { n = it.take(60) }, textDetailsName, RideIcons.Person, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next))
                 PickRow(RideIcons.Phone, textFriendPhone, phone, onChangePhone)
@@ -184,7 +191,16 @@ fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> 
             }
             Spacer(Modifier.height(16.dp))
         }
-        RideButton(textSaveChanges, { onSave(n.trim(), e.trim()) }, enabled = canSave, modifier = Modifier.padding(vertical = 12.dp))
+        if (saveFailed) Text(stringResource(R.string.profile_save_error), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
+        RideButton(textSaveChanges, {
+            if (!saving) scope.launch {
+                saving = true
+                saveFailed = false
+                try { onSave(n.trim(), e.trim()) }
+                catch (_: Exception) { saveFailed = true }
+                finally { saving = false }
+            }
+        }, enabled = canSave && !saving, loading = saving, modifier = Modifier.padding(vertical = 12.dp))
     }
     if (genderSheet) {
         val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)

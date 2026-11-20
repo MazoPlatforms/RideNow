@@ -34,6 +34,7 @@
     <string name="details_name">"フルネーム"</string>
     <string name="details_email">"電子メール (オプション)"</string>
     <string name="details_email_error">"有効な電子メール アドレスを入力してください"</string>
+    <string name="profile_save_error">プロフィールを保存できませんでした。接続を確認して、もう一度お試しください。</string>
     <string name="details_email_hint">"領収書のみに使用されます。後から設定で追加することもできます。"</string>
     <string name="details_continue">"続行"</string>
     <string name="photo_title">"プロフィール写真"</string>

@@ -1,15 +1,24 @@
 import { randomInt } from 'node:crypto';
 import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
+import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
 import * as OTPAuth from 'otpauth';
 import { hash, token, equal, encrypt, decrypt } from '../shared/crypto.js';
 import { transaction, one } from '../shared/db.js';
 import { AppError, ensure } from '../shared/errors.js';
 export function normalizePhone(input) {
-  let s = input.replace(/[\s()-]/g, '');
-  if (s.startsWith('0')) s = '+94' + s.slice(1);
-  ensure(/^\+947\d{8}$/.test(s), 400, 'INVALID_SRI_LANKAN_MOBILE');
-  return s;
+  ensure(typeof input === 'string', 400, 'INVALID_PHONE_NUMBER');
+  const compact = input.trim().replace(/[\s().-]/g, '');
+  let candidate = compact;
+  let defaultCountry;
+  if (compact.startsWith('00')) candidate = '+' + compact.slice(2);
+  else if (!compact.startsWith('+')) {
+    if (compact.startsWith('0')) defaultCountry = 'LK';
+    else candidate = '+' + compact;
+  }
+  const parsed = parsePhoneNumberFromString(candidate, defaultCountry);
+  ensure(parsed?.isValid() && !parsed.ext, 400, 'INVALID_PHONE_NUMBER');
+  return parsed.number;
 }
 export async function consumeOtp(db, config, id, code, expectedPhone) {
   const c = await one(db, 'SELECT * FROM otp_challenges WHERE id=$1 FOR UPDATE', [id]);
@@ -46,7 +55,14 @@ export function createAuth(pool, config) {
       accessToken,
       refreshToken,
       expiresIn: 900,
-      user: { id: user.id, roles: user.roles, name: user.name },
+      user: {
+        id: user.id,
+        phone: user.phone,
+        roles: user.roles,
+        name: user.name,
+        email: user.email ?? '',
+        profileComplete: Boolean(user.profile_completed_at || user.name?.trim()),
+      },
     };
   }
   return {

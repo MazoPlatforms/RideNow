@@ -35,6 +35,7 @@ const uuid = z.uuid(),
   money = z.number().int().positive().max(1000000000);
 const phone = z.string().min(9).max(30),
   profileEmail = z.string().trim().max(254).email().or(z.literal('')).optional(),
+  profileName = z.string().trim().min(2).max(60),
   page = z.object({
     cursor: uuid.optional(),
     limit: z.coerce.number().int().min(1).max(100).default(30),
@@ -67,6 +68,8 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       phone: user.phone,
       name: user.name,
       email: user.email ?? '',
+      profileComplete: Boolean(user.profile_completed_at || user.name?.trim()),
+      profileCompletedAt: user.profile_completed_at,
       profilePhotoUrl: user.profile_photo_key
         ? await storage.download(user.profile_photo_key, user.profile_photo_version)
         : null,
@@ -103,6 +106,7 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     cors({ origin: config.CORS_ORIGINS.split(',') }),
     express.json({ limit: '256kb' }),
   );
+  app.use('/v1', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   app.use('/v1', rateLimiter(redis, config, { limit: 10000, seconds: 60, prefix: 'edge' }));
   app.use('/v1/auth', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   mountAdminWeb(app, { pool, redis, config, auth, captchaVerifier });
@@ -262,11 +266,11 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
   route(
     'patch',
     '/v1/me',
-    { body: z.object({ name: text, email: profileEmail }).strict() },
+    { body: z.object({ name: profileName, email: profileEmail }).strict() },
     async ({ db, user, body }) => {
       const updated = await one(
         db,
-        "UPDATE users SET name=$2,email=COALESCE(NULLIF($3,''),email) WHERE id=$1 RETURNING *",
+        "UPDATE users SET name=$2,email=COALESCE($3,email),profile_completed_at=COALESCE(profile_completed_at,now()) WHERE id=$1 RETURNING *",
         [user.id, body.name, body.email ?? null],
       );
       return profileView(updated);
@@ -657,11 +661,17 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     return {
       items: (
         await db.query(
-          'SELECT id,phone,name,roles,permissions,suspended FROM users WHERE ($1::uuid IS NULL OR id<$1) ORDER BY id DESC LIMIT $2',
+          "SELECT id,phone,name,email,roles,permissions,suspended,deleted_at,created_at,profile_completed_at,(profile_completed_at IS NOT NULL OR btrim(name)<>'') AS profile_complete,(profile_photo_key IS NOT NULL) AS has_profile_photo FROM users WHERE ($1::uuid IS NULL OR id<$1) ORDER BY id DESC LIMIT $2",
           [p.cursor ?? null, p.limit],
         )
       ).rows,
     };
+  });
+  route('get', '/v1/admin/users/:id', { permission: 'users.manage' }, async ({ db, req }) => {
+    const user = ensure(await one(db,
+      "SELECT id,phone,name,email,roles,permissions,suspended,deleted_at,created_at,profile_completed_at,(profile_completed_at IS NOT NULL OR btrim(name)<>'') AS profile_complete,(profile_photo_key IS NOT NULL) AS has_profile_photo FROM users WHERE id=$1",
+      [req.params.id]), 404, 'USER_NOT_FOUND');
+    return { user };
   });
   route(
     'patch',
