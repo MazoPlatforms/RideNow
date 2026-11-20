@@ -41,7 +41,10 @@ private val Suggestions = listOf(
 
 /** Save a Home, Work or other place. [onSave] receives the label and address. */
 @Composable
-fun AddAddressScreen(initialLabel: String, onBack: () -> Unit, onSave: (String, String) -> Unit, modifier: Modifier = Modifier) {
+fun AddAddressScreen(
+    initialLabel: String, onBack: () -> Unit, onSave: (String, String) -> Unit,
+    modifier: Modifier = Modifier, allowCurrentLocation: () -> Boolean = { true },
+) {
     val textAddValueAddress = stringResource(R.string.text_add_value_address)
     val textSaveItOnceForOneTapRides = stringResource(R.string.text_save_it_once_for_one_tap_rides)
     val textSearchAddress = stringResource(R.string.text_search_address)
@@ -69,7 +72,7 @@ fun AddAddressScreen(initialLabel: String, onBack: () -> Unit, onSave: (String, 
         )
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             Spacer(Modifier.height(12.dp))
-            GroupCard { NavRow(RideIcons.Pin, textUseCurrentLocation, { address = text128MeridianWalkSector7; query = "" }, subtitle = text128MeridianWalkSector7) }
+            GroupCard { NavRow(RideIcons.Pin, textUseCurrentLocation, { if (allowCurrentLocation()) { address = text128MeridianWalkSector7; query = "" } }, subtitle = text128MeridianWalkSector7) }
             if (hits.isNotEmpty()) GroupCard(Modifier.padding(top = 10.dp)) {
                 hits.forEachIndexed { i, (t, s) -> if (i > 0) RowDivider(); NavRow(RideIcons.Pin, t, { address = "$t, $s"; query = "" }, subtitle = s) }
             }

@@ -65,6 +65,8 @@
     <string name="loc_step1">Open Settings</string>
     <string name="loc_step2">Tap Permissions, then Location</string>
     <string name="loc_step3">Choose While using the app</string>
+    <string name="loc_device_step2">Turn on Use location</string>
+    <string name="loc_device_step3">Return to RideNow</string>
     <string name="ntf_title">Stay updated.</string>
     <string name="ntf_subtitle">Get a heads-up when your ride is close, arriving, or when something changes.</string>
     <string name="ntf_b1">Know when your driver is arriving</string>

@@ -40,7 +40,11 @@ import com.ridenow.app.ui.util.entrance
 
 /** Choose where to be picked up. [places] are label-to-address pairs (current location, Home, Work, others). */
 @Composable
-fun ChangePickupScreen(current: String, places: List<Pair<String, String>>, onBack: () -> Unit, onConfirm: (String) -> Unit, onMap: () -> Unit, modifier: Modifier = Modifier) {
+fun ChangePickupScreen(
+    current: String, places: List<Pair<String, String>>, onBack: () -> Unit,
+    onConfirm: (String) -> Unit, onMap: () -> Unit, modifier: Modifier = Modifier,
+    allowCurrentLocation: () -> Boolean = { true },
+) {
     val textChangePickup = stringResource(R.string.change_pickup)
     val textPickupTitle = stringResource(R.string.pickup_title)
     val textSearchChooseMap = stringResource(R.string.search_choose_map)
@@ -71,7 +75,7 @@ fun ChangePickupScreen(current: String, places: List<Pair<String, String>>, onBa
                     val on = address == picked
                     NavRow(
                         when (label) { "Home" -> RideIcons.Home; "Work" -> RideIcons.Work; "Current location" -> RideIcons.Pin; else -> RideIcons.Clock },
-                        localizedLabel(label), { picked = address }, subtitle = address,
+                        localizedLabel(label), { if (label != "Current location" || allowCurrentLocation()) picked = address }, subtitle = address,
                         trailing = { Box(Modifier.size(20.dp).clip(CircleShape).then(if (on) Modifier.background(c.accent) else Modifier.border(1.5.dp, c.muted, CircleShape)), contentAlignment = Alignment.Center) { if (on) Box(Modifier.size(8.dp).clip(CircleShape).background(c.onAccent)) } },
                     )
                 }

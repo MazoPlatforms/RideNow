@@ -35,6 +35,7 @@ import com.ridenow.driver.R
 import com.ridenow.driver.ui.components.*
 import com.ridenow.driver.ui.theme.RideNowTheme
 import com.ridenow.driver.ui.theme.RideTheme
+import com.ridenow.driver.ui.system.rememberLocationEnabled
 import com.ridenow.driver.ui.util.currentCity
 import com.ridenow.driver.ui.util.entrance
 import com.ridenow.driver.ui.util.hasLocationPermission
@@ -67,7 +68,14 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
     var showSheet by rememberSaveable { mutableStateOf(false) }
     var showDate by rememberSaveable { mutableStateOf(false) }
     var emailFocused by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { if (city == null) city = currentCity(context) }
+    val locationOn = rememberLocationEnabled()
+    val locationAllowed = hasLocationPermission(context)
+    var detecting by remember(locationOn, locationAllowed) { mutableStateOf(locationOn && locationAllowed && city == null) }
+    LaunchedEffect(locationOn, locationAllowed) {
+        if (!locationOn || !locationAllowed) city = null
+        else if (city == null) city = currentCity(context)
+        detecting = false
+    }
 
     fun updatePhoto(value: Bitmap?) {
         photo = value
@@ -122,8 +130,8 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
                 )
                 if (!emailOk && !emailFocused) Text(stringResource(R.string.personal_email_error), color = c.danger, fontSize = 13.sp)
                 RideSelectField(
-                    stringResource(R.string.personal_location), city.orEmpty(),
-                    stringResource(if (hasLocationPermission(context)) R.string.personal_location_detecting else R.string.personal_location_unknown),
+                    stringResource(R.string.personal_location), city.orEmpty().takeIf { locationOn && locationAllowed }.orEmpty(),
+                    stringResource(if (detecting) R.string.personal_location_detecting else R.string.personal_location_unknown),
                     RideIcons.Pin,
                 )
             }
@@ -133,7 +141,8 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
                 fields.put("name", name.trim()).put("dateOfBirth", pickedDay(requireNotNull(dob)))
                     .put("gender", listOf("MALE", "FEMALE", "OTHER")[requireNotNull(gender)])
                 if (email.isBlank()) fields.remove("email") else fields.put("email", email.trim())
-                city?.trim()?.takeIf { it.isNotBlank() }?.let { fields.put("city", it.take(100)) }
+                val detectedCity = city?.trim()?.takeIf { locationOn && locationAllowed && it.isNotBlank() }
+                if (detectedCity == null) fields.remove("city") else fields.put("city", detectedCity.take(100))
                 setPhoto("PROFILE_PHOTO", photo)
             }
             onDone(name.trim()) }, enabled = canContinue, modifier = Modifier.padding(vertical = 12.dp))

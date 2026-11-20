@@ -8,7 +8,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -22,6 +22,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import com.ridenow.app.ui.permissions.rememberDeviceLocationEnabled
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
@@ -94,14 +96,24 @@ fun RideMap(
 /** The rider's current position, or a default city until permission and a fix are available. */
 @SuppressLint("MissingPermission")
 @Composable
-fun rememberUserLocation(default: LatLng = LatLng(37.7749, -122.4194)): UserLocation {
+fun rememberUserLocation(
+    default: LatLng = LatLng(37.7749, -122.4194),
+    locationOn: Boolean = rememberDeviceLocationEnabled(),
+): UserLocation {
     val context = LocalContext.current
-    var loc by remember { mutableStateOf<LatLng?>(null) }
+    var loc by remember(locationOn) { mutableStateOf<LatLng?>(null) }
     val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-    LaunchedEffect(granted) {
-        if (granted) LocationServices.getFusedLocationProviderClient(context).getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null)
-            .addOnSuccessListener { it?.let { l -> loc = LatLng(l.latitude, l.longitude) } }
+    DisposableEffect(context, granted, locationOn) {
+        val request = if (locationOn && granted) CancellationTokenSource() else null
+        if (request != null) {
+            LocationServices.getFusedLocationProviderClient(context)
+                .getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, request.token)
+                .addOnSuccessListener { fix ->
+                    if (!request.token.isCancellationRequested && fix != null) loc = LatLng(fix.latitude, fix.longitude)
+                }
+        }
+        onDispose { request?.cancel() }
     }
-    return UserLocation(loc ?: default, loc != null && granted)
+    return UserLocation(loc ?: default, loc != null && granted && locationOn)
 }

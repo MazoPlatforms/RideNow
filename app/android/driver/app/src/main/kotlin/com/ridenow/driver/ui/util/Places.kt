@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.LocationManager
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -21,6 +22,7 @@ suspend fun currentCity(context: Context): String? = withContext(Dispatchers.IO)
     runCatching {
         if (!hasLocationPermission(context)) return@runCatching null
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        if (!LocationManagerCompat.isLocationEnabled(lm)) return@runCatching null
         val fix = lm.getProviders(true).mapNotNull { lm.getLastKnownLocation(it) }.maxByOrNull { it.time } ?: return@runCatching null
         @Suppress("DEPRECATION")
         val a = Geocoder(context, Locale.getDefault()).getFromLocation(fix.latitude, fix.longitude, 1)?.firstOrNull() ?: return@runCatching null

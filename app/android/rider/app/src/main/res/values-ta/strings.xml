@@ -55,6 +55,8 @@
     <string name="loc_step1">"அமைப்புகளைத் திறக்கவும்"</string>
     <string name="loc_step2">"அனுமதிகளைத் தட்டவும், பின்னர் இருப்பிடம்"</string>
     <string name="loc_step3">"பயன்பாட்டைப் பயன்படுத்தும் போது தேர்வு செய்யவும்"</string>
+    <string name="loc_device_step2">இருப்பிட அமைப்பை இயக்கவும்</string>
+    <string name="loc_device_step3">RideNow செயலிக்குத் திரும்பவும்</string>
     <string name="ntf_title">"புதுப்பித்த நிலையில் இருங்கள்."</string>
     <string name="ntf_subtitle">"உங்கள் சவாரி நெருங்கும்போது, ​​வரும்போது அல்லது ஏதாவது மாறும்போது எச்சரிக்கையைப் பெறுங்கள்."</string>
     <string name="ntf_b1">"உங்கள் டிரைவர் எப்போது வருகிறார் என்பதை அறிந்து கொள்ளுங்கள்"</string>
