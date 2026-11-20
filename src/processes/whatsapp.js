@@ -50,18 +50,23 @@ function connect() {
   );
   socket.ev.on('connection.update', async (update) => {
     if (update.qr)
-      process.stdout.write(`WhatsApp pairing QR payload (render locally): ${update.qr}\n`);
+      process.stdout.write('WhatsApp pairing is required; QR payload is suppressed from logs.\n');
     if (update.connection === 'open') {
       connected = true;
+      process.stdout.write('WhatsApp session connected.\n');
       await ready(true);
     }
     if (update.connection === 'close') {
       connected = false;
       await ready(false);
-      if (update.lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut) {
+      const statusCode = update.lastDisconnect?.error?.output?.statusCode;
+      if (statusCode === DisconnectReason.loggedOut) {
         process.stderr.write('WhatsApp logged out; operator re-pairing required.\n');
         running = false;
-      } else reconnectAt = Date.now() + 5000;
+      } else {
+        process.stderr.write(`WhatsApp disconnected; status=${Number.isInteger(statusCode) ? statusCode : 'unknown'}.\n`);
+        reconnectAt = Date.now() + 5000;
+      }
     }
   });
 }
