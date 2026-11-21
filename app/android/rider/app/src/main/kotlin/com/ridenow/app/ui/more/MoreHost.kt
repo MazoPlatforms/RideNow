@@ -27,6 +27,8 @@ object MoreRoutes {
 fun MoreHost(start: String, ctx: MoreCtx, root: MoreNav) {
     var stack by rememberSaveable { mutableStateOf(arrayListOf(start)) }
     val label = stack.last()
+    var phoneChangeId by rememberSaveable { mutableStateOf("") }
+    var phoneChangeTarget by rememberSaveable { mutableStateOf("") }
     val push = { l: String -> stack = ArrayList(stack + l) }
     // Leaving a ticket conversation that was just created also skips the empty "New ticket" form behind it.
     val pop = {
@@ -43,7 +45,20 @@ fun MoreHost(start: String, ctx: MoreCtx, root: MoreNav) {
         complete = root.complete, report = root.report, support = root.support, safety = root.safety, setPhone = root.setPhone, setVehicle = root.setVehicle,
         setScheduled = root.setScheduled, confirm = root.confirm, changeDrop = root.changeDrop, cancelScheduled = root.cancelScheduled, signedOut = root.signedOut,
     )
-    key(label) { MoreScreen(label, ctx, nav) }
+    key(label) {
+        when (label) {
+            "Change phone number" -> ChangePhoneScreen(nav.exit) { target, id ->
+                phoneChangeTarget = target
+                phoneChangeId = id
+                push("Verify new number")
+            }
+            "Verify new number" -> VerifyNewNumberScreen(ctx.phone, phoneChangeTarget, phoneChangeId, nav.back) {
+                nav.setPhone(it)
+                nav.exit()
+            }
+            else -> MoreScreen(label, ctx, nav)
+        }
+    }
 }
 
 @Composable
@@ -87,15 +102,13 @@ private fun MoreScreen(label: String, ctx: MoreCtx, nav: MoreNav) {
             "Edit scheduled ride" -> EditScheduledScreen(ctx, nav.back, { nav.setScheduled(it); nav.back() }, { nav.open("Your route") })
             "Cancel scheduled ride" -> CancelScheduledScreen(ctx, nav.back) { nav.cancelScheduled() }
             // Account and settings
-            "Change phone number" -> ChangePhoneScreen(nav.exit) { nav.open("Verify new number") }
-            "Verify new number" -> VerifyNewNumberScreen(nav.back) { nav.setPhone(it); nav.exit() }
-            "Current city" -> CityPickerScreen(nav.exit)
+            "Current city" -> CityPickerScreen(nav.exit, ctx.city, ctx.setCity)
             "Transaction History" -> TransactionHistoryScreen(nav.exit)
             "Notification settings" -> NotificationSettingsScreen(nav.exit)
             "Appearance" -> com.ridenow.app.ui.settings.AppearanceScreen(nav.exit)
             "Language" -> LanguageScreen(nav.exit)
             "Privacy & Security" -> PrivacyHubScreen(nav.exit, nav.open)
-            "Manage Devices" -> ManageDevicesScreen(nav.back)
+            "Manage Devices" -> ManageDevicesScreen(nav.back, nav.signedOut)
             "Two-step verification" -> TwoStepScreen(nav.back, ctx.phone)
             "App data and permissions" -> AppDataScreen(nav.back)
             "Location data" -> LocationDataScreen(nav.back)

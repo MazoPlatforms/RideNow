@@ -29,7 +29,25 @@ object PhoneAuthApi {
         val email: String,
         val profileComplete: Boolean,
         val profilePhotoUrl: String?,
+        val details: ProfileDetails = ProfileDetails(),
     )
+
+    data class ProfileDetails(
+        val gender: String? = null,
+        val dateOfBirth: String? = null,
+        val city: String? = null,
+    )
+
+    suspend fun requestPhoneChange(context: Context, phone: String): JSONObject =
+        authorized(context, "POST", "/v1/auth/phone-change/request", JSONObject().put("phone", phone)) { it }
+
+    suspend fun verifyPhoneChange(context: Context, id: String, currentCode: String, newCode: String): String =
+        authorized(context, "POST", "/v1/auth/phone-change/verify",
+            JSONObject().put("changeId", id).put("currentCode", currentCode).put("newCode", newCode)) { response ->
+            val verifiedPhone = response.getJSONObject("user").getString("phone")
+            saveTokens(context, response)
+            verifiedPhone
+        }
 
     private fun prefs(context: Context) = EncryptedSharedPreferences.create(
         context,
@@ -39,6 +57,64 @@ object PhoneAuthApi {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
 
+    data class SignedInDevice(
+        val id: String, val name: String?, val app: String?, val updatedAt: String, val current: Boolean,
+    )
+
+    @Synchronized
+    private fun deviceMetadata(context: Context): JSONObject {
+        val storage = context.getSharedPreferences("ridenow_installation", Context.MODE_PRIVATE)
+        val id = storage.getString("id", null) ?: UUID.randomUUID().toString().also {
+            check(storage.edit().putString("id", it).commit())
+        }
+        val systemName = runCatching {
+            android.provider.Settings.Global.getString(context.contentResolver, "device_name")
+        }.getOrNull()
+        val cleanName = Regex("[\\p{C}]")
+        val name = sequenceOf(systemName, android.os.Build.MODEL, "Android")
+            .map { cleanName.replace(it.orEmpty().take(80), "").trim() }
+            .first { it.isNotEmpty() }
+        return JSONObject().put("installationId", id).put("name", name).put("app", "RIDER")
+    }
+
+    suspend fun listDevices(context: Context, register: Boolean = false): List<SignedInDevice> {
+        val response = if (register) {
+            val metadata = withContext(Dispatchers.IO) { deviceMetadata(context) }
+            authorized(context, "PUT", "/v1/auth/devices/current", metadata) { it }
+        } else authorized(context, "GET", "/v1/auth/devices") { it }
+        val items = response.getJSONArray("items")
+        return List(items.length()) { index ->
+            val item = items.getJSONObject(index)
+            SignedInDevice(item.getString("id"), item.opt("name") as? String, item.opt("app") as? String,
+                item.getString("updatedAt"), item.getBoolean("current"))
+        }
+    }
+
+    suspend fun revokeDevice(context: Context, id: String?) {
+        if (id == null) authorized(context, "POST", "/v1/auth/devices/revoke-others") { it }
+        else {
+            val family = UUID.fromString(id)
+            authorized(context, "DELETE", "/v1/auth/devices/$family") { it }
+        }
+    }
+
+    suspend fun requestAccountDeletion(context: Context): JSONObject =
+        authorized(context, "POST", "/v1/auth/account-deletion/request") { it }
+
+    suspend fun confirmAccountDeletion(context: Context, id: String, code: String, factor: String?) {
+        val body = JSONObject().put("challengeId", id).put("code", code)
+        factor?.let { body.put("factor", it) }
+        authorized(context, "POST", "/v1/auth/account-deletion/confirm", body) { result ->
+            check(result.getBoolean("deleted"))
+            prefs(context).edit().clear().commit()
+        }
+    }
+
+    suspend fun twoStepSettings(context: Context, action: String = "", body: JSONObject? = null): JSONObject {
+        require(action in setOf("", "/setup", "/enable", "/disable", "/recovery"))
+        return authorized(context, if (action.isEmpty()) "GET" else "POST", "/v1/auth/two-step" + action, body) { it }
+    }
+
     suspend fun requestCode(context: Context, phone: String): String = withContext(Dispatchers.IO) {
         val response = request("POST", "/v1/auth/otp/request", JSONObject().put("phone", phone))
         response.optString("challengeId").also {
@@ -47,10 +123,21 @@ object PhoneAuthApi {
     }
 
     suspend fun verifyCode(context: Context, challengeId: String, code: String): RiderProfile = withContext(Dispatchers.IO) {
-        val result = request("POST", "/v1/auth/otp/verify", JSONObject().put("challengeId", challengeId).put("code", code))
+        val result = request("POST", "/v1/auth/otp/verify", JSONObject().put("challengeId", challengeId).put("code", code)
+            .put("device", deviceMetadata(context)))
+        completeLogin(context, result)
+    }
+
+    suspend fun verifySecondStep(context: Context, token: String, code: String): RiderProfile = withContext(Dispatchers.IO) {
+        val result = request("POST", "/v1/auth/two-step/verify", JSONObject().put("token", token).put("code", code))
+        completeLogin(context, result)
+    }
+
+    private suspend fun completeLogin(context: Context, result: JSONObject): RiderProfile {
+        (result.opt("twoStepToken") as? String)?.let { throw TwoStepRequired(it) }
         sessionMutex.withLock { saveTokens(context, result) }
         val issued = parseAuthenticatedProfile(result)
-        try { authorized(context, "GET", "/v1/me") { parseProfile(it) } }
+        return try { authorized(context, "GET", "/v1/me") { parseProfile(it) } }
         catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (failure: PhoneAuthException) { if (failure.status == 401) throw failure else issued }
         catch (_: Exception) { issued }
@@ -110,9 +197,17 @@ object PhoneAuthApi {
     }
 
     /** Saves onboarding/edit-profile fields and uploads an optional profile image through the backend's private staging flow. */
-    suspend fun saveProfile(context: Context, name: String, email: String, photo: Bitmap? = null): RiderProfile = withContext(Dispatchers.IO) {
+    suspend fun saveProfile(
+        context: Context, name: String, email: String, photo: Bitmap? = null, details: ProfileDetails? = null,
+    ): RiderProfile = withContext(Dispatchers.IO) {
         if (photo != null) uploadProfilePhoto(context, photo)
-        authorized(context, "PATCH", "/v1/me", JSONObject().put("name", name).put("email", email)) { parseProfile(it) }
+        val payload = JSONObject().put("name", name).put("email", email)
+        if (details != null) {
+            payload.put("gender", details.gender ?: JSONObject.NULL)
+                .put("dateOfBirth", details.dateOfBirth ?: JSONObject.NULL)
+                .put("city", details.city ?: JSONObject.NULL)
+        }
+        authorized(context, "PATCH", "/v1/me", payload) { parseProfile(it) }
     }
 
     private suspend fun uploadProfilePhoto(context: Context, source: Bitmap): RiderProfile = withContext(Dispatchers.IO) {
@@ -177,7 +272,7 @@ object PhoneAuthApi {
         }
     }
 
-    private suspend fun <T> authorized(context: Context, method: String, path: String, payload: JSONObject? = null,
+    internal suspend fun <T> authorized(context: Context, method: String, path: String, payload: JSONObject? = null,
         idempotencyKey: String? = null, transform: (JSONObject) -> T): T = withContext(Dispatchers.IO) {
         sessionMutex.withLock {
             val storage = prefs(context)
@@ -226,6 +321,7 @@ object PhoneAuthApi {
         email = value.optString("email"),
         profileComplete = value.optBoolean("profileComplete"),
         profilePhotoUrl = value.optString("profilePhotoUrl").takeIf { it.startsWith("https://") },
+        details = ProfileDetails(value.opt("gender") as? String, value.opt("dateOfBirth") as? String, value.opt("city") as? String),
     )
 
     private fun parseAuthenticatedProfile(value: JSONObject): RiderProfile {
@@ -278,3 +374,5 @@ object PhoneAuthApi {
 }
 
 class PhoneAuthException(val code: String, message: String, val status: Int) : Exception(message)
+
+internal class TwoStepRequired(val token: String) : Exception("TWO_STEP_REQUIRED")

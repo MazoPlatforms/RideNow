@@ -1,5 +1,6 @@
 package com.ridenow.app.ui.map
 
+import kotlin.coroutines.resume
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
@@ -117,3 +118,19 @@ fun rememberUserLocation(
     }
     return UserLocation(loc ?: default, loc != null && granted && locationOn)
 }
+
+/** A fresh, bounded fix for explicit location actions. Call after checking location and permissions. */
+@SuppressLint("MissingPermission")
+internal suspend fun fetchRiderPosition(context: android.content.Context): LatLng? =
+    kotlinx.coroutines.withTimeoutOrNull(12_000L) {
+        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            val request = CancellationTokenSource()
+            continuation.invokeOnCancellation { request.cancel() }
+            LocationServices.getFusedLocationProviderClient(context)
+                .getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, request.token)
+                .addOnCompleteListener { task ->
+                    val fix = if (task.isSuccessful) task.result else null
+                    if (continuation.isActive) continuation.resume(fix?.let { LatLng(it.latitude, it.longitude) })
+                }
+        }
+    }

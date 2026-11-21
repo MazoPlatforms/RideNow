@@ -31,6 +31,7 @@ class DriverStore {
     var nic by mutableStateOf("")
     var prefLanguage by mutableStateOf("English")
     var photo by mutableStateOf<android.graphics.Bitmap?>(null)
+    var photoSource: String? = null
     var sessionEarned by mutableIntStateOf(0)
     private var counter = 1000
     private var noticeId = 100
@@ -45,7 +46,7 @@ class DriverStore {
 
     fun reset() {
         rides.clear(); txns.clear(); notices.clear(); tickets.clear(); docs.clear(); banks.clear()
-        sessionEarned = 0; balance = 0; rating = 0.0; totalRides = 0; memberSince = ""; dob = ""; nic = ""; prefLanguage = "English"; photo = null
+        sessionEarned = 0; balance = 0; rating = 0.0; totalRides = 0; memberSince = ""; dob = ""; nic = ""; prefLanguage = "English"; photo = null; photoSource = null
         vehicle = VehicleInfo("", "", "", "", "", "")
         acceptCash = true; acceptCard = true; acceptWallet = false
         if (sample) loadSample()

@@ -90,7 +90,7 @@ private val Places = listOf(
 @Composable
 fun SearchScreen(
     onBack: () -> Unit, onPlace: (Place, Boolean) -> Unit, onFriend: () -> Unit, onEditPickup: () -> Unit,
-    onSaved: () -> Unit, onMap: () -> Unit, onAdd: (String) -> Unit, modifier: Modifier = Modifier, scheduled: String? = null, pickup: String? = null, friend: String? = null, near: LatLng? = null,
+    onSaved: () -> Unit, onMap: () -> Unit, onAdd: (String) -> Unit, modifier: Modifier = Modifier, scheduled: String? = null, pickup: String? = null, friend: String? = null, near: LatLng? = null, savedHome: String? = null, savedWork: String? = null,
 ) {
     val textNovaTerminalGate4 = stringResource(R.string.text_nova_terminal_gate_4)
     val textSector12OrbitRing = stringResource(R.string.text_sector_12_orbit_ring)
@@ -156,8 +156,8 @@ fun SearchScreen(
             q.isEmpty() -> LazyColumn(Modifier.weight(1f).padding(top = 10.dp)) {
                 item { OptionRow(RideIcons.Heart, stringResource(R.string.search_saved), null, chevron = true, onClick = onSaved) }
                 item { OptionRow(RideIcons.Map, stringResource(R.string.search_map), null, chevron = true, onClick = onMap) }
-                item { OptionRow(RideIcons.Home, stringResource(R.string.search_add_home), null, plus = true) { onAdd("Home") } }
-                item { OptionRow(RideIcons.Work, stringResource(R.string.search_add_work), null, plus = true) { onAdd("Work") } }
+                item { OptionRow(RideIcons.Home, stringResource(if (savedHome == null) R.string.search_add_home else R.string.home_saved_home), savedHome, plus = savedHome == null) { onAdd("Home") } }
+                item { OptionRow(RideIcons.Work, stringResource(if (savedWork == null) R.string.search_add_work else R.string.home_saved_work), savedWork, plus = savedWork == null) { onAdd("Work") } }
                 item { OptionRow(RideIcons.Clock, textNovaTerminalGate4, textSector12OrbitRing, chevron = true) { onPlace(Places[4], returnTrip) } }
             }
             loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator(Modifier.size(28.dp), color = c.accent, strokeWidth = 3.dp) }

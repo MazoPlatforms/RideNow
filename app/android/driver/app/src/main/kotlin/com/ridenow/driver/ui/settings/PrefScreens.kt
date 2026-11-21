@@ -14,6 +14,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import com.ridenow.driver.R
+import com.ridenow.driver.ui.auth.AccountDeletionVerification
+import com.ridenow.driver.ui.notifications.rememberNotificationOptions
+import com.ridenow.driver.ui.notifications.NotificationOptionsStatus
 import com.ridenow.driver.ui.components.*
 import com.ridenow.driver.ui.data.DriverStore
 import com.ridenow.driver.ui.theme.RideTheme
@@ -45,21 +48,35 @@ private fun PrefToggle(icon: List<String>, title: String, sub: String?, key: Str
 fun NotificationSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val context = LocalContext.current
-    val push = rememberBoolPref("push_enabled", true)
+    val options = rememberNotificationOptions()
     var sheet by remember { mutableStateOf<NType?>(null) }
     SubScreen(str(R.string.ns_title), onBack, modifier) {
         InfoBanner(RideIcons.Bell, str(R.string.ns_banner_title), str(R.string.ns_banner_text), Modifier.padding(top = 4.dp), Tone.Brand)
-        SectionTitle(str(R.string.ns_push))
-        GroupCard { ToggleRow(RideIcons.Bell, str(R.string.ns_enable), push.value, { push.value = it }, subtitle = str(R.string.ns_enable_sub)) }
-        SectionTitle(str(R.string.ns_types))
-        GroupCard {
-            TYPES.forEachIndexed { i, t ->
-                if (i > 0) RowDivider()
-                PrefToggle(t.icon, str(t.title), str(t.sub), "n_" + t.key, t.default, if (t.more) ({ sheet = t }) else null, reserveMore = true)
+        NotificationOptionsStatus(options)
+        if (options.values != null) {
+            SectionTitle(str(R.string.ns_push))
+            GroupCard { ToggleRow(RideIcons.Bell, str(R.string.ns_enable), options.isOn("push"),
+                { if (!options.busy) options.update("push", it) }, subtitle = str(R.string.ns_enable_sub)) }
+            SectionTitle(str(R.string.ns_types))
+            GroupCard {
+                TYPES.forEachIndexed { i, t ->
+                    if (i > 0) RowDivider()
+                    val key = when (t.key) {
+                        "ride_requests" -> "offers"
+                        "trip_updates" -> "rides"
+                        "reminders" -> "scheduled"
+                        "safety_alerts" -> "safety"
+                        "app_updates" -> "account"
+                        else -> t.key
+                    }
+                    ToggleRow(t.icon, str(t.title), options.isOn(key), { if (!options.busy) options.update(key, it) },
+                        subtitle = str(t.sub), onMore = if (t.more) ({ sheet = t }) else null, reserveMore = true)
+                }
             }
+            SectionTitle(str(R.string.ns_in_app))
+            GroupCard { ToggleRow(RideIcons.Msg, str(R.string.ns_show_in_app), options.isOn("inApp"),
+                { if (!options.busy) options.update("inApp", it) }, subtitle = str(R.string.ns_show_in_app_sub)) }
         }
-        SectionTitle(str(R.string.ns_in_app))
-        GroupCard { PrefToggle(RideIcons.Msg, str(R.string.ns_show_in_app), str(R.string.ns_show_in_app_sub), "n_in_app", true) }
         SectionTitle(str(R.string.ns_system))
         GroupCard(Modifier.padding(bottom = 16.dp)) { NavRow(RideIcons.Gear, str(R.string.ns_system_settings), { openAppNotificationSettings(context) }, subtitle = str(R.string.ns_system_settings_sub)) }
     }
@@ -151,38 +168,37 @@ fun PaymentMethodsScreen(store: DriverStore, onBack: () -> Unit, onBank: () -> U
 
 /** Delete driver account: what goes, alternatives, and a confirmation before the red button does anything. */
 @Composable
-fun DeleteAccountScreen(onBack: () -> Unit, onDownload: () -> Unit, onGoOffline: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+fun DeleteAccountScreen(onBack: () -> Unit, onDownload: () -> Unit, onGoOffline: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, phone: String = "") {
     val c = RideTheme.colors
-    var confirm by rememberSaveable { mutableStateOf(false) }
+    var verify by remember { mutableStateOf(false) }
     val items = listOf(
         Triple(RideIcons.Person, R.string.del_personal, R.string.del_personal_sub), Triple(RideIcons.Car, R.string.del_docs, R.string.del_docs_sub),
-        Triple(RideIcons.Wallet, R.string.del_earnings, R.string.del_earnings_sub), Triple(RideIcons.Chart, R.string.del_ratings, R.string.del_ratings_sub),
-        Triple(RideIcons.Clock, R.string.del_history, R.string.del_history_sub), Triple(RideIcons.Gear, R.string.del_settings, R.string.del_settings_sub),
+        Triple(RideIcons.Wallet, R.string.del_earnings, R.string.account_delete_history), Triple(RideIcons.Chart, R.string.del_ratings, R.string.del_ratings_sub),
+        Triple(RideIcons.Clock, R.string.del_history, R.string.account_delete_history), Triple(RideIcons.Gear, R.string.del_settings, R.string.del_settings_sub),
     )
     SubScreen(
         str(R.string.del_title), onBack, modifier,
         bottom = {
-            Box(Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(28.dp)).background(Color_Red).clickable(role = androidx.compose.ui.semantics.Role.Button) { confirm = true }, contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(28.dp)).background(Color_Red).clickable(role = androidx.compose.ui.semantics.Role.Button) { verify = true }, contentAlignment = Alignment.Center) {
                 Text(str(R.string.del_button), color = androidx.compose.ui.graphics.Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp))
             }
             Text(str(R.string.del_irreversible), color = c.muted, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
         },
     ) {
-        InfoBanner(RideIcons.Trash, str(R.string.del_sorry), str(R.string.del_sorry_text), Modifier.padding(top = 4.dp), Tone.Danger)
+        InfoBanner(RideIcons.Trash, str(R.string.del_sorry), str(R.string.account_delete_summary), Modifier.padding(top = 4.dp), Tone.Danger)
         SectionTitle(str(R.string.del_what))
         GroupCard { items.forEachIndexed { i, (icon, t, s) -> if (i > 0) RowDivider(); NavRow(icon, str(t), { }, subtitle = str(s), trailing = { }) } }
+        Text(str(R.string.account_delete_retention), color = c.muted, modifier = Modifier.padding(top = 12.dp))
         SectionTitle(str(R.string.del_before))
         GroupCard(Modifier.padding(bottom = 16.dp)) {
             NavRow(RideIcons.Download, str(R.string.priv_download), onDownload, subtitle = str(R.string.del_download_sub)); RowDivider()
             NavRow(RideIcons.Pause, str(R.string.del_offline), onGoOffline, subtitle = str(R.string.del_offline_sub))
         }
     }
-    if (confirm) AlertDialog(
-        onDismissRequest = { confirm = false }, containerColor = c.bg,
-        title = { Text(str(R.string.del_confirm_title), color = c.fg) }, text = { Text(str(R.string.del_confirm_text), color = c.muted) },
-        confirmButton = { TextButton(onClick = { confirm = false; onDelete() }) { Text(str(R.string.del_button), color = c.danger) } },
-        dismissButton = { TextButton(onClick = { confirm = false }) { Text(str(R.string.dialog_cancel), color = c.fg) } },
-    )
+    if (verify) AccountDeletionVerification(phone, onBack = { verify = false }, onDeleted = {
+        verify = false
+        onDelete()
+    })
 }
 
 private val Color_Red = androidx.compose.ui.graphics.Color(0xFFE5282B)

@@ -33,7 +33,9 @@ class Txn(val id: String, val kind: TxnKind, val title: String, val sub: String,
 enum class NoticeKind { Rides, System }
 enum class NoticeTone { Blue, Green, Yellow, Neutral }
 
-class Notice(val id: Int, val kind: NoticeKind, val tone: NoticeTone, val icon: String, val title: String, val body: String, val age: String, unread: Boolean) {
+class Notice(val id: Int, val kind: NoticeKind, val tone: NoticeTone, val icon: String, val title: String, val body: String, val age: String, unread: Boolean, val serverId: String? = null,
+    val today: Boolean = !age.contains("day"),
+) {
     var unread by mutableStateOf(unread)
 }
 

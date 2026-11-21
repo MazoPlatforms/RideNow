@@ -12,6 +12,7 @@ import { idempotent } from './shared/idempotency.js';
 import { rateLimiter } from './shared/rate-limit.js';
 import { createRecaptchaVerifier } from './shared/recaptcha.js';
 import { createAuth, permission } from './modules/auth.js';
+import { createMobilePreferences, cityInput, savedAddressInput, trustedContactInput, notificationApp, notificationChange } from './modules/mobile-preferences.js';
 import { quote } from './modules/pricing.js';
 import * as rides from './modules/rides.js';
 import * as drivers from './modules/drivers.js';
@@ -42,6 +43,22 @@ const phone = z.string().min(9).max(30),
     cursor: uuid.optional(),
     limit: z.coerce.number().int().min(1).max(100).default(30),
   });
+const otpCode = z.string().regex(/^\d{6}$/);
+const mobileDevice = z.strictObject({
+  installationId: z.uuidv4(),
+  name: z.string().trim().min(1).max(80).regex(/^[^\p{C}]+$/u),
+  app: z.enum(['RIDER', 'DRIVER']),
+});
+const editableDate = z.iso.date().refine(value => value >= '1900-01-01' &&
+  value <= new Date().toISOString().slice(0, 10), 'Invalid date of birth');
+function dateOnly(value) {
+  if (value instanceof Date) {
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${value.getFullYear()}-${month}-${day}`;
+  }
+  return value ?? null;
+}
 const quoteSchema = z
   .object({
     waypoints: z.array(coordinate).length(2),
@@ -53,7 +70,8 @@ const quoteSchema = z
 export function createApp({ pool, redis, config, maps, storage, logger, captchaVerifier = createRecaptchaVerifier(config) }) {
   const app = express(),
     auth = createAuth(pool, config),
-    paths = {};
+    paths = {},
+    settings = createMobilePreferences(pool, config);
   const authenticate = async (req, res, next) => {
     try {
       const value = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
@@ -72,6 +90,9 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       email: user.email ?? '',
       profileComplete: await riderProfileComplete(pool, user),
       profileCompletedAt: user.profile_completed_at,
+      gender: user.rider_gender ?? null,
+      dateOfBirth: dateOnly(user.rider_birth_date),
+      city: user.rider_city ?? null,
       profilePhotoUrl: user.profile_photo_key
         ? await storage.download(user.profile_photo_key, user.profile_photo_version)
         : null,
@@ -216,9 +237,9 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     '/v1/auth/otp/verify',
     {
       access: 'public',
-      body: z.object({ challengeId: uuid, code: z.string().regex(/^\d{6}$/) }).strict(),
+      body: z.strictObject({ challengeId: uuid, code: otpCode, device: mobileDevice.optional() }),
     },
-    ({ body }) => auth.verifyOtp(body.challengeId, body.code),
+    ({ body }) => auth.verifyOtp(body.challengeId, body.code, body.device),
   );
   route(
     'post',
@@ -264,98 +285,181 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     ]);
     return { revoked: true };
   });
+  route('get', '/v1/auth/devices', {}, ({ user }) => auth.listDevices(user));
+  route('put', '/v1/auth/devices/current', { body: mobileDevice },
+    async ({ user, body }) => {
+      await auth.registerDevice(user, body);
+      return auth.listDevices(user);
+    });
+  route('delete', '/v1/auth/devices/:id', {}, ({ user, req }) => auth.revokeDevices(user, req.params.id));
+  route('post', '/v1/auth/devices/revoke-others', {}, ({ user }) => auth.revokeDevices(user));
+  const factorCode = z.string().regex(/^(?:\d{6}|[a-fA-F0-9]{24}|(?:[a-fA-F0-9]{4}-){5}[a-fA-F0-9]{4})$/);
+  route('get', '/v1/auth/two-step', {}, ({ user }) => auth.twoStep.status(user));
+  route('post', '/v1/auth/two-step/setup', {}, ({ user }) => auth.twoStep.start(user));
+  route('post', '/v1/auth/two-step/enable', { body: z.strictObject({ whatsappCode: otpCode, code: otpCode }) },
+    ({ user, body }) => auth.twoStep.enable(user, body));
+  route('post', '/v1/auth/two-step/disable', { body: z.strictObject({ code: factorCode }) },
+    ({ user, body }) => auth.twoStep.update(user, body.code, true));
+  route('post', '/v1/auth/two-step/recovery', { body: z.strictObject({ code: factorCode }) },
+    ({ user, body }) => auth.twoStep.update(user, body.code, false));
+  route('post', '/v1/auth/two-step/verify', { access: 'public', body: z.strictObject({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/), code: factorCode,
+  }) }, ({ body }) => auth.twoStep.verifyLogin(body.token, body.code));
+  route('post', '/v1/auth/account-deletion/request', { status: 202 },
+    ({ user }) => auth.accountDeletion.request(user));
+  route('post', '/v1/auth/account-deletion/confirm', { body: z.strictObject({
+    challengeId: uuid, code: otpCode, factor: factorCode.optional(),
+  }) }, ({ user, body }) => auth.accountDeletion.confirm(user, body));
+  route('post', '/v1/auth/phone-change/request',
+    { body: z.strictObject({ phone }), status: 202 },
+    ({ user, body }) => auth.requestPhoneChange(user, body.phone));
+  route('post', '/v1/auth/phone-change/verify',
+    { body: z.strictObject({ changeId: uuid, currentCode: otpCode, newCode: otpCode }) },
+    ({ user, body }) => auth.verifyPhoneChange(user, body));
+  route('get', '/v1/me/rider-settings', {}, ({ user }) => settings.riderSettings(user));
+  route('put', '/v1/me/current-city', { body: cityInput }, ({ user, body }) => settings.setCity(user, body.city));
+  route('post', '/v1/me/saved-addresses', { body: savedAddressInput },
+    ({ user, body }) => settings.saveAddress(user, body));
+  route('patch', '/v1/me/saved-addresses/:id', { body: savedAddressInput },
+    ({ user, req, body }) => settings.saveAddress(user, body, req.params.id));
+  route('delete', '/v1/me/saved-addresses/:id', {},
+    ({ user, req }) => settings.removeAddress(user, req.params.id));
+  route('post', '/v1/me/trusted-contacts', { body: trustedContactInput },
+    ({ user, body }) => settings.saveContact(user, body));
+  route('delete', '/v1/me/trusted-contacts/:id', {},
+    ({ user, req }) => settings.removeContact(user, req.params.id));
+  route('get', '/v1/me/notification-preferences', {},
+    ({ user, req }) => settings.notifications(user, notificationApp.parse(req.query.app)));
+  route('patch', '/v1/me/notification-preferences', { body: notificationChange },
+    ({ user, body }) => settings.changeNotification(user, body));
   route('get', '/v1/me', {}, async ({ user }) => profileView(user));
   route(
     'patch',
     '/v1/me',
-    { body: z.object({ name: profileName, email: profileEmail }).strict() },
+    { body: z.strictObject({
+      name: profileName,
+      email: profileEmail,
+      gender: z.enum(['FEMALE','MALE','NON_BINARY','UNDISCLOSED']).nullable().optional(),
+      dateOfBirth: editableDate.nullable().optional(),
+      city: z.string().trim().max(100).nullable().optional(),
+    }) },
     async ({ db, user, body }) => {
       const updated = await one(
         db,
-        "UPDATE users SET name=$2,email=COALESCE($3,email),profile_completed_at=COALESCE(profile_completed_at,now()) WHERE id=$1 RETURNING *",
-        [user.id, body.name, body.email ?? null],
+        `UPDATE users SET name=$2,email=COALESCE($3,email),
+         rider_gender=CASE WHEN $4 THEN $5 ELSE rider_gender END,
+         rider_birth_date=CASE WHEN $6 THEN $7::date ELSE rider_birth_date END,
+         rider_city=CASE WHEN $8 THEN $9 ELSE rider_city END,
+         profile_completed_at=COALESCE(profile_completed_at,now()) WHERE id=$1 AND deleted_at IS NULL RETURNING *`,
+        [user.id, body.name, body.email ?? null,
+          'gender' in body, body.gender ?? null,
+          'dateOfBirth' in body, body.dateOfBirth ?? null,
+          'city' in body, body.city || null],
       );
-      return profileView(updated);
+      return profileView(ensure(updated, 401, 'SESSION_REVOKED'));
     },
   );
-  route(
-    'post',
-    '/v1/me/profile-photo',
-    {
-      idem: true,
-      body: z.object({
-        mime: z.enum(['image/jpeg', 'image/png']),
-        bytes: z.number().int().positive().max(5 * 1024 * 1024),
-      }).strict(),
-    },
-    async ({ db, user, body }) => {
-      const id = randomUUID();
-      const key = 'profiles/' + user.id + '/' + id;
-      const upload = await one(
-        db,
-        "INSERT INTO profile_photo_uploads(id,user_id,object_key,mime,bytes,expires_at) VALUES($1,$2,$3,$4,$5,now()+interval '10 minutes') RETURNING id,expires_at",
-        [id, user.id, key, body.mime, body.bytes],
-      );
-      return {
-        photoId: upload.id,
-        uploadUrl: await storage.upload(key, body.mime, body.bytes),
-        expiresAt: upload.expires_at,
-      };
-    },
-  );
-  route(
-    'post',
-    '/v1/me/profile-photo/:id/complete',
-    {},
-    async ({ user, req }) => {
-      const outcome = await transaction(pool, async (db) => {
-        const upload = ensure(await one(
+  for (const [prefix, purpose, access] of [
+    ['/v1/me/profile-photo', 'RIDER', 'user'],
+    ['/v1/drivers/profile-photo', 'DRIVER', 'driver'],
+  ]) {
+    route(
+      'post',
+      prefix,
+      {
+        access,
+        idem: true,
+        body: z.object({
+          mime: z.enum(['image/jpeg', 'image/png']),
+          bytes: z.number().int().positive().max(5 * 1024 * 1024),
+        }).strict(),
+      },
+      async ({ db, user, body }) => {
+        ensure(await one(db, 'SELECT id FROM users WHERE id=$1 AND deleted_at IS NULL FOR UPDATE', [user.id]),
+          401, 'SESSION_REVOKED');
+        if (purpose === 'DRIVER') ensure(await one(db,
+          "SELECT user_id FROM driver_profiles WHERE user_id=$1 AND status<>'SUSPENDED'", [user.id]),
+          403, 'DRIVER_PROFILE_UNAVAILABLE');
+        const id = randomUUID();
+        const key = 'profiles/' + user.id + '/' + id;
+        const upload = await one(
           db,
-          'SELECT * FROM profile_photo_uploads WHERE id=$1 AND user_id=$2 FOR UPDATE',
-          [req.params.id, user.id],
-        ), 404, 'PROFILE_PHOTO_UPLOAD_NOT_FOUND');
-        if (upload.status === 'CLEAN') {
-          return { user: await one(db, 'SELECT * FROM users WHERE id=$1', [user.id]) };
-        }
-        ensure(upload.status === 'PENDING' && upload.expires_at > Date.now(), 409, 'PROFILE_PHOTO_UPLOAD_EXPIRED');
-        const result = await storage.sanitizeProfilePhoto(upload);
-        if (result.status !== 'CLEAN') {
-          await db.query("UPDATE profile_photo_uploads SET status='REJECTED' WHERE id=$1", [upload.id]);
-          return { rejected: true };
-        }
-        const key = result.verifiedKey ?? upload.object_key;
-        const version = result.version ?? null;
-        await db.query(
-          "UPDATE profile_photo_uploads SET status='CLEAN',object_key=$2,object_version=$3 WHERE id=$1",
-          [upload.id, key, version],
+          "INSERT INTO profile_photo_uploads(id,user_id,object_key,mime,bytes,purpose,expires_at) VALUES($1,$2,$3,$4,$5,$6,now()+interval '10 minutes') RETURNING id,expires_at",
+          [id, user.id, key, body.mime, body.bytes, purpose],
         );
-        const updated = await one(
-          db,
-          'UPDATE users SET profile_photo_key=$2,profile_photo_version=$3 WHERE id=$1 RETURNING *',
-          [user.id, key, version],
-        );
-        return { user: updated, stagingKey: upload.object_key, stagingVersion: result.stagingVersion };
-      });
-      ensure(!outcome.rejected, 422, 'PROFILE_PHOTO_REJECTED');
-      if (outcome.stagingKey && storage.discardProfileStaging) {
-        try {
-          await storage.discardProfileStaging(outcome.stagingKey, outcome.stagingVersion);
-        } catch {
-          logger.warn({ photoId: req.params.id }, 'Profile photo staging cleanup failed');
+        return {
+          photoId: upload.id,
+          uploadUrl: await storage.upload(key, body.mime, body.bytes),
+          expiresAt: upload.expires_at,
+        };
+      },
+    );
+    route(
+      'post',
+      `${prefix}/:id/complete`,
+      { access },
+      async ({ user, req }) => {
+        const outcome = await transaction(pool, async (db) => {
+          ensure(await one(db, 'SELECT id FROM users WHERE id=$1 AND deleted_at IS NULL FOR UPDATE', [user.id]),
+            401, 'SESSION_REVOKED');
+          const upload = ensure(await one(
+            db,
+            'SELECT * FROM profile_photo_uploads WHERE id=$1 AND user_id=$2 AND purpose=$3 FOR UPDATE',
+            [req.params.id, user.id, purpose],
+          ), 404, 'PROFILE_PHOTO_UPLOAD_NOT_FOUND');
+          if (upload.status === 'CLEAN') {
+            return { profile: await one(db, purpose === 'DRIVER'
+              ? 'SELECT * FROM driver_profiles WHERE user_id=$1' : 'SELECT * FROM users WHERE id=$1', [user.id]) };
+          }
+          ensure(upload.status === 'PENDING' && upload.expires_at > Date.now(), 409, 'PROFILE_PHOTO_UPLOAD_EXPIRED');
+          const result = await storage.sanitizeProfilePhoto(upload);
+          if (result.status !== 'CLEAN') {
+            await db.query("UPDATE profile_photo_uploads SET status='REJECTED' WHERE id=$1", [upload.id]);
+            return { rejected: true };
+          }
+          const key = result.verifiedKey ?? upload.object_key;
+          const version = result.version ?? null;
+          await db.query(
+            "UPDATE profile_photo_uploads SET status='CLEAN',object_key=$2,object_version=$3 WHERE id=$1",
+            [upload.id, key, version],
+          );
+          const updated = await one(
+            db,
+            purpose === 'DRIVER'
+              ? "UPDATE driver_profiles SET profile_photo_key=$2,profile_photo_version=$3 WHERE user_id=$1 AND status<>'SUSPENDED' RETURNING *"
+              : 'UPDATE users SET profile_photo_key=$2,profile_photo_version=$3 WHERE id=$1 RETURNING *',
+            [user.id, key, version],
+          );
+          ensure(updated, 404, 'PROFILE_NOT_FOUND');
+          return { profile: updated, stagingKey: upload.object_key, stagingVersion: result.stagingVersion };
+        });
+        ensure(!outcome.rejected, 422, 'PROFILE_PHOTO_REJECTED');
+        if (outcome.stagingKey && storage.discardProfileStaging) {
+          try {
+            await storage.discardProfileStaging(outcome.stagingKey, outcome.stagingVersion);
+          } catch {
+            logger.warn({ photoId: req.params.id }, 'Profile photo staging cleanup failed');
+          }
         }
-      }
-      return profileView(outcome.user);
-    },
-  );
+        if (purpose === 'DRIVER') {
+          const { profile_photo_key: key, profile_photo_version: version } = outcome.profile;
+          return { profilePhotoUrl: key ? await storage.download(key, version) : null };
+        }
+        return profileView(outcome.profile);
+      },
+    );
+  }
   route(
     'put',
     '/v1/me/devices',
     { body: z.object({ token: z.string().min(20).max(4096) }).strict() },
     async ({ db, user, body }) => {
-      await db.query(
-        'INSERT INTO device_tokens(user_id,token) VALUES($1,$2) ON CONFLICT(token) DO UPDATE SET user_id=$1',
-        [user.id, body.token],
-      );
+      ensure(await one(db, `INSERT INTO device_tokens(user_id,token,device_app)
+        SELECT u.id,$2,s.device_app FROM users u JOIN sessions s ON s.user_id=u.id
+        WHERE u.id=$1 AND u.deleted_at IS NULL AND s.id=$3 AND s.revoked_at IS NULL FOR KEY SHARE OF u
+        ON CONFLICT(token) DO UPDATE SET user_id=EXCLUDED.user_id,device_app=EXCLUDED.device_app
+        RETURNING user_id`, [user.id, body.token, user.session_id]),
+      401, 'SESSION_REVOKED');
       return { registered: true };
     },
   );
@@ -373,15 +477,30 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
   );
   route('get', '/v1/me/notifications', {}, async ({ db, user, req }) => {
     const p = page.parse(req.query);
+    const appType = notificationApp.optional().parse(req.query.app);
+    if (appType) {
+      const options = await settings.notifications(user, appType);
+      if (options.inApp === false) return { items: [] };
+    }
     return {
-      items: (
-        await db.query(
-          'SELECT * FROM notifications WHERE user_id=$1 AND ($2::uuid IS NULL OR id<$2) ORDER BY id DESC LIMIT $3',
-          [user.id, p.cursor ?? null, p.limit],
-        )
-      ).rows,
+      items: (await db.query(`SELECT n.* FROM notifications n
+        LEFT JOIN notification_preferences pref ON pref.user_id=n.user_id AND pref.app=$4
+        WHERE n.user_id=$1 AND ($2::uuid IS NULL OR n.id<$2)
+        AND ($4::text IS DISTINCT FROM 'RIDER' OR n.type NOT LIKE 'driver.%')
+        AND (pref.inbox_cleared_at IS NULL OR n.created_at>pref.inbox_cleared_at)
+        ORDER BY CASE WHEN $4 IS NOT NULL AND $2 IS NULL THEN n.created_at END DESC, n.id DESC LIMIT $3`,
+      [user.id, p.cursor ?? null, p.limit, appType ?? null])).rows,
     };
   });
+  route('post', '/v1/me/notifications/clear', { body: z.strictObject({ app: notificationApp }) },
+    ({ user, body }) => settings.clearNotifications(user, body.app));
+  route('post', '/v1/me/notifications/read-all', { body: z.strictObject({ app: notificationApp }) },
+    async ({ db, user, body }) => {
+      await settings.notifications(user, body.app);
+      await db.query(`UPDATE notifications SET read_at=now() WHERE user_id=$1 AND read_at IS NULL
+        AND ($2<>'RIDER' OR type NOT LIKE 'driver.%')`, [user.id, body.app]);
+      return { read: true };
+    });
   route('post', '/v1/me/notifications/:id/read', {}, async ({ db, user, req }) => {
     await db.query('UPDATE notifications SET read_at=now() WHERE id=$1 AND user_id=$2', [
       req.params.id,
@@ -398,19 +517,43 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
   route('get', '/v1/drivers/me', { access: 'driver' }, async ({ db, user }) => {
     const profile = await one(db, 'SELECT * FROM driver_profiles WHERE user_id=$1', [user.id]);
     const saved = profile ? application.readApplication(profile, config.ENCRYPTION_KEY) : null;
+    const ownPhoto = profile?.profile_photo_key ?
+      { object_key: profile.profile_photo_key, object_version: profile.profile_photo_version } : null;
+    const photo = ownPhoto ?? (profile?.application_document_ids?.length
+      ? await one(db, `SELECT object_key,object_version FROM documents
+        WHERE driver_id=$1 AND id=ANY($2::uuid[]) AND kind='PROFILE_PHOTO' AND scan_status='CLEAN'`,
+        [user.id, profile.application_document_ids]) : null);
     if (saved?.bank) {
       const { number, ...bank } = saved.bank;
       saved.bank = { ...bank, lastFour: number.slice(-4) };
     }
+    const contact = profile ? application.driverContact(profile, saved, user, config.ENCRYPTION_KEY) : null;
+    if (contact) contact.photoUrl = photo && contact.photoVisible
+      ? await storage.download(photo.object_key, photo.object_version)
+      : null;
     return {
       profile: application.publicProfile(profile),
       application: saved,
+      contact,
       vehicles: (await db.query('SELECT * FROM vehicles WHERE driver_id=$1 ORDER BY created_at', [user.id])).rows,
       documents: (await db.query(
-        `SELECT ${application.documentFields} FROM documents WHERE driver_id=$1 ORDER BY created_at`, [user.id]
+        `SELECT ${application.documentFields} FROM documents WHERE driver_id=$1 ORDER BY created_at`,
+        [user.id],
       )).rows,
     };
   });
+  route('patch', '/v1/drivers/profile', { access: 'driver', body: z.strictObject({
+    name: profileName, email: profileEmail,
+    address: z.string().trim().max(200),
+    preferredLanguage: z.string().trim().min(1).max(42),
+    photoVisible: z.boolean().optional(),
+    dateOfBirth: editableDate.optional(),
+    identityNumber: z.string().trim().min(2).max(40).optional(),
+  }) }, ({ user, body }) => transaction(pool, (db) =>
+    application.updateDriverContact(db, user, body, config.ENCRYPTION_KEY)));
+  route('post', '/v1/drivers/reapplication', { access: 'driver', idem: true, body: z.strictObject({
+    confirmed: z.literal(true),
+  }) }, ({ db, user }) => application.beginReapplication(db, user.id));
   route(
     'put', '/v1/drivers/application', { access: 'driver', body: application.applicationSchema },
     ({ user, body }) => transaction(pool, (db) =>
@@ -713,6 +856,7 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
         404,
         'USER_NOT_FOUND',
       );
+      ensure(!target.deleted_at, 409, 'ACCOUNT_DELETED');
       ensure(!target.roles.includes('ADMIN') || user.roles.includes('ADMIN'), 403, 'FORBIDDEN');
       await db.query('UPDATE users SET suspended=$2 WHERE id=$1', [target.id, body.suspended]);
       if (body.suspended) {

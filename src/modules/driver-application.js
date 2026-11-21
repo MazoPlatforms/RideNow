@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { decrypt, encrypt } from '../shared/crypto.js';
-import { one, event } from '../shared/db.js';
+import { one, event, audit } from '../shared/db.js';
 import { ensure } from '../shared/errors.js';
 
 const short = z.string().trim().min(1).max(100);
@@ -79,8 +79,52 @@ export function readApplication(profile, key) {
 
 export function publicProfile(profile) {
   if (!profile) return null;
-  const { application_encrypted, ...safe } = profile;
+  const { application_encrypted, contact_encrypted, profile_photo_key, profile_photo_version, ...safe } = profile;
   return safe;
+}
+
+export function driverContact(profile, saved, user, key) {
+  const contact = profile.contact_encrypted ? JSON.parse(decrypt(profile.contact_encrypted, key)) : {};
+  return {
+    name: contact.name ?? saved?.name ?? user.name,
+    email: contact.email ?? saved?.email ?? user.email ?? '',
+    address: contact.address ?? '',
+    preferredLanguage: contact.preferredLanguage ?? '',
+    photoVisible: contact.photoVisible ?? true,
+    dateOfBirth: saved?.dateOfBirth ?? null,
+    identityNumber: saved?.identity?.number ?? null,
+  };
+}
+
+export async function updateDriverContact(db, user, body, key) {
+  const profile = ensure(await one(db, 'SELECT * FROM driver_profiles WHERE user_id=$1 FOR UPDATE', [user.id]),
+    404, 'DRIVER_NOT_FOUND');
+  ensure(profile.status !== 'SUSPENDED', 409, 'DRIVER_SUSPENDED');
+  const saved = readApplication(profile, key);
+  const current = driverContact(profile, saved, user, key);
+  const { dateOfBirth, identityNumber, ...contact } = body;
+  ensure((dateOfBirth === undefined || dateOfBirth === current.dateOfBirth) &&
+    (identityNumber === undefined || identityNumber === current.identityNumber),
+    409, 'DRIVER_IDENTITY_REVIEW_REQUIRED');
+  const updated = { ...current, ...contact };
+  const { dateOfBirth: dob, identityNumber: nic, ...editable } = updated;
+  await db.query('UPDATE driver_profiles SET contact_encrypted=$2 WHERE user_id=$1',
+    [user.id, encrypt(JSON.stringify(editable), key)]);
+  await audit(db, user.id, 'DRIVER_PROFILE_UPDATED', user.id);
+  return updated;
+}
+
+export async function beginReapplication(db, id) {
+  const profile = ensure(await one(db, 'SELECT * FROM driver_profiles WHERE user_id=$1 FOR UPDATE', [id]),
+    404, 'DRIVER_NOT_FOUND');
+  ensure(['APPROVED','DRAFT','REJECTED'].includes(profile.status), 409, 'APPLICATION_NOT_EDITABLE');
+  ensure(!['RESERVED','ON_TRIP'].includes(profile.availability), 409, 'DRIVER_BUSY');
+  if (profile.status !== 'APPROVED') return { status: profile.status };
+  ensure(!(await one(db, `SELECT id FROM rides WHERE driver_id=$1
+    AND state NOT IN ('COMPLETED','CANCELLED','NO_DRIVER','NO_SHOW') LIMIT 1`, [id])), 409, 'DRIVER_BUSY');
+  await db.query("UPDATE driver_profiles SET status='DRAFT',availability='OFFLINE',review_reason=NULL WHERE user_id=$1", [id]);
+  await audit(db, id, 'DRIVER_REAPPLICATION_STARTED', id);
+  return { status: 'DRAFT' };
 }
 
 export async function editableProfile(db, id) {

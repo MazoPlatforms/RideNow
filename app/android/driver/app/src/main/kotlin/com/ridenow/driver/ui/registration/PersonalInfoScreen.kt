@@ -41,6 +41,8 @@ import com.ridenow.driver.ui.util.entrance
 import com.ridenow.driver.ui.util.hasLocationPermission
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.ZoneOffset
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -61,8 +63,20 @@ fun PersonalInfoScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: M
     val focus = LocalFocusManager.current
     var name by rememberSaveable { mutableStateOf(draft?.fields?.optString("name").orEmpty()) }
     var email by rememberSaveable { mutableStateOf(draft?.fields?.optString("email").orEmpty()) }
-    var dob by rememberSaveable { mutableStateOf<Long?>(null) }
-    var gender by rememberSaveable { mutableStateOf<Int?>(null) }
+    var dob by rememberSaveable {
+        val existingDate = draft?.fields?.optString("dateOfBirth").orEmpty()
+        val eligibleDate = runCatching { LocalDate.parse(existingDate) }.getOrNull()
+            ?.takeIf { it >= LocalDate.of(1900, 1, 1) && it <= LocalDate.now(ZoneOffset.UTC).minusYears(18) }
+        mutableStateOf(eligibleDate?.atStartOfDay()?.toInstant(ZoneOffset.UTC)?.toEpochMilli())
+    }
+    var gender by rememberSaveable {
+        mutableStateOf(when (draft?.fields?.optString("gender")) {
+            "MALE" -> 0
+            "FEMALE" -> 1
+            "OTHER" -> 2
+            else -> null
+        })
+    }
     var city by rememberSaveable { mutableStateOf<String?>(null) }
     var photo by remember { mutableStateOf(draft?.photo("PROFILE_PHOTO")) }
     var showSheet by rememberSaveable { mutableStateOf(false) }

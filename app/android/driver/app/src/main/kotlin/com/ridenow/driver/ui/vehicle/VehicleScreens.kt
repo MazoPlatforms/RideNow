@@ -87,7 +87,10 @@ private fun VehicleHero(v: VehicleInfo, modifier: Modifier = Modifier, plate: Bo
 }
 
 @Composable
-fun VehicleDetailsScreen(store: DriverStore, onBack: () -> Unit, onDocs: () -> Unit, modifier: Modifier = Modifier) {
+fun VehicleDetailsScreen(
+    store: DriverStore, onBack: () -> Unit, onDocs: () -> Unit, modifier: Modifier = Modifier,
+    onUpdate: (() -> Unit)? = null,
+) {
     val c = RideTheme.colors
     val v = store.vehicle
     val fields = listOf(
@@ -100,7 +103,12 @@ fun VehicleDetailsScreen(store: DriverStore, onBack: () -> Unit, onDocs: () -> U
         Triple(RideIcons.Fuel, R.string.veh_fuel, v.fuel),
     ).filter { it.third.isNotBlank() }
     val vehicleDocuments = store.docs.filter { it.type != DocType.License }
-    SubScreen(str(R.string.vd_title), onBack, modifier) {
+    SubScreen(str(R.string.vd_title), onBack, modifier,
+        bottom = { if (onUpdate != null) RideButton(str(R.string.veh_update), onUpdate) },
+    ) {
+        if (onUpdate != null) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            RideButton(str(R.string.profile_edit), onUpdate, style = RideButtonStyle.Text)
+        }
         VehicleHero(v, Modifier.entrance(0))
         if (fields.isNotEmpty()) {
             SectionTitle(str(R.string.veh_info))
@@ -133,12 +141,16 @@ fun VehicleDetailsScreen(store: DriverStore, onBack: () -> Unit, onDocs: () -> U
 }
 
 @Composable
-fun VehicleDocumentsScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -> Unit, modifier: Modifier = Modifier) {
+fun VehicleDocumentsScreen(
+    store: DriverStore, onBack: () -> Unit, onHelp: () -> Unit, modifier: Modifier = Modifier,
+    onUpdate: (() -> Unit)? = null,
+) {
     val c = RideTheme.colors
     var detail by remember { mutableStateOf<DocType?>(null) }
     SubScreen(
         str(R.string.docs_title), onBack, modifier,
         trailing = { CircleButton(RideIcons.Help, str(R.string.acct_help), onHelp, filled = false) },
+        bottom = { if (onUpdate != null) RideButton(str(R.string.doc_add_update), onUpdate) },
     ) {
         VehicleHero(store.vehicle, Modifier.padding(top = 4.dp), plate = true)
         Column(Modifier.padding(top = 12.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -168,6 +180,7 @@ fun VehicleDocumentsScreen(store: DriverStore, onBack: () -> Unit, onHelp: () ->
         RideSheet(docTitle(doc.type), { detail = null }) {
             DocStatusChip(doc.status)
             doc.expiry?.let { Text(str(R.string.doc_expires, it), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp)) }
+            if (onUpdate != null) RideButton(str(R.string.doc_update_this), onUpdate, modifier = Modifier.padding(top = 12.dp))
         }
     }
 }

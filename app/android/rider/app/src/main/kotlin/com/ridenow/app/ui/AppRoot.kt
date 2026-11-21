@@ -59,6 +59,8 @@ import com.ridenow.app.ui.safety.SafetyCenterScreen
 import com.ridenow.app.ui.safety.TrustedContactsScreen
 import com.ridenow.app.ui.saved.AddAddressScreen
 import com.ridenow.app.ui.saved.SavedAddressesScreen
+import com.ridenow.app.ui.saved.SavedAddress
+import com.ridenow.app.ui.saved.RiderSettingsApi
 import com.ridenow.app.ui.search.ChangePickupScreen
 import com.ridenow.app.ui.search.FriendScreen
 import com.ridenow.app.ui.share.ShareTripScreen
@@ -120,6 +122,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var name by rememberSaveable { mutableStateOf(textAlexMorgan) }
     var email by rememberSaveable { mutableStateOf("") }
     var profileComplete by remember { mutableStateOf(false) }
+    var profileDetails by remember { mutableStateOf(PhoneAuthApi.ProfileDetails()) }
     var profilePhoto by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var stub by rememberSaveable { mutableStateOf("") }
     var stubBack by rememberSaveable { mutableStateOf(Screen.Home) }
@@ -133,7 +136,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     val backStack = remember { mutableStateListOf<Screen>() }
     val back = { screen = backStack.removeLastOrNull() ?: Screen.Home }
     var doc by rememberSaveable { mutableStateOf("") }
-    val contacts = remember { mutableStateListOf(Contact(textAna, "+15550101"), Contact(textBen, "+15550102")) }
+    val contacts = remember { mutableStateListOf<Contact>() }
     val scope = rememberCoroutineScope()
     val locationOn = rememberDeviceLocationEnabled()
     var locationDismissed by rememberSaveable(locationOn) { mutableStateOf(false) }
@@ -151,8 +154,10 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var destLat by rememberSaveable { mutableStateOf(0.0) }
     var destLng by rememberSaveable { mutableStateOf(0.0) }
     val destLL = if (destLat != 0.0 || destLng != 0.0) LatLng(destLat, destLng) else null
+    var pickupPoint by rememberSaveable { mutableStateOf<LatLng?>(null) }
+    val routePickup = pickupPoint ?: me.position
     var routeInfo by remember { mutableStateOf<RouteInfo?>(null) }
-    LaunchedEffect(destLat, destLng, me.position) { routeInfo = null; destLL?.let { routeInfo = GoogleApi.route(me.position, it) } }
+    LaunchedEffect(destLat, destLng, routePickup) { routeInfo = null; destLL?.let { routeInfo = GoogleApi.route(routePickup, it) } }
     val pickDest = { name: String, placeId: String?, ll: LatLng? ->
         dest = name; destLat = 0.0; destLng = 0.0
         scope.launch {
@@ -179,6 +184,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             name = restoredProfile.name
             email = restoredProfile.email
             profileComplete = restoredProfile.profileComplete
+            profileDetails = restoredProfile.details
             profilePhoto = loadProfilePhoto(restoredProfile.profilePhotoUrl)
             screen = if (profileComplete) Screen.Home else Screen.Details
             return
@@ -196,13 +202,63 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var netKey by remember { mutableIntStateOf(0) }
     val online = rememberOnline(netKey)
     var pickup by rememberSaveable { mutableStateOf(text128MeridianWalk) }
-    var home by rememberSaveable { mutableStateOf<String?>(text128MeridianWalkSector7) }
-    var work by rememberSaveable { mutableStateOf<String?>(null) }
+    val savedAddresses = remember { mutableStateListOf<SavedAddress>() }
+    val home = savedAddresses.firstOrNull { it.kind == "HOME" }
+    val work = savedAddresses.firstOrNull { it.kind == "WORK" }
     var friend by rememberSaveable { mutableStateOf<String?>(null) }
     var mapFor by rememberSaveable { mutableStateOf("drop") }
     var addLabel by rememberSaveable { mutableStateOf("Home") }
-    val others = remember { mutableStateListOf(textNovaTerminalGate4 to textSector12OrbitRing, textHelixGardenPlaza to textSector9GardenLoop, textAuroraMedicalCentre to textSector3SkylineWay) }
+    var editAddress by remember { mutableStateOf<SavedAddress?>(null) }
+    var pendingRemove by remember { mutableStateOf<SavedAddress?>(null) }
+    val settingsErrorText = stringResource(R.string.saved_settings_failed)
+    var settingsError by remember { mutableStateOf(false) }
+    var syncingSettings by remember { mutableStateOf(false) }
+    suspend fun syncSettings() {
+        if (phone.isBlank() || !profileComplete || syncingSettings) return
+        syncingSettings = true
+        try {
+            val currentPhone = phone
+            val settings = RiderSettingsApi.load(context)
+            if (phone == currentPhone && profileComplete) {
+                savedAddresses.clear()
+                savedAddresses.addAll(settings.addresses)
+                contacts.clear()
+                contacts.addAll(settings.contacts)
+                profileDetails = profileDetails.copy(city = settings.city)
+                settingsError = false
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            settingsError = true
+        } finally { syncingSettings = false }
+    }
+    LaunchedEffect(phone, profileComplete) {
+        if (phone.isBlank() || !profileComplete) {
+            savedAddresses.clear()
+            contacts.clear()
+            settingsError = false
+        } else syncSettings()
+    }
+    LaunchedEffect(screen, stub) {
+        if (screen in setOf(Screen.Saved, Screen.Contacts) || (screen == Screen.Stub && stub == "Current city")) syncSettings()
+    }
     val nav = { to: Screen -> backStack.add(screen); screen = to }
+    fun openAddress(kind: String, address: SavedAddress?) {
+        addLabel = kind
+        editAddress = address
+        nav(Screen.AddAddr)
+    }
+    fun chooseAddress(address: SavedAddress) {
+        pickDest(address.address, null, address.point)
+        isReturn = false
+        screen = Screen.Options
+    }
+    fun quickAddress(kind: String) {
+        val address = savedAddresses.firstOrNull { it.kind == kind }
+        if (address == null) openAddress(kind, null) else chooseAddress(address)
+    }
+
     val shownPhone = formatPhoneForDisplay(phone.ifBlank { "+1 555 012 3456" })
     val open = { label: String -> if (label == "Report an issue") nav(Screen.ReportIssue) else { stubBack = screen; stub = label; screen = Screen.Stub }; Unit }
     // Opens a destination by its menu or settings title; unknown titles show a placeholder.
@@ -230,9 +286,38 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         schedule = { scheduleFrom = Screen.Options; screen = Screen.Schedule }, finding = { screen = Screen.Finding }, trip = { screen = Screen.Trip },
         complete = { rating = 0; screen = Screen.Complete }, report = { screen = Screen.Report }, support = { nav(Screen.Support) }, safety = { nav(Screen.Safety) },
         setPhone = { phone = it }, setVehicle = { vehicle = it }, setScheduled = { scheduled = it }, confirm = { screen = Screen.Confirm },
-        changeDrop = { pickDest(it, null, null) }, cancelScheduled = { scheduled = null; screen = Screen.Home }, signedOut = { screen = Screen.Welcome },
+        changeDrop = { pickDest(it, null, null) }, cancelScheduled = { scheduled = null; screen = Screen.Home }, signedOut = {
+            phone = ""; name = textAlexMorgan; email = ""; profilePhoto = null
+            profileDetails = PhoneAuthApi.ProfileDetails(); profileComplete = false
+            challengeId = ""; dest = ""; destLat = 0.0; destLng = 0.0
+            friend = null; pickup = text128MeridianWalk; pickupPoint = null; scheduled = null
+            contacts.clear(); savedAddresses.clear(); backStack.clear(); drawer = false
+            com.ridenow.app.ui.support.TicketStore.tickets.clear()
+            com.ridenow.app.ui.support.TicketStore.selectedId = null
+            screen = Screen.Welcome
+        },
     )
     Box(Modifier.fillMaxSize()) {
+    pendingRemove?.let { item ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingRemove = null },
+            title = { Text(stringResource(R.string.text_remove)) },
+            text = { Text(item.address) },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { pendingRemove = null }) {
+                Text(stringResource(R.string.two_step_cancel))
+            } },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = {
+                pendingRemove = null
+                scope.launch {
+                    try {
+                        RiderSettingsApi.deleteAddress(context, item.id)
+                        savedAddresses.removeAll { it.id == item.id }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (_: Exception) { settingsError = true }
+                }
+            }) { Text(stringResource(R.string.text_remove)) } },
+        )
+    }
     Crossfade(targetState = screen, animationSpec = tween(400), label = "root") { current ->
         when (current) {
             Screen.Splash -> SplashScreen(onFinished = { SessionFlags.splashDone = true; restoreRequested = true })
@@ -251,19 +336,21 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.Otp -> {
                 BackHandler { screen = Screen.Phone }
+                suspend fun acceptLogin(profile: PhoneAuthApi.RiderProfile) {
+                    phone = profile.phone
+                    name = profile.name
+                    email = profile.email
+                    profileComplete = profile.profileComplete
+                    profileDetails = profile.details
+                    profilePhoto = loadProfilePhoto(profile.profilePhotoUrl)
+                }
                 OtpScreen(
                     phone = shownPhone,
                     challengeId = challengeId,
                     onBack = { screen = Screen.Phone },
                     onResend = { PhoneAuthApi.requestCode(context, phone) },
-                    onVerify = { id, code ->
-                        val profile = PhoneAuthApi.verifyCode(context, id, code)
-                        phone = profile.phone
-                        name = profile.name
-                        email = profile.email
-                        profileComplete = profile.profileComplete
-                        profilePhoto = loadProfilePhoto(profile.profilePhotoUrl)
-                    },
+                    onVerify = { id, code -> acceptLogin(PhoneAuthApi.verifyCode(context, id, code)) },
+                    onVerifySecond = { token, code -> acceptLogin(PhoneAuthApi.verifySecondStep(context, token, code)) },
                     onVerified = { screen = if (profileComplete) Screen.Home else Screen.Details },
                 )
             }
@@ -276,6 +363,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                         name = profile.name
                         email = profile.email
                         profileComplete = profile.profileComplete
+                        profileDetails = profile.details
                         if (photo != null) profilePhoto = photo
                         screen = Screen.Location
                     } catch (failure: Exception) {
@@ -296,7 +384,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 HomeScreen(
                     onMenu = { drawer = true }, onNotifications = { nav(Screen.Notifs) },
                     onSearch = { screen = Screen.Search }, onLater = { scheduleFrom = Screen.Home; screen = Screen.Schedule },
-                    onEditPickup = { nav(Screen.ChangePickup) }, onSaved = { nav(Screen.Saved) }, pickup = pickup,
+                    onEditPickup = { nav(Screen.ChangePickup) }, onSaved = { quickAddress(it.uppercase(java.util.Locale.ROOT)) }, pickup = pickup,
                     onRecent = { pickDest(it, null, null); isReturn = false; screen = Screen.Options },
                 )
                 MenuDrawer(
@@ -311,7 +399,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     onBack = { scheduled = null; screen = Screen.Home }, scheduled = scheduled,
                     onPlace = { place, ret -> pickDest(place.name, place.placeId, null); isReturn = ret; screen = Screen.Options },
                     onFriend = { nav(Screen.Friend) }, onEditPickup = { nav(Screen.ChangePickup) }, pickup = pickup, friend = friend, near = me.position,
-                    onSaved = { nav(Screen.Saved) }, onMap = { mapFor = "drop"; nav(Screen.MapPick) }, onAdd = { open("Add $it address") },
+                    onSaved = { nav(Screen.Saved) }, onMap = { mapFor = "drop"; nav(Screen.MapPick) }, onAdd = { quickAddress(it.uppercase(java.util.Locale.ROOT)) },
+                    savedHome = home?.address, savedWork = work?.address,
                 )
             }
             Screen.Options -> {
@@ -320,7 +409,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     destination = dest, returnTrip = isReturn, initial = vehicle, onBack = { screen = Screen.Search },
                     onContinue = { vehicle = it; screen = Screen.Confirm },
                     onLater = { vehicle = it; scheduleFrom = Screen.Options; screen = Screen.Schedule },
-                    route = routeInfo, from = me.position, to = destLL,
+                    route = routeInfo, from = routePickup, to = destLL,
                 )
             }
             Screen.Schedule -> {
@@ -335,7 +424,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 ConfirmScreen(
                     dest, vehicle, isReturn, whenLabel = scheduled, onBack = { screen = Screen.Options },
                     onBook = { if (scheduled != null) open("Scheduled ride details") else screen = Screen.Finding },
-                    route = routeInfo, from = me.position, to = destLL,
+                    route = routeInfo, from = routePickup, to = destLL,
                 )
             }
             Screen.Finding -> FindingDriverScreen(dest, vehicle, isReturn, onFound = { screen = Screen.Trip }, onCancel = { scheduled = null; screen = Screen.Home }, me = me.position)
@@ -373,18 +462,20 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 BackHandler { screen = Screen.Profile }
                 EditProfileScreen(
                     name, email, shownPhone, onBack = { screen = Screen.Profile },
-                    onSave = { n, e ->
+                    onSave = { n, e, replacement, details ->
                         try {
-                            val profile = PhoneAuthApi.saveProfile(context, n, e)
+                            val profile = PhoneAuthApi.saveProfile(context, n, e, replacement, details)
+                            if (replacement != null) profilePhoto = loadProfilePhoto(profile.profilePhotoUrl) ?: replacement
                             name = profile.name
                             email = profile.email
                             profileComplete = profile.profileComplete
+                            profileDetails = profile.details
                             screen = Screen.Profile
                         } catch (failure: Exception) {
                             if (failure is PhoneAuthException && failure.status == 401) screen = Screen.Welcome
                             throw failure
                         }
-                    }, onChangePhone = { open("Change phone number") }, photo = profilePhoto,
+                    }, onChangePhone = { open("Change phone number") }, photo = profilePhoto, details = profileDetails,
                 )
             }
             Screen.MyRides -> {
@@ -406,8 +497,11 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             Screen.Saved -> {
                 BackHandler { back() }
                 SavedAddressesScreen(
-                    home, work, others, onBack = { back() },
-                    onEdit = { l -> when (l) { "Home address" -> { addLabel = "Home"; nav(Screen.AddAddr) }; "Work address" -> { addLabel = "Work"; nav(Screen.AddAddr) }; "Add address" -> { addLabel = "Other"; nav(Screen.AddAddr) }; else -> open(l) }; Unit },
+                    savedAddresses, onBack = { back() }, onEdit = ::openAddress,
+                    onPick = if (backStack.lastOrNull() == Screen.Search) ::chooseAddress else null,
+                    error = settingsErrorText.takeIf { settingsError }, onRetry = { scope.launch { syncSettings() } },
+                    onRemove = { pendingRemove = it },
+
                 )
             }
             Screen.Help -> {
@@ -440,11 +534,19 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.Contacts -> {
                 BackHandler { back() }
-                TrustedContactsScreen(contacts, onAdd = { contacts.add(it) }, onRemove = { contacts.remove(it) }, onBack = { back() })
+                TrustedContactsScreen(contacts, onAdd = {
+                    val saved = RiderSettingsApi.saveContact(context, it)
+                    val index = contacts.indexOfFirst { item -> item.id == saved.id }
+                    if (index < 0) contacts.add(saved) else contacts[index] = saved
+                }, onRemove = {
+                    RiderSettingsApi.deleteContact(context, requireNotNull(it.id))
+                    contacts.remove(it)
+                }, onBack = { back() }, error = settingsErrorText.takeIf { settingsError },
+                    onRetry = { scope.launch { syncSettings() } })
             }
             Screen.MapPick -> {
                 BackHandler { back() }
-                if (mapFor == "pickup") MapPickerScreen(textSetPickup, textPickupConfirm, onBack = { back() }, onConfirm = { addr, _ -> pickup = addr; back() }, onLocationOff = { locationRequested = true })
+                if (mapFor == "pickup") MapPickerScreen(textSetPickup, textPickupConfirm, onBack = { back() }, onConfirm = { addr, point -> pickup = addr; pickupPoint = point; back() }, onLocationOff = { locationRequested = true })
                 else MapPickerScreen(textMapSetDrop, textMapSetDrop, onBack = { back() }, onConfirm = { addr, ll -> pickDest(addr, null, ll); isReturn = false; screen = Screen.Options }, onLocationOff = { locationRequested = true })
             }
             Screen.ShareTrip -> {
@@ -454,9 +556,22 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             Screen.ChangePickup -> {
                 BackHandler { back() }
                 val places = buildList {
-                    add("Current location" to text128MeridianWalk); home?.let { add("Home" to it) }; work?.let { add("Work" to it) }; others.forEach { add(it.first to it.second) }
+                    if (me.real) add("Current location" to "%.6f, %.6f".format(java.util.Locale.ROOT, me.position.latitude, me.position.longitude))
+                    savedAddresses.forEach { item ->
+                        val label = when (item.kind) { "HOME" -> "Home"; "WORK" -> "Work"; else -> item.label ?: item.address.substringBefore(',') }
+                        add(label to item.address)
+                    }
                 }
-                ChangePickupScreen(pickup, places, onBack = { back() }, onConfirm = { pickup = it; back() }, onMap = { mapFor = "pickup"; screen = Screen.MapPick }, allowCurrentLocation = allowCurrentLocation)
+                ChangePickupScreen(pickup, places, onBack = { back() }, onConfirm = { address ->
+                    pickup = address
+                    val saved = savedAddresses.firstOrNull { it.address == address }
+                    pickupPoint = saved?.point ?: me.position.takeIf { me.real && address == places.firstOrNull { it.first == "Current location" }?.second }
+                    if (pickupPoint == null && saved != null) scope.launch {
+                        val found = GoogleApi.geocode(address)
+                        if (pickup == address) pickupPoint = found
+                    }
+                    back()
+                }, onMap = { mapFor = "pickup"; screen = Screen.MapPick }, allowCurrentLocation = allowCurrentLocation)
             }
             Screen.Friend -> {
                 BackHandler { back() }
@@ -464,13 +579,22 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.AddAddr -> {
                 BackHandler { back() }
-                AddAddressScreen(addLabel, onBack = { back() }, onSave = { l, a ->
-                    when (l) { "Home" -> home = a; "Work" -> work = a; else -> others.add(0, a.substringBefore(",") to a.substringAfter(", ", textSavedPlace)) }
+                AddAddressScreen(addLabel, onBack = { back() }, onSave = { kind, label, address, point ->
+                    val saved = RiderSettingsApi.saveAddress(context, editAddress?.id, kind, label, address, point)
+                    savedAddresses.removeAll { it.id == saved.id }
+                    savedAddresses.add(0, saved)
                     back()
-                }, allowCurrentLocation = allowCurrentLocation)
+                }, allowCurrentLocation = allowCurrentLocation, near = me.position.takeIf { me.real }, existing = editAddress,
+                    onRemove = editAddress?.let { item -> suspend {
+                        RiderSettingsApi.deleteAddress(context, item.id)
+                        savedAddresses.removeAll { it.id == item.id }
+                        back()
+                    } })
+
             }
             Screen.Stub -> if (MoreRoutes.handles(stub)) {
-                key(stub) { MoreHost(stub, MoreCtx(name, shownPhone, dest.ifBlank { textHelixGardenPlaza }, pickup, vehicle, scheduled), moreNav) }
+                key(stub) { MoreHost(stub, MoreCtx(name, shownPhone, dest.ifBlank { textHelixGardenPlaza }, pickup, vehicle, scheduled, profileDetails.city,
+                    { city -> profileDetails = profileDetails.copy(city = city) }), moreNav) }
             } else {
                 BackHandler { screen = stubBack }
                 val c = RideTheme.colors

@@ -21,8 +21,7 @@ import com.ridenow.driver.ui.util.entrance
 
 /** Round profile picture: the chosen photo, or initials when there is none. */
 @Composable
-fun ProfilePhoto(store: DriverStore, name: String, size: Dp, modifier: Modifier = Modifier) {
-    val photo = store.photo
+fun ProfilePhoto(store: DriverStore, name: String, size: Dp, modifier: Modifier = Modifier, photo: android.graphics.Bitmap? = store.photo) {
     if (photo != null) Image(photo.asImageBitmap(), null, modifier.size(size).clip(CircleShape).border(2.dp, RideTheme.colors.accent, CircleShape), contentScale = ContentScale.Crop)
     else Avatar(initialsOf(name), size, modifier)
 }

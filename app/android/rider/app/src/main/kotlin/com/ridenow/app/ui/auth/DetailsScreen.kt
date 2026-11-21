@@ -247,7 +247,7 @@ private fun SheetRow(icon: List<String>, label: String, danger: Boolean, onClick
 }
 
 /** Decodes a picked image at roughly 1024 px so large photos do not use much memory. */
-private fun decodeSampled(context: android.content.Context, uri: Uri): Bitmap? = runCatching {
+internal fun decodeSampled(context: android.content.Context, uri: Uri): Bitmap? = runCatching {
     val resolver = context.contentResolver
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }

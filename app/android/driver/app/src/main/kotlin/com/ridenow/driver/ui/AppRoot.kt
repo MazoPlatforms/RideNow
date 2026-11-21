@@ -9,7 +9,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -80,6 +82,7 @@ import com.ridenow.driver.ui.legal.LegalDocScreen
 import com.ridenow.driver.ui.legal.LegalDocs
 import com.ridenow.driver.ui.more.LanguageScreen
 import com.ridenow.driver.ui.notifications.NotificationsScreen
+import com.ridenow.driver.ui.notifications.loadDriverNotices
 import com.ridenow.driver.ui.payouts.BankAccountManageScreen
 import com.ridenow.driver.ui.payouts.BankFormScreen
 import com.ridenow.driver.ui.payouts.PayoutsScreen
@@ -176,6 +179,8 @@ fun AppRoot(appearance: AppearanceState) {
     val editText = stringResource(R.string.onboarding_edit)
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
+    var confirmReapplication by remember { mutableStateOf(false) }
+    var proposedIdentity by remember { mutableStateOf<Pair<String, String>?>(null) }
     var reviewStatus by app.onboardingStatus
     var reviewReason by app.onboardingReason
 
@@ -188,10 +193,39 @@ fun AppRoot(appearance: AppearanceState) {
         app.store.docs.addAll(snapshot.documents)
         reviewStatus = profile?.optString("status").orEmpty()
         reviewReason = profile?.opt("review_reason") as? String ?: ""
-        data?.optJSONObject("application")?.let {
-            app.profileName = it.optString("name")
-            app.profileEmail = it.optString("email")
-            app.bankSaved = it.optJSONObject("bank") != null
+        val contact = data?.optJSONObject("contact")
+        data?.optJSONObject("application")?.let { application ->
+            app.bankSaved = application.optJSONObject("bank") != null
+            if (contact == null) {
+                app.profileName = application.optString("name")
+                app.profileEmail = application.optString("email")
+            }
+        }
+        contact?.let {
+            app.profileName = contact.optString("name")
+            app.profileEmail = contact.optString("email")
+            app.profileAddress = contact.optString("address")
+            app.store.prefLanguage = contact.optString("preferredLanguage").ifBlank { app.store.prefLanguage }
+            app.store.dob = (contact.opt("dateOfBirth") as? String).orEmpty()
+            app.store.nic = (contact.opt("identityNumber") as? String).orEmpty()
+            val photoUrl = contact.opt("photoUrl") as? String
+            val imageKey = photoUrl?.substringBefore('?')
+            if (imageKey == null) {
+                app.store.photo = null
+                app.store.photoSource = null
+            } else if (app.store.photoSource != imageKey) {
+                val image = try {
+                    DriverOnboardingApi.downloadProfilePhoto(photoUrl)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+                if (image != null) {
+                    app.store.photo = image
+                    app.store.photoSource = imageKey
+                }
+            }
         }
         val pending = PhoneAuthApi.pendingApplication(context)
         if (reviewStatus == "APPROVED") {
@@ -373,8 +407,23 @@ fun AppRoot(appearance: AppearanceState) {
     LaunchedEffect(Unit) {
         if (SessionFlags.splashDone && screen == Screen.Splash) runOnboarding { restoreAuth() }
     }
+    val inboxRide = stringResource(R.string.nc_ride_update)
+    val inboxApplication = stringResource(R.string.nc_application_update)
+    val inboxAccount = stringResource(R.string.nc_account_update)
+    LaunchedEffect(phone, reviewStatus, screen) {
+        if (phone.isBlank() || reviewStatus != "APPROVED" || screen != Screen.Home) return@LaunchedEffect
+        try {
+            val notices = loadDriverNotices(context, inboxRide, inboxApplication, inboxAccount)
+            store.notices.clear()
+            store.notices.addAll(notices)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            store.notices.clear()
+        }
+    }
     LaunchedEffect(screen, reviewStatus) {
-        if (screen in setOf(Screen.VehicleDetails, Screen.VehicleDocuments)) {
+        if (screen in setOf(Screen.DriverProfile, Screen.VehicleDetails, Screen.VehicleDocuments)) {
             runOnboarding { checkStatus() }
         } else if (screen == Screen.Submitted && reviewStatus in setOf("PENDING", "SCANNING")) {
             while (true) {
@@ -413,6 +462,7 @@ fun AppRoot(appearance: AppearanceState) {
                             onBack = { screen = Screen.Phone },
                             onResend = { PhoneAuthApi.requestCode(context, phone) },
                             onVerify = { id, code -> PhoneAuthApi.verifyCode(context, phone, id, code) },
+                            onVerifySecond = { token, code -> PhoneAuthApi.verifySecondStep(context, phone, token, code) },
                             onVerified = { screen = Screen.Splash; runOnboarding { checkStatus() } },
                         )
                     }
@@ -596,7 +646,31 @@ fun AppRoot(appearance: AppearanceState) {
                         BackHandler { back() }
                         EditProfileScreen(
                             store, driverName, shownPhone, app.profileEmail, app.profileAddress, onBack = { back() },
-                            onSave = { n, p, e, a -> app.profileName = n; if (p.isNotBlank()) phone = p; app.profileEmail = e; app.profileAddress = a; back() },
+                            onSave = { edits ->
+                                val body = JSONObject().put("name", edits.name).put("email", edits.email)
+                                    .put("address", edits.address).put("preferredLanguage", edits.language)
+                                edits.dateOfBirth.takeIf(String::isNotBlank)?.let { body.put("dateOfBirth", it) }
+                                edits.identityNumber.takeIf(String::isNotBlank)?.let { body.put("identityNumber", it) }
+                                if (edits.photoChanged) {
+                                    edits.photo?.let { DriverOnboardingApi.replaceProfilePhoto(context, it) }
+                                    body.put("photoVisible", edits.photo != null)
+                                }
+                                val contact = DriverOnboardingApi.updateContact(context, body)
+                                app.profileName = contact.getString("name")
+                                app.profileEmail = contact.optString("email")
+                                app.profileAddress = contact.optString("address")
+                                store.prefLanguage = contact.optString("preferredLanguage")
+                                if (edits.photoChanged) {
+                                    store.photo = edits.photo
+                                    store.photoSource = null
+                                }
+                                back()
+                            },
+                            onPhoneVerified = { phone = it },
+                            onReviewIdentityChange = { dob, nic ->
+                                proposedIdentity = dob to nic
+                                confirmReapplication = true
+                            },
                         )
                     }
                     Screen.Account -> {
@@ -622,9 +696,11 @@ fun AppRoot(appearance: AppearanceState) {
                     }
                     Screen.VehicleDetails -> {
                         BackHandler { back() }
-                        VehicleDetailsScreen(store, { back() }, { go(Screen.VehicleDocuments) })
+                        VehicleDetailsScreen(store, { back() }, { go(Screen.VehicleDocuments) },
+                            onUpdate = { confirmReapplication = true })
                     }
-                    Screen.VehicleDocuments -> { BackHandler { back() }; VehicleDocumentsScreen(store, { back() }, { selTopic = 1; go(Screen.Faq) }) }
+                    Screen.VehicleDocuments -> { BackHandler { back() }; VehicleDocumentsScreen(store, { back() }, { selTopic = 1; go(Screen.Faq) },
+                        onUpdate = { confirmReapplication = true }) }
                     Screen.Payouts -> { BackHandler { back() }; PayoutsScreen(store, { back() }, { selTopic = 2; go(Screen.Faq) }, { editBankId = -1; go(Screen.BankForm) }) }
                     Screen.BankManage -> {
                         BackHandler { back() }
@@ -657,7 +733,7 @@ fun AppRoot(appearance: AppearanceState) {
                         BackHandler { back() }
                         PrivacySecurityScreen({ back() }, onPersonalData = { go(Screen.DriverProfile) }, onDelete = { go(Screen.DeleteAccount) }, onDevices = { go(Screen.ManageDevices) }, onTwoStep = { go(Screen.TwoStep) }, onDownload = { go(Screen.DownloadData) })
                     }
-                    Screen.ManageDevices -> { BackHandler { back() }; ManageDevicesScreen({ back() }) }
+                    Screen.ManageDevices -> { BackHandler { back() }; ManageDevicesScreen({ back() }, onSessionExpired = { signOut() }) }
                     Screen.TwoStep -> { BackHandler { back() }; TwoStepScreen(shownPhone, { back() }) }
                     Screen.DownloadData -> { BackHandler { back() }; DownloadDataScreen({ back() }) }
                     Screen.PaymentMethods -> { BackHandler { back() }; PaymentMethodsScreen(store, { back() }, { go(Screen.BankManage) }) }
@@ -666,7 +742,15 @@ fun AppRoot(appearance: AppearanceState) {
                         val requested = stringResource(R.string.priv_download_done)
                         DeleteAccountScreen(
                             { back() }, onDownload = { toast(context, requested) }, onGoOffline = { app.goOffline(); tab(MainTab.Home) },
-                            onDelete = { prefs.edit().clear().apply(); app.reset(); phone = ""; editing = false; bankReturn = null; screen = Screen.Welcome },
+                            onDelete = {
+                                prefs.edit().clear().apply()
+                                app.reset()
+                                phone = ""; challengeId = ""; editing = false; bankReturn = null
+                                reviewStatus = ""; reviewReason = ""
+                                Screen.entries.forEach { saveable.removeState(it.name) }
+                                screen = Screen.Welcome
+                            },
+                            phone = shownPhone,
                         )
                     }
                     Screen.Faq -> { BackHandler { back() }; FaqScreen(selTopic, { back() }, { go(Screen.NewTicket) }) }
@@ -701,6 +785,54 @@ fun AppRoot(appearance: AppearanceState) {
             }
         }
         }
+        if (confirmReapplication) AlertDialog(
+            onDismissRequest = {
+                if (!busy) {
+                    proposedIdentity = null
+                    confirmReapplication = false
+                }
+            },
+            title = { Text(stringResource(R.string.driver_start_review)) },
+            text = {
+                Text(feedback ?: stringResource(R.string.driver_reapplication_notice))
+            },
+            confirmButton = {
+                TextButton(enabled = !busy, onClick = {
+                    runOnboarding {
+                        try {
+                            DriverOnboardingApi.beginReapplication(context)
+                        } catch (error: PhoneAuthException) {
+                            if (error.status == 401) confirmReapplication = false
+                            throw error
+                        }
+                        confirmReapplication = false
+                        PhoneAuthApi.savePendingApplication(context, null)
+                        app.goOffline()
+                        app.draft = com.ridenow.driver.ui.registration.DriverDraft()
+                        app.summaries.clear()
+                        app.draft.fields.put("name", app.profileName).put("email", app.profileEmail)
+                        val (dob, nic) = proposedIdentity ?: (app.store.dob to app.store.nic)
+                        if (dob.isNotBlank()) app.draft.fields.put("dateOfBirth", dob)
+                        if (nic.isNotBlank()) app.draft.fields.put("identity", JSONObject().put("number", nic))
+                        proposedIdentity = null
+                        app.draft.setPhoto("PROFILE_PHOTO", app.store.photo)
+                        Screen.entries.forEach { saveable.removeState(it.name) }
+                        editing = false
+                        app.stack.clear()
+                        screen = Screen.Terms
+                    }
+                }) { Text(stringResource(R.string.driver_start_review)) }
+            },
+            dismissButton = {
+                TextButton(enabled = !busy, onClick = {
+                    feedback = null
+                    proposedIdentity = null
+                    confirmReapplication = false
+                }) {
+                    Text(stringResource(R.string.dialog_cancel))
+                }
+            },
+        )
         // Full-screen states shown over everything, in this order of priority.
         val inApp = screen in setOf(Screen.Home, Screen.Earnings, Screen.Rides, Screen.Support, Screen.Account, Screen.Trip)
         val onboardingUsesLocation = screen in setOf(Screen.Background, Screen.Personal, Screen.ServiceArea)

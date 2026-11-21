@@ -8,11 +8,15 @@ export async function deliverWhatsAppOtp({ pool, socket, config, job, demo = fal
   if (!challenge || challenge.used_at || challenge.expires_at <= Date.now())
     return { skipped: true };
   const code = decrypt(job.payload.encryptedCode, config.ENCRYPTION_KEY);
+  const description = challenge.purpose === 'PHONE_CURRENT' ? 'number change (current number)'
+    : challenge.purpose === 'PHONE_NEW' ? 'number change (new number)'
+    : challenge.purpose === 'TWO_STEP_SETUP' ? 'two-step verification setup'
+    : challenge.purpose === 'ACCOUNT_DELETION' ? 'permanent account deletion' : null;
   let timer;
   try {
     const sent = await Promise.race([
       socket.sendMessage(`${challenge.phone.slice(1)}@s.whatsapp.net`, {
-        text: `${demo ? 'RideNow test' : 'Mazo Ride Service'} OTP: ${code}. Expires in 5 minutes. Do not share this code.`,
+        text: `${demo ? 'RideNow test' : 'Mazo Ride Service'} OTP${description ? ` for ${description}` : ''}: ${code}. Expires in 5 minutes. Do not share this code.`,
       }),
       new Promise((_, reject) => {
         timer = setTimeout(

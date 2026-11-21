@@ -15,7 +15,9 @@ export async function publishOutbox({ pool, redis, config }) {
           for (const userId of e.user_ids) {
             const notification = await one(
               db,
-              'INSERT INTO notifications(user_id,event_id,type,payload) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING RETURNING id',
+              `INSERT INTO notifications(user_id,event_id,type,payload)
+               SELECT id,$2,$3,$4 FROM users WHERE id=$1 AND deleted_at IS NULL FOR KEY SHARE
+               ON CONFLICT DO NOTHING RETURNING id`,
               [userId, e.id, e.type, e.payload],
             );
             if (notification && config?.FCM_ENABLED === 'true')
@@ -64,7 +66,7 @@ export async function finishJob(pool, job, error) {
     );
   else
     await pool.query(
-      "UPDATE jobs SET done_at=now(),lease_until=NULL,lease_token=NULL,payload=CASE WHEN kind='otp' THEN '{}'::jsonb ELSE payload END WHERE id=$1 AND lease_token=$2",
+      "UPDATE jobs SET done_at=now(),lease_until=NULL,lease_token=NULL,payload=CASE WHEN kind IN ('otp','purge_account_storage') THEN '{}'::jsonb ELSE payload END WHERE id=$1 AND lease_token=$2",
       [job.id, job.lease_token],
     );
 }
@@ -73,7 +75,7 @@ export async function processJobs(deps) {
   for (let i = 0; i < 20; i++) {
     // Disabled external push must not consume retries or falsely record delivery.
     // Existing jobs remain pending until an external push provider is enabled.
-    const job = await claimJob(pool, push ? ['scan', 'push'] : ['scan']);
+    const job = await claimJob(pool, push ? ['scan', 'push', 'purge_account_storage'] : ['scan', 'purge_account_storage']);
     if (!job) break;
     try {
       if (job.kind === 'scan') {
@@ -93,6 +95,13 @@ export async function processJobs(deps) {
               logger.warn({ documentId: doc.id }, 'Unreferenced verified copy requires cleanup');
             }
           }
+        }
+      } else if (job.kind === 'purge_account_storage') {
+        const { more } = await storage.purgeAccountPrefix(job.payload.prefix);
+        if (more) {
+          await pool.query(`UPDATE jobs SET attempts=0,lease_until=NULL,lease_token=NULL,run_at=now()
+            WHERE id=$1 AND lease_token=$2`, [job.id, job.lease_token]);
+          continue;
         }
       } else if (push) await push(job.payload);
       else throw Object.assign(new Error('Push unavailable'), { code: 'PUSH_DISABLED' });
@@ -162,6 +171,7 @@ export async function maintenance(pool) {
     await db.query(
       "DELETE FROM jobs WHERE (done_at IS NOT NULL OR dead) AND run_at<now()-interval '90 days'",
     );
+    await db.query("DELETE FROM mobile_login_steps WHERE expires_at<=now()");
     await db.query("DELETE FROM notifications WHERE created_at<now()-interval '90 days'");
     await db.query(
       "DELETE FROM fare_quotes q WHERE q.created_at<now()-interval '90 days' AND NOT EXISTS(SELECT 1 FROM rides r WHERE r.quote_id=q.id)",

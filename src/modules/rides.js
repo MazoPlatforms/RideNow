@@ -29,7 +29,8 @@ export async function setState(db, ride, state, actor, extra = {}) {
 }
 export async function book(db, user, quoteId, config) {
   // Lock rider to serialize scheduled-spacing and active-ride checks.
-  await db.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [user.id]);
+  ensure(await one(db, 'SELECT id FROM users WHERE id=$1 AND deleted_at IS NULL AND NOT suspended FOR UPDATE',
+    [user.id]), 401, 'SESSION_REVOKED');
   const q = await one(db, 'SELECT * FROM fare_quotes WHERE id=$1 AND rider_id=$2 FOR UPDATE', [
     quoteId,
     user.id,

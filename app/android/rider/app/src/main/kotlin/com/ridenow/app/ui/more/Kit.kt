@@ -45,6 +45,7 @@ import kotlinx.coroutines.delay
 /** Everything the extra screens need from the app shell. */
 class MoreCtx(
     val name: String, val phone: String, val dest: String, val pickup: String, val vehicle: Int, val scheduled: String?,
+    val city: String? = null, val setCity: (String?) -> Unit = {},
 )
 
 /** Navigation callbacks. [back] pops inside the extra screens; [exit] leaves them for the app shell. */

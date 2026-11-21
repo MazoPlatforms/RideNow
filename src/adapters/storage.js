@@ -4,6 +4,9 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
+  ListObjectVersionsCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createHash, randomUUID } from 'node:crypto';
@@ -109,6 +112,28 @@ export function createStorage(config) {
       ensure(/^profiles\/[a-f\d-]{36}\/[a-f\d-]{36}$/.test(Key), 400, 'INVALID_PROFILE_STAGING_KEY');
       if (mode === 'versioned') ensure(VersionId && VersionId !== 'null', 409, 'PROFILE_STAGING_VERSION_REQUIRED');
       await send(new DeleteObjectCommand({ Bucket, Key, ...(mode === 'versioned' ? { VersionId } : {}) }));
+    },
+    async purgeAccountPrefix(Prefix) {
+      ensure(/^(?:profiles|drivers|verified)\/[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}\/$/.test(Prefix),
+        400, 'INVALID_ACCOUNT_STORAGE_PREFIX');
+      // Listing again from the start allows a retry to resume after a partially deleted batch.
+      const page = mode === 'versioned'
+        ? await send(new ListObjectVersionsCommand({ Bucket, Prefix, MaxKeys: 1000 }))
+        : await send(new ListObjectsV2Command({ Bucket, Prefix, MaxKeys: 1000 }));
+      const items = mode === 'versioned'
+        ? [...(page.Versions ?? []), ...(page.DeleteMarkers ?? [])]
+        : page.Contents ?? [];
+      ensure(items.length || !page.IsTruncated, 503, 'ACCOUNT_STORAGE_LIST_INVALID');
+      if (items.length) {
+        const Objects = items.map(({ Key, VersionId }) => {
+          ensure(Key?.startsWith(Prefix) && (mode !== 'versioned' || VersionId),
+            503, 'ACCOUNT_STORAGE_LIST_INVALID');
+          return mode === 'versioned' ? { Key, VersionId } : { Key };
+        });
+        const deleted = await send(new DeleteObjectsCommand({ Bucket, Delete: { Objects, Quiet: true } }));
+        ensure(!deleted.Errors?.length, 503, 'ACCOUNT_STORAGE_DELETE_FAILED');
+      }
+      return { more: Boolean(page.IsTruncated) };
     },
     async scan(doc) {
       const head = await send(new HeadObjectCommand({ Bucket, Key: doc.object_key }));

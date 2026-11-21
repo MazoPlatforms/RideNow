@@ -30,9 +30,18 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 
-/** Home and Work are always shown; other places can be removed. Edits and adds open placeholders for now. */
 @Composable
-fun SavedAddressesScreen(home: String?, work: String?, others: androidx.compose.runtime.snapshots.SnapshotStateList<Pair<String, String>>, onBack: () -> Unit, onEdit: (String) -> Unit, modifier: Modifier = Modifier) {
+fun SavedAddressesScreen(addresses: List<SavedAddress>, onBack: () -> Unit,
+    onEdit: (String, SavedAddress?) -> Unit, modifier: Modifier = Modifier,
+    onPick: ((SavedAddress) -> Unit)? = null, error: String? = null, onRetry: () -> Unit = {},
+    onRemove: (SavedAddress) -> Unit = {},
+) {
+    val home = addresses.firstOrNull { it.kind == "HOME" }
+    val work = addresses.firstOrNull { it.kind == "WORK" }
+    val others = addresses.filter { it.kind == "OTHER" }
+    fun open(kind: String, address: SavedAddress?) {
+        if (address != null && onPick != null) onPick(address) else onEdit(kind, address)
+    }
     val textSearchSaved = stringResource(R.string.search_saved)
     val textHomeAndWorkAreAlwaysOneTapAway = stringResource(R.string.text_home_and_work_are_always_one_tap_away)
     val textMenuHome = stringResource(R.string.home_saved_home)
@@ -50,9 +59,13 @@ fun SavedAddressesScreen(home: String?, work: String?, others: androidx.compose.
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         ScreenTop(textSearchSaved, onBack, subtitle = textHomeAndWorkAreAlwaysOneTapAway)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
+            if (error != null) {
+                Text(error, color = c.danger, modifier = Modifier.padding(top = 10.dp))
+                TextButton(onClick = onRetry) { Text(stringResource(R.string.device_retry)) }
+            }
             Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Slot(RideIcons.Home, textMenuHome, home ?: textNotSetYet, set = home != null) { onEdit("Home address") }
-                Slot(RideIcons.Work, textHomeSavedWork, work ?: textNotSetYet, set = work != null) { onEdit("Work address") }
+                Slot(RideIcons.Home, textMenuHome, home?.address ?: textNotSetYet, set = home != null) { open("HOME", home) }
+                Slot(RideIcons.Work, textHomeSavedWork, work?.address ?: textNotSetYet, set = work != null) { open("WORK", work) }
             }
             SectionLabel(textOtherPlaces)
             if (others.isEmpty()) Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp)).padding(vertical = 30.dp, horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -64,18 +77,20 @@ fun SavedAddressesScreen(home: String?, work: String?, others: androidx.compose.
                 Text(textNoFavoritesYet, color = c.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
                 Text(textSavePlacesYouVisitOftenForFasterPickups, color = c.muted, fontSize = 13.sp, lineHeight = 19.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
             }
-            others.forEachIndexed { i, (title, sub) ->
-                var menu by remember { mutableStateOf(false) }
+            others.forEach { address ->
+                val title = address.label ?: address.address.substringBefore(',')
+                val sub = address.address.takeIf { it != title }.orEmpty()
+                var menu by remember(address.id) { mutableStateOf(false) }
                 Column(Modifier.fillMaxWidth()) {
-                    Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().height(64.dp).clickable { open("OTHER", address) }, verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(36.dp).clip(CircleShape).border(1.dp, c.border, CircleShape), contentAlignment = Alignment.Center) { RideIcon(RideIcons.Heart, c.accent, size = 18.dp) }
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) { Text(title, color = c.fg, fontSize = 15.sp); Text(sub, color = c.muted, fontSize = 12.sp) }
                         Box {
                             Box(Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button) { menu = true }.semantics { contentDescription = textMoreOptionsForValue.format(title) }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.More, c.muted) }
                             DropdownMenu(menu, { menu = false }) {
-                                DropdownMenuItem(text = { Text(textEdit) }, onClick = { menu = false; onEdit(title) })
-                                DropdownMenuItem(text = { Text(textRemove) }, onClick = { menu = false; others.removeAt(i) })
+                                DropdownMenuItem(text = { Text(textEdit) }, onClick = { menu = false; onEdit("OTHER", address) })
+                                DropdownMenuItem(text = { Text(textRemove) }, onClick = { menu = false; onRemove(address) })
                             }
                         }
                     }
@@ -84,7 +99,7 @@ fun SavedAddressesScreen(home: String?, work: String?, others: androidx.compose.
             }
             Spacer(Modifier.height(16.dp))
         }
-        RideButton(textAddNewAddress, { onEdit("Add address") }, modifier = Modifier.padding(vertical = 12.dp))
+        RideButton(textAddNewAddress, { onEdit("OTHER", null) }, modifier = Modifier.padding(vertical = 12.dp))
     }
 }
 
@@ -107,4 +122,7 @@ private fun Slot(icon: List<String>, title: String, sub: String, set: Boolean, o
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun SavedPreview() = RideNowTheme(darkTheme = true) { SavedAddressesScreen(stringResource(R.string.text_text_128_meridian_walk), null, remember { mutableStateListOf("Zenith Café" to "Sector 7") }, {}, {}) }
+private fun SavedPreview() = RideNowTheme(darkTheme = true) {
+    SavedAddressesScreen(listOf(SavedAddress("sample", "HOME", null,
+        stringResource(R.string.text_text_128_meridian_walk), null)), {}, { _, _ -> })
+}

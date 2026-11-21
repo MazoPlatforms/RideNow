@@ -9,6 +9,8 @@ import {
   PutBucketVersioningCommand,
   ListObjectVersionsCommand,
   DeleteObjectsCommand,
+  DeleteObjectCommand,
+  PutObjectCommand,
   DeleteBucketCommand,
   ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
@@ -105,6 +107,15 @@ test('real versioned S3 upload, immutable review download and scanner protocol f
     await assert.rejects(storage.scan({ ...doc, bytes: 1 }), {
       code: 'DOCUMENT_METADATA_MISMATCH',
     });
+    const closedAccountPrefix = `profiles/${randomUUID()}/`;
+    const photo = closedAccountPrefix + randomUUID();
+    for (const bytes of [first, second]) await s3.send(new PutObjectCommand({ Bucket, Key: photo, Body: bytes }));
+    await s3.send(new DeleteObjectCommand({ Bucket, Key: photo }));
+    await assert.rejects(storage.purgeAccountPrefix('profiles/'), { code: 'INVALID_ACCOUNT_STORAGE_PREFIX' });
+    assert.deepEqual(await storage.purgeAccountPrefix(closedAccountPrefix), { more: false });
+    const afterPurge = await s3.send(new ListObjectVersionsCommand({ Bucket }));
+    assert(![...(afterPurge.Versions ?? []), ...(afterPurge.DeleteMarkers ?? [])].some(item => item.Key === photo));
+    assert(afterPurge.Versions.some(item => item.Key === key));
     await new Promise((resolve) => scanner.close(resolve));
     await assert.rejects(storage.scan({ ...doc, bytes: second.length }), { code: 'ECONNREFUSED' });
   } finally {
@@ -231,6 +242,10 @@ test('non-versioned storage publishes only scanned bytes under a server-only ver
     const profileImage = await fetch(await storage.download(photo.verifiedKey));
     assert.equal(profileImage.headers.get('content-type'), 'image/jpeg');
     assert.equal((await sharp(Buffer.from(await profileImage.arrayBuffer())).metadata()).format, 'jpeg');
+    assert.deepEqual(await storage.purgeAccountPrefix(`verified/${id}/`), { more: false });
+    const keys = (await s3.send(new ListObjectsV2Command({ Bucket }))).Contents.map(item => item.Key);
+    assert(keys.includes(key));
+    assert(!keys.some(key => key.startsWith(`verified/${id}/`)));
   } finally {
     await new Promise((resolve) => scanner.close(resolve));
     const objects = (await s3.send(new ListObjectsV2Command({ Bucket }))).Contents ?? [];

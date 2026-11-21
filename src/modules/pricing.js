@@ -39,10 +39,11 @@ export async function quote(db, maps, user, body) {
   const snapshot = { ...plan, surge: Number(surge?.multiplier ?? 1) };
   const route = await maps.route({ waypoints: points, vehicleCategory: body.category });
   const amount = calculateFare(snapshot, route.distanceMeters, route.durationSeconds);
-  return one(
+  return ensure(await one(
     db,
     `INSERT INTO fare_quotes(rider_id,area_id,category,trip_type,waypoints,route,fare_snapshot,estimated_minor,scheduled_at,expires_at)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '2 minutes') RETURNING *`,
+    SELECT id,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '2 minutes' FROM users
+    WHERE id=$1 AND deleted_at IS NULL AND NOT suspended FOR KEY SHARE RETURNING *`,
     [
       user.id,
       area.id,
@@ -54,5 +55,5 @@ export async function quote(db, maps, user, body) {
       amount,
       body.scheduledAt ?? null,
     ],
-  );
+  ), 401, 'SESSION_REVOKED');
 }

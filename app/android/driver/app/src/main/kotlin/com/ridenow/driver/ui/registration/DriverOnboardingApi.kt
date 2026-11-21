@@ -77,9 +77,18 @@ internal object DriverOnboardingApi {
         } catch (_: Exception) {
             return
         }
-        for (field in listOf("name", "email")) {
+        for (field in listOf("name", "email", "dateOfBirth")) {
             val value = profile.opt(field) as? String
             if (!draft.fields.has(field) && !value.isNullOrBlank()) draft.fields.put(field, value)
+        }
+        if (!draft.fields.has("gender")) {
+            val gender = when (profile.optString("gender")) {
+                "MALE" -> "MALE"
+                "FEMALE" -> "FEMALE"
+                "NON_BINARY" -> "OTHER"
+                else -> null
+            }
+            if (gender != null) draft.fields.put("gender", gender)
         }
         val photoUrl = profile.opt("profilePhotoUrl") as? String
         if (photoUrl != null && draft.photo("PROFILE_PHOTO") == null) {
@@ -94,7 +103,7 @@ internal object DriverOnboardingApi {
         }
     }
 
-    private suspend fun downloadProfilePhoto(value: String): Bitmap? = withContext(Dispatchers.IO) {
+    suspend fun downloadProfilePhoto(value: String): Bitmap? = withContext(Dispatchers.IO) {
         val url = URL(value)
         if (url.protocol != "https" || url.userInfo != null || url.host.isBlank()) return@withContext null
         val connection = (url.openConnection() as HttpsURLConnection).apply {
@@ -118,11 +127,40 @@ internal object DriverOnboardingApi {
             }
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
-            if (bounds.outWidth !in 1..512 || bounds.outHeight !in 1..512) return@withContext null
+            if (bounds.outWidth !in 1..2048 || bounds.outHeight !in 1..2048) return@withContext null
             BitmapFactory.decodeByteArray(data, 0, data.size)
         } finally {
             connection.disconnect()
         }
+    }
+
+    suspend fun updateContact(context: Context, payload: JSONObject): JSONObject =
+        PhoneAuthApi.authorized(context, "PATCH", "/v1/drivers/profile", payload)
+
+    suspend fun replaceProfilePhoto(context: Context, image: Bitmap): String? {
+        val bytes = withContext(Dispatchers.IO) {
+            val maxSide = maxOf(image.width, image.height)
+            val scaled = if (maxSide <= 512) image else {
+                val ratio = 512f / maxSide
+                Bitmap.createScaledBitmap(image, (image.width * ratio).toInt().coerceAtLeast(1),
+                    (image.height * ratio).toInt().coerceAtLeast(1), true)
+            }
+            ByteArrayOutputStream().use { output ->
+                check(scaled.compress(Bitmap.CompressFormat.JPEG, 86, output))
+                output.toByteArray()
+            }
+        }
+        val staged = PhoneAuthApi.authorized(context, "POST", "/v1/drivers/profile-photo",
+            JSONObject().put("mime", MIME).put("bytes", bytes.size), UUID.randomUUID().toString())
+        putImage(staged.getString("uploadUrl"), bytes)
+        val id = staged.getString("photoId")
+        val profile = PhoneAuthApi.authorized(context, "POST", "/v1/drivers/profile-photo/$id/complete", JSONObject())
+        return profile.opt("profilePhotoUrl") as? String
+    }
+
+    suspend fun beginReapplication(context: Context) {
+        PhoneAuthApi.authorized(context, "POST", "/v1/drivers/reapplication",
+            JSONObject().put("confirmed", true), UUID.randomUUID().toString())
     }
 
     suspend fun queue(context: Context, draft: DriverDraft, progress: (Int, Int) -> Unit): JSONObject {
@@ -166,27 +204,29 @@ internal object DriverOnboardingApi {
         file.expiresOn?.let { payload.put("expiresAt", "${it}T23:59:59Z") }
         val upload = PhoneAuthApi.authorized(context, "POST", "/v1/drivers/documents", payload, UUID.randomUUID().toString())
         val id = upload.getString("documentId")
-        withContext(Dispatchers.IO) {
-            val url = URL(upload.getString("uploadUrl"))
-            check(url.protocol == "https" && url.userInfo == null && url.host.isNotBlank())
-            val connection = (url.openConnection() as HttpsURLConnection).apply {
-                requestMethod = "PUT"
-                instanceFollowRedirects = false
-                doOutput = true
-                connectTimeout = 15_000
-                readTimeout = 45_000
-                setFixedLengthStreamingMode(bytes.size)
-                setRequestProperty("Content-Type", MIME)
-            }
-            try {
-                connection.outputStream.use { it.write(bytes) }
-                check(connection.responseCode in 200..299) { "DOCUMENT_UPLOAD_FAILED" }
-            } finally {
-                connection.disconnect()
-            }
-        }
+        putImage(upload.getString("uploadUrl"), bytes)
         PhoneAuthApi.authorized(context, "POST", "/v1/drivers/documents/$id/submit", JSONObject(), id)
         return id
+    }
+
+    private suspend fun putImage(value: String, bytes: ByteArray) = withContext(Dispatchers.IO) {
+        val url = URL(value)
+        check(url.protocol == "https" && url.userInfo == null && url.host.isNotBlank())
+        val connection = (url.openConnection() as HttpsURLConnection).apply {
+            requestMethod = "PUT"
+            instanceFollowRedirects = false
+            doOutput = true
+            connectTimeout = 15_000
+            readTimeout = 45_000
+            setFixedLengthStreamingMode(bytes.size)
+            setRequestProperty("Content-Type", MIME)
+        }
+        try {
+            connection.outputStream.use { it.write(bytes) }
+            check(connection.responseCode in 200..299) { "DOCUMENT_UPLOAD_FAILED" }
+        } finally {
+            connection.disconnect()
+        }
     }
 
     suspend fun submit(context: Context, pending: JSONObject): JSONObject =

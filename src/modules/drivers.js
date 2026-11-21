@@ -29,6 +29,8 @@ export async function eligible(db, id) {
   );
 }
 export async function onboard(db, user, body) {
+  ensure(await one(db, 'SELECT id FROM users WHERE id=$1 AND deleted_at IS NULL FOR UPDATE', [user.id]),
+    401, 'SESSION_REVOKED');
   const profile = await one(db, `INSERT INTO driver_profiles(user_id) VALUES($1)
     ON CONFLICT(user_id) DO NOTHING RETURNING ${profileFields}`, [user.id]);
   if (!profile)
@@ -66,7 +68,8 @@ export async function availability(db, user, value) {
 }
 export async function location(db, user, body) {
   ensure(user.roles.includes('DRIVER'), 403, 'DRIVER_REQUIRED');
-  await db.query('SELECT user_id FROM driver_profiles WHERE user_id=$1 FOR UPDATE', [user.id]);
+  ensure(await one(db, `SELECT d.user_id FROM driver_profiles d JOIN users u ON u.id=d.user_id
+    WHERE d.user_id=$1 AND u.deleted_at IS NULL FOR UPDATE OF d`, [user.id]), 401, 'SESSION_REVOKED');
   const previous = await one(
     db,
     'SELECT *,ST_X(point::geometry) AS lng,ST_Y(point::geometry) AS lat FROM driver_locations WHERE driver_id=$1',

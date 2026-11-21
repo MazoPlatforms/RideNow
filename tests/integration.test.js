@@ -8,6 +8,7 @@ import { io as socketClient } from 'socket.io-client';
 import supertest from 'supertest';
 import { createClient } from 'redis';
 import pino from 'pino';
+import * as OTPAuth from 'otpauth';
 import { runner } from 'node-pg-migrate';
 import { database, one, transaction } from '../src/shared/db.js';
 import { loadConfig } from '../src/shared/config.js';
@@ -1570,4 +1571,459 @@ test('driver application enforces ownership, scan completion and revision-bound 
   await request('post', adminPath + '/review', admin, { status: 'APPROVED', vehicleId, revision: newRevision, expectedStatus: 'SUSPENDED' }).expect(200);
   await pool.query("UPDATE documents SET expires_at=now()-interval '1 day' WHERE id=$1", [documentIds[6]]);
   await request('put', '/v1/drivers/availability', applicant, { availability: 'AVAILABLE' }).expect(409);
+  await request('post', '/v1/drivers/reapplication', applicant, { confirmed: true }).expect(200);
+  await request('put', '/v1/drivers/application', applicant, draft).expect(200);
+  const editedVehicle = (await request('post', '/v1/drivers/vehicles', applicant, {
+    ...vehicle, color: 'Silver',
+  }).expect(200)).body;
+  assert.equal(editedVehicle.id, vehicleId);
+  const replacement = (await request('post', '/v1/drivers/documents', applicant, {
+    vehicleId, kind: 'REVENUE_LICENSE', expiresAt: future, mime: 'image/jpeg', bytes: 100,
+  }).expect(200)).body.documentId;
+  await request('post', `/v1/drivers/documents/${replacement}/submit`, applicant).expect(200);
+  const updatedSubmission = { ...submit, documentIds: documentIds.map(id => id === documentIds[6] ? replacement : id) };
+  await request('post', '/v1/drivers/submit', applicant, updatedSubmission).expect(409);
+  await pool.query("UPDATE jobs SET run_at=now() WHERE kind='scan'");
+  await processJobs({ pool, storage, logger });
+  const updatedRevision = (await request('post', '/v1/drivers/submit', applicant, updatedSubmission).expect(200)).body.application_revision;
+  assert.notEqual(updatedRevision, newRevision);
+  await request('post', adminPath + '/review', admin, { status: 'APPROVED', vehicleId, revision: newRevision, expectedStatus: 'PENDING' }).expect(409);
+  await request('post', adminPath + '/review', admin, { status: 'APPROVED', vehicleId, revision: updatedRevision, expectedStatus: 'PENDING' }).expect(200);
+  assert(await one(pool, 'SELECT id FROM documents WHERE id=$1', [documentIds[6]]));
+  assert.equal((await one(pool, 'SELECT color FROM vehicles WHERE id=$1', [vehicleId])).color, 'Silver');
+});
+
+test('phone changes require both scoped codes, preserve the user and revoke other sessions', async () => {
+  const owner = await login();
+  const stranger = await login();
+  const target = '+94772229999';
+  await api.post('/v1/auth/phone-change/request').send({ phone: target }).expect(401);
+  await pool.query("UPDATE otp_challenges SET created_at=now()-interval '2 minutes' WHERE phone=$1", [owner.user.phone]);
+  await request('post', '/v1/auth/phone-change/request', owner, { phone: stranger.user.phone }).expect(409);
+  const change = (await request('post', '/v1/auth/phone-change/request', owner, { phone: target }).expect(202)).body;
+  assert.equal(change.phone, target);
+  const codes = {};
+  const rows = (await pool.query(`SELECT c.id,c.purpose,j.payload FROM otp_challenges c JOIN jobs j
+    ON j.payload->>'challengeId'=c.id::text WHERE c.change_id=$1`, [change.changeId])).rows;
+  assert.equal(rows.length, 2);
+  for (const row of rows) {
+    const code = decrypt(row.payload.encryptedCode, config.ENCRYPTION_KEY);
+    codes[row.purpose] = code;
+    await api.post('/v1/auth/otp/verify').send({ challengeId: row.id, code }).expect(401);
+  }
+  const proof = { changeId: change.changeId, currentCode: codes.PHONE_CURRENT, newCode: codes.PHONE_NEW };
+  await request('post', '/v1/auth/phone-change/verify', stranger, proof).expect(400);
+  const wrong = proof.newCode === '111111' ? '222222' : '111111';
+  await request('post', '/v1/auth/phone-change/verify', owner, { ...proof, newCode: wrong }).expect(400);
+  assert.equal((await request('get', '/v1/me', owner).expect(200)).body.phone, owner.user.phone);
+  const verified = (await request('post', '/v1/auth/phone-change/verify', owner, proof).expect(200)).body;
+  assert.equal(verified.user.phone, target);
+  assert.equal(verified.user.id, owner.user.id);
+  await request('get', '/v1/me', owner).expect(401);
+  await api.post('/v1/auth/refresh').send({ refreshToken: owner.refreshToken }).expect(401);
+  await request('post', '/v1/auth/phone-change/verify', verified, proof).expect(400);
+  assert.equal((await request('get', '/v1/me', verified).expect(200)).body.phone, target);
+  assert.equal((await one(pool, "SELECT count(*)::int AS n FROM audit_logs WHERE action='ACCOUNT_PHONE_CHANGED'")).n, 1);
+});
+
+test('rider extras and driver contact edits persist with separate private avatar scopes', async () => {
+  const owner = await driver();
+  const other = await driver();
+  const rider = { name: 'Test Rider', email: 'rider@example.test', gender: 'NON_BINARY', dateOfBirth: '1996-03-10', city: 'Kattankudy' };
+  await request('patch', '/v1/me', owner, rider).expect(200);
+  const saved = (await request('get', '/v1/me', owner).expect(200)).body;
+  assert.equal(saved.gender, rider.gender);
+  assert.equal(saved.dateOfBirth, rider.dateOfBirth);
+  assert.equal(saved.city, rider.city);
+  await request('patch', '/v1/me', owner, { name: 'Test Rider', dateOfBirth: '2099-01-01' }).expect(400);
+  await request('patch', '/v1/me', owner, { name: 'Test Rider', city: null }).expect(200);
+  assert.equal((await request('get', '/v1/me', owner).expect(200)).body.city, null);
+
+  const driverContact = { name: 'Test Driver', email: 'driver@example.test', address: 'Driver address', preferredLanguage: 'Tamil' };
+  await request('patch', '/v1/drivers/profile', owner, { ...driverContact, identityNumber: 'Different ID' }).expect(409);
+  await request('patch', '/v1/drivers/profile', owner, driverContact).expect(200);
+  const returned = (await request('get', '/v1/drivers/me', owner).expect(200)).body;
+  for (const [key, value] of Object.entries(driverContact)) assert.equal(returned.contact[key], value);
+  assert(!Object.hasOwn(returned.profile, 'contact_encrypted'));
+  assert(!Object.hasOwn(returned.profile, 'profile_photo_key'));
+  assert.equal((await request('get', '/v1/me', owner).expect(200)).body.name, rider.name);
+  const photo = (await request('post', '/v1/drivers/profile-photo', owner, { mime: 'image/jpeg', bytes: 100 }).expect(200)).body;
+  await request('post', `/v1/me/profile-photo/${photo.photoId}/complete`, owner).expect(404);
+  await request('post', `/v1/drivers/profile-photo/${photo.photoId}/complete`, other).expect(404);
+  await request('post', `/v1/drivers/profile-photo/${photo.photoId}/complete`, owner).expect(200);
+  assert.equal((await request('get', '/v1/me', owner).expect(200)).body.profilePhotoUrl, null);
+  assert.equal((await request('get', '/v1/drivers/me', owner).expect(200)).body.contact.photoUrl, 'http://storage.test/download');
+  await request('patch', '/v1/drivers/profile', owner, { ...driverContact, photoVisible: false }).expect(200);
+  assert.equal((await request('get', '/v1/drivers/me', owner).expect(200)).body.contact.photoUrl, null);
+});
+
+test('reviewing updated vehicle details requires a new application and blocks online mode', async () => {
+  const d = await driver();
+  await pool.query("UPDATE driver_profiles SET availability='ON_TRIP' WHERE user_id=$1", [d.user.id]);
+  await request('post', '/v1/drivers/reapplication', d, { confirmed: true }).expect(409);
+  await pool.query("UPDATE driver_profiles SET availability='OFFLINE' WHERE user_id=$1", [d.user.id]);
+  await request('post', '/v1/drivers/reapplication', d, { confirmed: false }).expect(400);
+  const started = await request('post', '/v1/drivers/reapplication', d, { confirmed: true }).expect(200);
+  assert.equal(started.body.status, 'DRAFT');
+  const view = (await request('get', '/v1/drivers/me', d).expect(200)).body;
+  assert.equal(view.profile.availability, 'OFFLINE');
+  assert.equal(view.vehicles.length, 1);
+  await request('put', '/v1/drivers/availability', d, { availability: 'AVAILABLE' }).expect(409);
+  await request('post', '/v1/drivers/vehicles', d, {
+    registration: view.vehicles[0].registration, category: 'TUK', make: 'Bajaj',
+    model: 'RE', modelYear: 2024, color: 'Blue',
+  }).expect(200);
+});
+
+async function signInDevice(phone, device) {
+  await pool.query("UPDATE otp_challenges SET created_at=now()-interval '61 seconds' WHERE phone=$1", [phone]);
+  const { challengeId } = await auth.requestOtp(phone);
+  const job = await one(pool, "SELECT payload FROM jobs WHERE payload->>'challengeId'=$1", [challengeId]);
+  const code = decrypt(job.payload.encryptedCode, config.ENCRYPTION_KEY);
+  return (await api.post('/v1/auth/otp/verify').send({ challengeId, code, device }).expect(200)).body;
+}
+
+test('device list keeps names through rotation, registers older sessions and protects account boundaries', async () => {
+  const old = await login();
+  const rider = { installationId: randomUUID(), name: 'Maazin’s Phone', app: 'RIDER' };
+  const driver = { installationId: randomUUID(), name: rider.name, app: 'DRIVER' };
+  const signed = await signInDevice(old.user.phone, driver);
+  const stranger = await login();
+  await api.get('/v1/auth/devices').expect(401);
+  await request('put', '/v1/auth/devices/current', old, { ...rider, name: 'Phone\u202e' }).expect(400);
+  const enrolled = (await request('put', '/v1/auth/devices/current', old, rider).expect(200)).body.items;
+  assert.equal(enrolled.length, 2);
+  const current = enrolled.find(item => item.current);
+  const other = enrolled.find(item => !item.current);
+  assert.equal(current.name, rider.name);
+  assert.equal(current.app, 'RIDER');
+  assert.equal(other.app, 'DRIVER');
+  assert.notEqual(current.id, other.id);
+  assert(!JSON.stringify(enrolled).includes(rider.installationId));
+  assert.deepEqual(Object.keys(current).sort(), ['app','current','id','name','updatedAt']);
+  const saved = await one(pool, "SELECT device_key FROM sessions WHERE user_id=$1 AND device_app='RIDER'", [old.user.id]);
+  assert.notEqual(saved.device_key, rider.installationId);
+
+  const rotated = await auth.refresh(signed.refreshToken);
+  await request('put', '/v1/auth/devices/current', rotated, { ...driver, installationId: randomUUID() }).expect(409);
+  const view = (await request('get', '/v1/auth/devices', rotated).expect(200)).body.items.find(item => item.current);
+  assert.equal(view.name, driver.name);
+  assert.equal(view.id, other.id);
+  await request('delete', '/v1/auth/devices/' + other.id, stranger).expect(200);
+  await request('get', '/v1/me', rotated).expect(200);
+  await request('delete', '/v1/auth/devices/' + current.id.toUpperCase(), old).expect(409);
+  await request('delete', '/v1/auth/devices/' + other.id, old).expect(200);
+  await request('get', '/v1/me', rotated).expect(401);
+  await assert.rejects(auth.refresh(rotated.refreshToken), { code: 'REFRESH_REUSE' });
+  await request('get', '/v1/me', old).expect(200);
+});
+
+test('signing in again on one installation replaces its session and bulk revocation wins against an in-flight refresh', async () => {
+  const owner = await login();
+  const install = { installationId: randomUUID(), name: 'Pixel', app: 'RIDER' };
+  const replaced = await signInDevice(owner.user.phone, install);
+  const current = await signInDevice(owner.user.phone, { ...install, name: 'My Pixel' });
+  await request('get', '/v1/me', replaced).expect(401);
+  const other = await signInDevice(owner.user.phone, { ...install, app: 'DRIVER' });
+  const outsider = await login();
+  const recent = (await request('get', '/v1/auth/devices', current).expect(200)).body.items;
+  assert.equal(recent.length, 3);
+  assert.equal(recent.find(item => item.current).name, 'My Pixel');
+  assert.equal(recent.find(item => item.app === null).name, null);
+  const [rotation, revoke] = await Promise.allSettled([
+    auth.refresh(other.refreshToken),
+    request('post', '/v1/auth/devices/revoke-others', current, {}).expect(200),
+  ]);
+  assert.equal(revoke.status, 'fulfilled');
+  if (rotation.status === 'fulfilled') {
+    await request('get', '/v1/me', rotation.value).expect(401);
+    await assert.rejects(auth.refresh(rotation.value.refreshToken), { code: 'REFRESH_REUSE' });
+  } else {
+    assert.equal(rotation.reason.code, 'REFRESH_REUSE');
+  }
+  await request('get', '/v1/me', owner).expect(401);
+  assert.equal((await request('get', '/v1/auth/devices', current).expect(200)).body.items.length, 1);
+  await request('get', '/v1/me', outsider).expect(200);
+  await pool.query("UPDATE users SET roles=ARRAY['ADMIN'] WHERE id=$1", [outsider.user.id]);
+  await request('get', '/v1/auth/devices', outsider).expect(403);
+});
+
+async function twoStepOtp(phone) {
+  await pool.query("UPDATE otp_challenges SET created_at=now()-interval '61 seconds' WHERE phone=$1", [phone]);
+  const challenge = await auth.requestOtp(phone);
+  const job = await one(pool, "SELECT payload FROM jobs WHERE payload->>'challengeId'=$1", [challenge.challengeId]);
+  return { challengeId: challenge.challengeId, code: decrypt(job.payload.encryptedCode, config.ENCRYPTION_KEY) };
+}
+
+async function enrollMobileFactor(session) {
+  await pool.query("UPDATE otp_challenges SET created_at=now()-interval '61 seconds' WHERE phone=$1", [session.user.phone]);
+  const setup = (await request('post', '/v1/auth/two-step/setup', session).expect(200)).body;
+  const job = await one(pool, "SELECT payload FROM jobs WHERE payload->>'purpose'='TWO_STEP_SETUP' AND payload->>'phone'=$1 ORDER BY run_at DESC LIMIT 1",
+    [session.user.phone]);
+  const whatsappCode = decrypt(job.payload.encryptedCode, config.ENCRYPTION_KEY);
+  const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(setup.secret) });
+  return { setup, job, whatsappCode, totp };
+}
+
+test('mobile two-step is opt-in, binds enrollment to its session family and revokes pre-enrollment sessions', async () => {
+  const session = await login();
+  const otherProof = await twoStepOtp(session.user.phone);
+  const other = await auth.verifyOtp(otherProof.challengeId, otherProof.code);
+  assert(other.accessToken);
+  assert.deepEqual((await request('get', '/v1/auth/two-step', session).expect(200)).body,
+    { enabled: false, recoveryRemaining: 0 });
+  await api.post('/v1/auth/two-step/setup').expect(401);
+  const { setup, job, whatsappCode, totp } = await enrollMobileFactor(session);
+  const pending = await one(pool, 'SELECT mobile_totp_pending FROM users WHERE id=$1', [session.user.id]);
+  assert(!JSON.stringify(pending).includes(setup.secret));
+  await api.post('/v1/auth/otp/verify').send({ challengeId: job.payload.challengeId, code: whatsappCode }).expect(401);
+
+  const enroll = { whatsappCode, code: totp.generate() };
+  await request('post', '/v1/auth/two-step/enable', other, enroll).expect(400);
+  const wrong = whatsappCode === '111111' ? '222222' : '111111';
+  await request('post', '/v1/auth/two-step/enable', session, { ...enroll, whatsappCode: wrong }).expect(400);
+  const refreshed = await auth.refresh(session.refreshToken);
+  const response = (await request('post', '/v1/auth/two-step/enable', refreshed, enroll).expect(200)).body;
+  assert.equal(response.recoveryCodes.length, 8);
+  assert.equal(new Set(response.recoveryCodes).size, 8);
+  const user = await one(pool, 'SELECT mobile_totp_secret,mobile_recovery_hashes,mobile_totp_pending FROM users WHERE id=$1', [session.user.id]);
+  assert.equal(user.mobile_totp_pending, null);
+  assert.equal(decrypt(user.mobile_totp_secret, config.ENCRYPTION_KEY), setup.secret);
+  assert(!JSON.stringify(user).includes(response.recoveryCodes[0]));
+  await request('get', '/v1/me', other).expect(401);
+  await request('get', '/v1/me', refreshed).expect(200);
+  await request('post', '/v1/auth/two-step/disable', refreshed, { code: enroll.code }).expect(400);
+});
+
+test('mobile sign-in enforces a fresh TOTP or single-use recovery code, limits attempts and supports secure disable', async () => {
+  const session = await login();
+  const { whatsappCode, totp } = await enrollMobileFactor(session);
+  const enrollmentTime = Date.now();
+  const enrollmentToken = totp.generate({ timestamp: enrollmentTime });
+  const enrolled = (await request('post', '/v1/auth/two-step/enable', session,
+    { whatsappCode, code: enrollmentToken }).expect(200)).body;
+  const firstProof = await twoStepOtp(session.user.phone);
+  const device = { installationId: randomUUID(), name: 'Phone', app: 'DRIVER' };
+  const pending = (await api.post('/v1/auth/otp/verify').send({ ...firstProof, device }).expect(200)).body;
+  assert.deepEqual(Object.keys(pending), ['twoStepToken']);
+  await api.get('/v1/me').set('Authorization', 'Bearer ' + pending.twoStepToken).expect(401);
+  const verify = (token, code) => api.post('/v1/auth/two-step/verify').send({ token, code });
+  await verify(pending.twoStepToken, enrollmentToken).expect(401);
+  const futureCode = totp.generate({ timestamp: enrollmentTime + 30_000 });
+  const signed = (await verify(pending.twoStepToken, futureCode).expect(200)).body;
+  await verify(pending.twoStepToken, enrolled.recoveryCodes[0]).expect(401);
+  const listed = (await request('get', '/v1/auth/devices', signed).expect(200)).body.items;
+  assert.equal(listed.find(item => item.current).app, 'DRIVER');
+
+  const another = async () => {
+    const proof = await twoStepOtp(session.user.phone);
+    return (await auth.verifyOtp(proof.challengeId, proof.code)).twoStepToken;
+  };
+  const recovery = await another();
+  const competing = await another();
+  const redemption = await Promise.allSettled([recovery, competing].map(ticket =>
+    auth.twoStep.verifyLogin(ticket, enrolled.recoveryCodes[0])));
+  assert.equal(redemption.filter(item => item.status === 'fulfilled' && item.value.accessToken).length, 1);
+  assert.equal(redemption.find(item => item.status === 'rejected')?.reason.code, 'TWO_STEP_INVALID');
+  const blocked = await another();
+  for (let i = 0; i < 5; i++) {
+    await assert.rejects(auth.twoStep.verifyLogin(blocked, enrolled.recoveryCodes[0]), { code: 'TWO_STEP_INVALID' });
+  }
+  await assert.rejects(auth.twoStep.verifyLogin(blocked, enrolled.recoveryCodes[1]), { code: 'TWO_STEP_INVALID' });
+  const expired = await another();
+  await pool.query('UPDATE mobile_login_steps SET expires_at=now()-interval \'1 second\'');
+  await assert.rejects(auth.twoStep.verifyLogin(expired, enrolled.recoveryCodes[1]), { code: 'TWO_STEP_INVALID' });
+
+  const replaced = (await request('post', '/v1/auth/two-step/recovery', session,
+    { code: enrolled.recoveryCodes[1] }).expect(200)).body.recoveryCodes;
+  const fresh = await another();
+  await assert.rejects(auth.twoStep.verifyLogin(fresh, enrolled.recoveryCodes[2]), { code: 'TWO_STEP_INVALID' });
+  await request('post', '/v1/auth/two-step/disable', session, { code: replaced[0] }).expect(200);
+  await assert.rejects(auth.twoStep.verifyLogin(fresh, replaced[1]), { code: 'TWO_STEP_INVALID' });
+  await request('get', '/v1/me', signed).expect(401);
+  const proof = await twoStepOtp(session.user.phone);
+  assert((await auth.verifyOtp(proof.challengeId, proof.code)).accessToken);
+});
+
+async function startAccountDeletion(session) {
+  await pool.query("UPDATE otp_challenges SET created_at=now()-interval '61 seconds' WHERE phone=$1", [session.user.phone]);
+  const challenge = (await request('post', '/v1/auth/account-deletion/request', session).expect(202)).body;
+  const job = await one(pool, "SELECT payload FROM jobs WHERE payload->>'challengeId'=$1", [challenge.challengeId]);
+  return { challenge, code: decrypt(job.payload.encryptedCode, config.ENCRYPTION_KEY) };
+}
+
+test('account deletion OTP is scoped to its owner and session family, then erases the account and frees the phone', async () => {
+  const owner = await login();
+  const unrelated = await login();
+  const proof = await twoStepOtp(owner.user.phone);
+  const anotherSession = await auth.verifyOtp(proof.challengeId, proof.code);
+  const id = owner.user.id;
+  await request('patch', '/v1/me', owner, { name: 'Private Rider', email: 'private@example.test', city: 'Private City' }).expect(200);
+  const token = 'push-token-' + randomUUID();
+  await request('put', '/v1/me/devices', owner, { token }).expect(200);
+  const photo = (await request('post', '/v1/me/profile-photo', owner, { mime: 'image/jpeg', bytes: 91 }).expect(200)).body;
+  const { challenge, code } = await startAccountDeletion(owner);
+  const payload = { challengeId: challenge.challengeId, code };
+  assert.equal(challenge.twoStepRequired, false);
+  await api.post('/v1/auth/account-deletion/confirm').send(payload).expect(401);
+  await api.post('/v1/auth/otp/verify').send(payload).expect(401);
+  await request('post', '/v1/auth/account-deletion/confirm', unrelated, payload).expect(400);
+  await request('post', '/v1/auth/account-deletion/confirm', anotherSession, payload).expect(400);
+  await request('post', '/v1/auth/account-deletion/confirm', owner,
+    { ...payload, code: code === '111111' ? '222222' : '111111' }).expect(400);
+  assert.equal((await one(pool, 'SELECT attempts FROM otp_challenges WHERE id=$1', [challenge.challengeId])).attempts, 1);
+
+  const refreshed = await auth.refresh(owner.refreshToken);
+  await request('post', '/v1/auth/account-deletion/confirm', refreshed, payload).expect(200, { deleted: true });
+  await request('get', '/v1/me', refreshed).expect(401);
+  await request('get', '/v1/me', anotherSession).expect(401);
+  await assert.rejects(auth.refresh(refreshed.refreshToken), { code: 'INVALID_REFRESH' });
+  await request('get', '/v1/me', unrelated).expect(200);
+  await pool.query("UPDATE users SET roles=ARRAY['STAFF'] WHERE id=$1", [unrelated.user.id]);
+  await request('post', '/v1/auth/account-deletion/request', unrelated).expect(403);
+  const erased = await one(pool, 'SELECT phone,name,email,deleted_at,rider_city FROM users WHERE id=$1', [id]);
+  assert(erased.deleted_at);
+  assert.equal(erased.phone, 'deleted:' + id);
+  assert.equal(erased.name, '');
+  assert.equal(erased.email, '');
+  assert.equal(erased.rider_city, null);
+  assert.equal(await one(pool, 'SELECT id FROM profile_photo_uploads WHERE user_id=$1', [id]), undefined);
+  assert.equal(await one(pool, 'SELECT token FROM device_tokens WHERE user_id=$1', [id]), undefined);
+  assert.equal(await one(pool, 'SELECT id FROM otp_challenges WHERE phone=$1 OR owner_id=$2', [owner.user.phone, id]), undefined);
+  const targets = (await pool.query("SELECT payload->>'prefix' AS prefix FROM jobs WHERE kind='purge_account_storage' AND run_at>now()")).rows;
+  assert.deepEqual(new Set(targets.map(target => target.prefix)), new Set([
+    `profiles/${id}/`, `drivers/${id}/`, `verified/${photo.photoId}/`,
+  ]));
+  const newProof = await twoStepOtp(owner.user.phone);
+  const newAccount = await auth.verifyOtp(newProof.challengeId, newProof.code);
+  assert.notEqual(newAccount.user.id, id);
+  assert.equal(newAccount.user.profileComplete, false);
+});
+
+test('driver account deletion blocks pending rides and financial obligations and requires enabled two-step verification', async () => {
+  const owner = await driver();
+  const { whatsappCode, totp } = await enrollMobileFactor(owner);
+  const { recoveryCodes } = (await request('post', '/v1/auth/two-step/enable', owner,
+    { whatsappCode, code: totp.generate() }).expect(200)).body;
+  const id = owner.user.id;
+  const ride = await booking(owner);
+  const busy = (await request('post', '/v1/auth/account-deletion/request', owner).expect(409)).body;
+  assert.equal(busy.code, 'ACCOUNT_DELETION_RIDES_PENDING');
+  await request('post', `/v1/rides/${ride.rideId}/cancel`, owner, { reason: 'Changed plans' }).expect(200);
+  const staff = await login();
+  const payout = await one(pool, `INSERT INTO payouts(driver_id,amount_minor,maker_id,reason)
+    VALUES($1,100,$2,'fixture') RETURNING id`, [id, staff.user.id]);
+  const blocked = (await request('post', '/v1/auth/account-deletion/request', owner).expect(409)).body;
+  assert.equal(blocked.code, 'ACCOUNT_DELETION_PAYMENTS_PENDING');
+  await pool.query("UPDATE payouts SET status='REJECTED' WHERE id=$1", [payout.id]);
+  await pool.query("UPDATE driver_profiles SET application_encrypted='private', contact_encrypted='private', availability='AVAILABLE' WHERE user_id=$1", [id]);
+  const { challenge, code } = await startAccountDeletion(owner);
+  assert.equal(challenge.twoStepRequired, true);
+  const payload = { challengeId: challenge.challengeId, code };
+  await pool.query("UPDATE otp_challenges SET expires_at=now()-interval '1 second' WHERE id=$1", [challenge.challengeId]);
+  await request('post', '/v1/auth/account-deletion/confirm', owner, { ...payload, factor: recoveryCodes[0] }).expect(400);
+  const current = await startAccountDeletion(owner);
+  await request('post', '/v1/auth/account-deletion/confirm', owner, { challengeId: current.challenge.challengeId, code: current.code }).expect(400);
+  await request('post', '/v1/auth/account-deletion/confirm', owner,
+    { challengeId: current.challenge.challengeId, code: current.code, factor: recoveryCodes[0] }).expect(200);
+  const retained = await one(pool, 'SELECT status,availability,application_encrypted,contact_encrypted FROM driver_profiles WHERE user_id=$1', [id]);
+  assert.deepEqual(retained, { status: 'SUSPENDED', availability: 'OFFLINE', application_encrypted: null, contact_encrypted: null });
+  assert.equal(await one(pool, 'SELECT id FROM documents WHERE driver_id=$1', [id]), undefined);
+  assert(await one(pool, 'SELECT id FROM rides WHERE id=$1 AND rider_id=$2', [ride.rideId, id]));
+  assert(await one(pool, 'SELECT id FROM payouts WHERE id=$1', [payout.id]));
+});
+
+test('account deletion storage jobs retry and resume paginated storage erasure', async () => {
+  const prefix = `profiles/${randomUUID()}/`;
+  const job = await one(pool, "INSERT INTO jobs(kind,payload) VALUES('purge_account_storage',$1) RETURNING id", [{ prefix }]);
+  let calls = 0;
+  const cleanup = { async purgeAccountPrefix(value) {
+    assert.equal(value, prefix);
+    ++calls;
+    if (calls === 1) throw new AppError(503, 'BUCKET_TEMPORARY_FAILURE');
+    return { more: calls === 2 };
+  } };
+  await processJobs({ pool, storage: cleanup, logger });
+  assert.equal((await one(pool, 'SELECT done_at,last_error FROM jobs WHERE id=$1', [job.id])).last_error, 'BUCKET_TEMPORARY_FAILURE');
+  await pool.query('UPDATE jobs SET run_at=now() WHERE id=$1', [job.id]);
+  await processJobs({ pool, storage: cleanup, logger });
+  assert.equal(calls, 3);
+  const completed = await one(pool, 'SELECT done_at,payload FROM jobs WHERE id=$1', [job.id]);
+  assert(completed.done_at);
+  assert.deepEqual(completed.payload, {});
+});
+
+test('rider city, coordinates and trusted contacts persist privately with account-scoped edit and removal', async () => {
+  const rider = await login();
+  const stranger = await login();
+  await api.get('/v1/me/rider-settings').expect(401);
+  const empty = (await request('get', '/v1/me/rider-settings', rider).expect(200)).body;
+  assert.deepEqual(empty, { city: null, addresses: [], contacts: [] });
+  await request('put', '/v1/me/current-city', rider, { city: 'Kattankudy' }).expect(200);
+  assert.equal((await request('get', '/v1/me', rider).expect(200)).body.city, 'Kattankudy');
+  const home = { kind: 'HOME', address: 'Private home, Kattankudy', coordinates: [81.7, 7.68] };
+  const first = (await request('post', '/v1/me/saved-addresses', rider, home).expect(200)).body;
+  const saved = (await request('post', '/v1/me/saved-addresses', rider,
+    { ...home, address: 'Updated private home' }).expect(200)).body;
+  assert.equal(first.id, saved.id);
+  assert.deepEqual(saved.coordinates, home.coordinates);
+  const other = { kind: 'OTHER', label: 'Library', address: 'Library road', coordinates: null };
+  const favorite = (await request('post', '/v1/me/saved-addresses', rider, other).expect(200)).body;
+  assert.equal((await request('post', '/v1/me/saved-addresses', rider, other).expect(200)).body.id, favorite.id);
+  await request('post', '/v1/me/saved-addresses', rider, { ...home, coordinates: [7, 100] }).expect(400);
+  await request('patch', '/v1/me/saved-addresses/' + favorite.id, stranger, other).expect(404);
+  await request('delete', '/v1/me/saved-addresses/' + favorite.id, stranger).expect(404);
+  await request('patch', '/v1/me/saved-addresses/' + favorite.id, rider, { ...other, label: 'Public library' }).expect(200);
+  const contact = (await request('post', '/v1/me/trusted-contacts', rider,
+    { name: 'Private contact', phone: '0771234567' }).expect(200)).body;
+  assert.equal(contact.phone, '+94771234567');
+  const matched = (await request('post', '/v1/me/trusted-contacts', rider,
+    { name: 'Updated', phone: '+94771234567' }).expect(200)).body;
+  assert.equal(matched.id, contact.id);
+  await request('delete', '/v1/me/trusted-contacts/' + contact.id, stranger).expect(404);
+  const stored = await one(pool, 'SELECT * FROM trusted_contacts WHERE id=$1', [contact.id]);
+  assert(!JSON.stringify(stored).includes(contact.phone));
+  assert(!(await one(pool, 'SELECT details_encrypted FROM saved_addresses WHERE id=$1', [first.id])).details_encrypted.includes(saved.address));
+  const reloaded = (await request('get', '/v1/me/rider-settings', rider).expect(200)).body;
+  assert.equal(reloaded.addresses.length, 2);
+  assert.equal(reloaded.addresses.find(item => item.id === favorite.id).label, 'Public library');
+  assert.deepEqual(reloaded.contacts, [matched]);
+  await request('delete', '/v1/me/saved-addresses/' + favorite.id, rider).expect(200);
+  await request('delete', '/v1/me/trusted-contacts/' + contact.id, rider).expect(200);
+  const deletion = await startAccountDeletion(rider);
+  await request('post', '/v1/auth/account-deletion/confirm', rider,
+    { challengeId: deletion.challenge.challengeId, code: deletion.code }).expect(200);
+  assert.equal(await one(pool, 'SELECT id FROM saved_addresses WHERE user_id=$1', [rider.user.id]), undefined);
+});
+
+test('notification preferences are app-specific and enforce notifications and inbox controls', async () => {
+  const account = await driver();
+  const stranger = await login();
+  await request('get', '/v1/me/notification-preferences?app=DRIVER', stranger).expect(403);
+  await request('patch', '/v1/me/notification-preferences', stranger, { app: 'DRIVER', key: 'inApp', enabled: false }).expect(403);
+  await request('patch', '/v1/me/notification-preferences', account, { app: 'RIDER', key: 'offers', enabled: true }).expect(400);
+  await request('patch', '/v1/me/notification-preferences', account, { app: 'RIDER', key: 'push', enabled: false }).expect(200);
+  await request('patch', '/v1/me/notification-preferences', account, { app: 'DRIVER', key: 'offers', enabled: false }).expect(200);
+  const driverPrefs = (await request('get', '/v1/me/notification-preferences?app=DRIVER', account).expect(200)).body;
+  const riderPrefs = (await request('get', '/v1/me/notification-preferences?app=RIDER', account).expect(200)).body;
+  assert.equal(driverPrefs.push, true);
+  assert.equal(driverPrefs.offers, false);
+  assert.equal(riderPrefs.push, false);
+  const { allowsNotification } = await import('../src/modules/mobile-preferences.js');
+  assert.equal(allowsNotification(driverPrefs, 'DRIVER', 'driver.offer', {}, 'push'), false);
+  assert.equal(allowsNotification(driverPrefs, 'DRIVER', 'driver.reviewed', {}, 'push'), true);
+  assert.equal(allowsNotification(riderPrefs, 'RIDER', 'ride.updated', { state:'SCHEDULED' }, 'push'), false);
+  await pool.query("INSERT INTO notifications(user_id,event_id,type,payload) VALUES($1,$2,'ride.updated','{}'),($1,$3,'driver.offer','{}')",
+    [account.user.id, randomUUID(), randomUUID()]);
+  assert.equal((await request('get', '/v1/me/notifications?app=RIDER', account).expect(200)).body.items.length, 1);
+  assert.equal((await request('get', '/v1/me/notifications?app=DRIVER', account).expect(200)).body.items.length, 2);
+  await request('post', '/v1/me/notifications/read-all', account, { app: 'RIDER' }).expect(200);
+  assert((await one(pool, "SELECT read_at FROM notifications WHERE user_id=$1 AND type='ride.updated'", [account.user.id])).read_at);
+  assert.equal((await one(pool, "SELECT read_at FROM notifications WHERE user_id=$1 AND type='driver.offer'", [account.user.id])).read_at, null);
+  await request('patch', '/v1/me/notification-preferences', account, { app: 'DRIVER', key: 'inApp', enabled: false }).expect(200);
+  assert.equal((await request('get', '/v1/me/notifications?app=DRIVER', account).expect(200)).body.items.length, 0);
+  await request('patch', '/v1/me/notification-preferences', account, { app: 'DRIVER', key: 'inApp', enabled: true }).expect(200);
+  await request('post', '/v1/me/notifications/clear', account, { app: 'DRIVER' }).expect(200);
+  assert.equal((await request('get', '/v1/me/notifications?app=DRIVER', account).expect(200)).body.items.length, 0);
+  assert.equal((await request('get', '/v1/me/notifications?app=RIDER', account).expect(200)).body.items.length, 1);
 });

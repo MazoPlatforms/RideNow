@@ -1,5 +1,8 @@
 package com.ridenow.app.ui.safety
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+
 import com.ridenow.app.ui.components.offsetByStartDirection
 
 import com.ridenow.app.R
@@ -40,7 +43,7 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 
-data class Contact(val name: String, val phone: String)
+data class Contact(val name: String, val phone: String, val id: String? = null)
 
 /** Local emergency number. Replace with a per-country lookup before release. */
 private const val EmergencyNumber = "112"
@@ -114,7 +117,10 @@ fun SafetyCenterScreen(contacts: Int, onBack: () -> Unit, onShare: () -> Unit, o
 /** Add, view and remove trusted contacts. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TrustedContactsScreen(contacts: List<Contact>, onAdd: (Contact) -> Unit, onRemove: (Contact) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun TrustedContactsScreen(contacts: List<Contact>, onAdd: suspend (Contact) -> Unit,
+    onRemove: suspend (Contact) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier,
+    error: String? = null, onRetry: () -> Unit = {},
+) {
     val textTrustedContacts = stringResource(R.string.text_trusted_contacts)
     val textPeopleWhoCanFollowYourLiveTrip = stringResource(R.string.text_people_who_can_follow_your_live_trip)
     val textNoTrustedContactsYetAddSomeoneYouTrustToFollowYourTrips = stringResource(R.string.text_no_trusted_contacts_yet_add_someone_you_trust_to_follow_your_trips)
@@ -125,10 +131,31 @@ fun TrustedContactsScreen(contacts: List<Contact>, onAdd: (Contact) -> Unit, onR
     val textSaveContact = stringResource(R.string.text_save_contact)
 
     val c = RideTheme.colors
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
     var sheet by rememberSaveable { mutableStateOf(false) }
+
+    fun change(contact: Contact, adding: Boolean) {
+        if (busy) return
+        busy = true
+        failed = false
+        scope.launch {
+            try {
+                if (adding) { onAdd(contact); sheet = false } else onRemove(contact)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { failed = true }
+            finally { busy = false }
+        }
+    }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         ScreenTop(textTrustedContacts, onBack, subtitle = textPeopleWhoCanFollowYourLiveTrip)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
+            if (error != null) {
+                Text(error, color = c.danger, modifier = Modifier.padding(top = 8.dp))
+                TextButton(onClick = onRetry) { Text(stringResource(R.string.device_retry)) }
+            }
+            if (failed && !sheet) Text(stringResource(R.string.saved_settings_failed), color = c.danger)
             if (contacts.isEmpty()) Text(textNoTrustedContactsYetAddSomeoneYouTrustToFollowYourTrips, color = c.muted, fontSize = 14.sp, lineHeight = 21.sp, modifier = Modifier.padding(top = 24.dp))
             else GroupCard(Modifier.padding(top = 16.dp)) {
                 contacts.forEachIndexed { i, k ->
@@ -137,24 +164,26 @@ fun TrustedContactsScreen(contacts: List<Contact>, onAdd: (Contact) -> Unit, onR
                         Box(Modifier.size(40.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)).border(1.dp, c.accent, CircleShape), contentAlignment = Alignment.Center) { Text(k.name.take(2).uppercase(), color = c.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) { Text(k.name, color = c.fg, fontSize = 15.sp); Text(k.phone, color = c.muted, fontSize = 12.sp) }
-                        Box(Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button) { onRemove(k) }.semantics { contentDescription = textRemoveValue.format(k.name) }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Trash, c.muted) }
+                        Box(Modifier.size(48.dp).clip(CircleShape).clickable(enabled = !busy, role = Role.Button) { change(k, false) }.semantics { contentDescription = textRemoveValue.format(k.name) }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Trash, c.muted) }
                     }
                 }
             }
         }
-        RideButton(textAddAContact, { sheet = true }, modifier = Modifier.padding(vertical = 12.dp))
+        RideButton(textAddAContact, { failed = false; sheet = true }, enabled = !busy, modifier = Modifier.padding(vertical = 12.dp))
     }
     if (sheet) {
         val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         var name by remember { mutableStateOf("") }; var phone by remember { mutableStateOf("") }
-        ModalBottomSheet(onDismissRequest = { sheet = false }, sheetState = state, containerColor = c.bg, contentColor = c.fg, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
+        ModalBottomSheet(onDismissRequest = { if (!busy) sheet = false }, sheetState = state, containerColor = c.bg, contentColor = c.fg, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
             Column(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
                 Text(textAddAContact, color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 14.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RideTextField(name, { name = it.take(40) }, textName, RideIcons.Person, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next))
                     RideTextField(phone, { phone = it.filter { ch -> ch.isDigit() || ch == '+' }.take(15) }, textFriendPhone, RideIcons.Phone, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done))
                 }
-                RideButton(textSaveContact, { onAdd(Contact(name.trim(), phone)); sheet = false }, enabled = name.isNotBlank() && phone.length >= 6, modifier = Modifier.padding(top = 16.dp))
+                if (failed) Text(stringResource(R.string.saved_contact_failed), color = c.danger)
+                RideButton(textSaveContact, { change(Contact(name.trim(), phone), true) },
+                    enabled = !busy && name.isNotBlank() && phone.length >= 6, loading = busy, modifier = Modifier.padding(top = 16.dp))
             }
         }
     }

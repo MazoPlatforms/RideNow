@@ -44,6 +44,11 @@ import com.ridenow.app.ui.util.entrance
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import android.graphics.Bitmap
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import com.ridenow.app.ui.auth.PhoneAuthApi.ProfileDetails
+import com.ridenow.app.ui.auth.decodeSampled
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 
@@ -137,12 +142,16 @@ private fun Tile(icon: List<String>, title: String, sub: String, modifier: Modif
     }
 }
 
-private val Genders = listOf("Female", "Male", "Non-binary", "Prefer not to say")
+private val Genders = listOf("FEMALE" to "Female", "MALE" to "Male", "NON_BINARY" to "Non-binary", "UNDISCLOSED" to "Prefer not to say")
 
 /** Edit profile with the optional extras: gender, date of birth and city. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> Unit, onSave: suspend (String, String) -> Unit, onChangePhone: () -> Unit, photo: Bitmap? = null, modifier: Modifier = Modifier) {
+fun EditProfileScreen(
+    name: String, email: String, phone: String, onBack: () -> Unit,
+    onSave: suspend (String, String, Bitmap?, ProfileDetails) -> Unit, onChangePhone: () -> Unit,
+    photo: Bitmap? = null, details: ProfileDetails = ProfileDetails(), modifier: Modifier = Modifier,
+) {
     val textEditProfile = stringResource(R.string.text_edit_profile)
     val textKeepYourInformationUpToDate = stringResource(R.string.text_keep_your_information_up_to_date)
     val textDetailsName = stringResource(R.string.details_name)
@@ -161,9 +170,13 @@ fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> 
     val context = LocalContext.current
     var n by rememberSaveable { mutableStateOf(name) }
     var e by rememberSaveable { mutableStateOf(email) }
-    var gender by rememberSaveable { mutableStateOf("Prefer not to say") }
-    var dob by rememberSaveable { mutableStateOf("") }
-    var city by rememberSaveable { mutableStateOf("") }
+    var gender by rememberSaveable { mutableStateOf(details.gender ?: "UNDISCLOSED") }
+    var dob by rememberSaveable { mutableStateOf(details.dateOfBirth.orEmpty()) }
+    var city by rememberSaveable { mutableStateOf(details.city.orEmpty()) }
+    var replacement by remember { mutableStateOf<Bitmap?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { decodeSampled(context, it) }?.let { replacement = it }
+    }
     var genderSheet by rememberSaveable { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var saveFailed by remember { mutableStateOf(false) }
@@ -173,7 +186,11 @@ fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         ScreenTop(textEditProfile, onBack, subtitle = textKeepYourInformationUpToDate)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
-            Box(Modifier.fillMaxWidth().padding(vertical = 18.dp), contentAlignment = Alignment.Center) { Avatar(n, 88.dp, badge = true, photo = photo) }
+            Box(Modifier.fillMaxWidth().padding(vertical = 18.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.clickable(role = Role.Button) {
+                    picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }) { Avatar(n, 88.dp, badge = true, photo = replacement ?: photo) }
+            }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 RideTextField(n, { n = it.take(60) }, textDetailsName, RideIcons.Person, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next))
                 PickRow(RideIcons.Phone, textFriendPhone, phone, onChangePhone)
@@ -181,7 +198,7 @@ fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> 
             }
             Text(textAdditionalInformation, color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                PickRow(RideIcons.Person, textGenderOptional, localizedLabel(gender)) { genderSheet = true }
+                PickRow(RideIcons.Person, textGenderOptional, localizedLabel(Genders.firstOrNull { it.first == gender }?.second ?: "Prefer not to say")) { genderSheet = true }
                 PickRow(RideIcons.Calendar, textDateOfBirthOptional, dob.ifEmpty { textSelectADate }) {
                     val d = LocalDate.now().minusYears(25)
                     DatePickerDialog(context, { _, y, m, day -> dob = LocalDate.of(y, m + 1, day).toString() }, d.year, d.monthValue - 1, d.dayOfMonth)
@@ -196,7 +213,7 @@ fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> 
             if (!saving) scope.launch {
                 saving = true
                 saveFailed = false
-                try { onSave(n.trim(), e.trim()) }
+                try { onSave(n.trim(), e.trim(), replacement, ProfileDetails(gender, dob.ifBlank { null }, city.trim().ifBlank { null })) }
                 catch (_: Exception) { saveFailed = true }
                 finally { saving = false }
             }
@@ -210,11 +227,11 @@ fun EditProfileScreen(name: String, email: String, phone: String, onBack: () -> 
                 Text(textGender, color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 Text(textOptionalYouCanChangeThisAnyTime, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
                 GroupCard {
-                    Genders.forEachIndexed { i, g ->
+                    Genders.forEachIndexed { i, (code, g) ->
                         if (i > 0) RowDivider()
-                        Row(Modifier.fillMaxWidth().height(56.dp).clickable(role = Role.RadioButton) { gender = g; scope.launch { state.hide() }.invokeOnCompletion { genderSheet = false } }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(localizedLabel(g), color = c.fg, fontSize = 15.sp, fontWeight = if (g == gender) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
-                            if (g == gender) RideIcon(RideIcons.Check, c.accent)
+                        Row(Modifier.fillMaxWidth().height(56.dp).clickable(role = Role.RadioButton) { gender = code; scope.launch { state.hide() }.invokeOnCompletion { genderSheet = false } }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(localizedLabel(g), color = c.fg, fontSize = 15.sp, fontWeight = if (code == gender) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
+                            if (code == gender) RideIcon(RideIcons.Check, c.accent)
                         }
                     }
                 }

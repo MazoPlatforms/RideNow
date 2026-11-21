@@ -86,6 +86,7 @@ fun OtpScreen(
     onVerify: suspend (String, String) -> Unit,
     onVerified: () -> Unit,
     modifier: Modifier = Modifier,
+    onVerifySecond: (suspend (String, String) -> Unit)? = null,
 ) {
     val textSearchBack = stringResource(R.string.search_back)
     val text6DigitVerificationCode = stringResource(R.string.text_text_6_digit_verification_code)
@@ -96,6 +97,7 @@ fun OtpScreen(
     var error by remember { mutableStateOf(false) }
     var errorRes by remember { mutableStateOf(R.string.otp_error) }
     var errorTick by remember { mutableIntStateOf(0) }
+    var secondToken by remember { mutableStateOf<String?>(null) }
     var verifying by remember { mutableStateOf(false) }
     var resending by remember { mutableStateOf(false) }
     var activeChallengeId by rememberSaveable(challengeId) { mutableStateOf(challengeId) }
@@ -112,6 +114,10 @@ fun OtpScreen(
             try {
                 onVerify(activeChallengeId, code)
                 onVerified()
+            } catch (step: TwoStepRequired) {
+                secondToken = step.token
+                code = ""
+                verifying = false
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -154,6 +160,18 @@ fun OtpScreen(
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             for (v in listOf(-12f, 12f, -8f, 8f, 0f)) shake.animateTo(v, tween(50))
         }
+    }
+    secondToken?.let { token ->
+        SecondFactorDialog(
+            title = stringResource(R.string.two_step_login_title),
+            onDismiss = onBack,
+            onSubmit = { secondCode ->
+                val verify = requireNotNull(onVerifySecond)
+                verify(token, secondCode)
+                secondToken = null
+                onVerified()
+            },
+        )
     }
     val cursor by rememberInfiniteTransition(label = "cursor").animateFloat(1f, 0f, infiniteRepeatable(tween(550), RepeatMode.Reverse), label = "blink")
 

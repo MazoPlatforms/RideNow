@@ -4,6 +4,18 @@ import com.ridenow.app.getAppLanguage
 import com.ridenow.app.setAppLanguage
 
 import com.ridenow.app.R
+import com.ridenow.app.ui.auth.SecondFactorDialog
+import com.ridenow.app.ui.auth.VerificationCodeField
+import com.ridenow.app.ui.auth.secureFactorDialog
+import org.json.JSONObject
+import com.ridenow.app.ui.auth.AccountDeletionVerification
+import com.ridenow.app.ui.saved.RiderSettingsApi
+import com.ridenow.app.ui.map.fetchRiderPosition
+import com.ridenow.app.ui.notifications.rememberNotificationOptions
+import com.ridenow.app.ui.notifications.NotificationOptionsStatus
+import com.ridenow.app.ui.auth.PhoneAuthApi
+import com.ridenow.app.ui.auth.PhoneAuthException
+import kotlinx.coroutines.CancellationException
 import com.ridenow.app.ui.permissions.RiderLocationOffScreen
 import com.ridenow.app.ui.permissions.deviceLocationEnabled
 import com.ridenow.app.ui.permissions.rememberDeviceLocationEnabled
@@ -23,13 +35,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
-import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.shape.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -68,9 +80,11 @@ private fun MutableState<Boolean>.set(context: Context, key: String, value: Bool
 // ---------- Change phone number ----------
 
 @Composable
-fun ChangePhoneScreen(onBack: () -> Unit, onSend: () -> Unit) {
+fun ChangePhoneScreen(onBack: () -> Unit, onSend: (String, String) -> Unit) {
     val textChangePhoneNumber = stringResource(R.string.text_change_phone_number)
-    val textWeWillSendACodeToYourNewNumber = stringResource(R.string.text_we_will_send_a_code_to_your_new_number)
+    val textWeWillSendACodeToYourNewNumber = stringResource(R.string.phone_change_both_message)
+    val failureText = stringResource(R.string.phone_change_failed)
+    val waitText = stringResource(R.string.phone_change_wait)
     val textPhoneSend = stringResource(R.string.phone_send)
     val textCountryCodeValueValue = stringResource(R.string.text_country_code_value_value)
     val textFriendPhone = stringResource(R.string.friend_phone)
@@ -84,12 +98,27 @@ fun ChangePhoneScreen(onBack: () -> Unit, onSend: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val country = com.ridenow.app.ui.auth.Countries.byIso(iso)
     val valid = digits.length >= country.min
+    val scope = rememberCoroutineScope()
+    var sending by remember { mutableStateOf(false) }
+    var failure by remember { mutableStateOf<String?>(null) }
 
     MoreScaffold(textChangePhoneNumber, onBack, subtitle = textWeWillSendACodeToYourNewNumber, bottom = {
         RideButton(textPhoneSend, {
-            context.prefs().edit().putString("pending_phone", country.dial + digits).putString("pending_iso", country.iso).apply()
-            onSend()
-        }, enabled = valid)
+            if (!sending) scope.launch {
+                sending = true
+                failure = null
+                try {
+                    val result = PhoneAuthApi.requestPhoneChange(context, country.dial + digits)
+                    onSend(result.getString("phone"), result.getString("changeId"))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    failure = if ((error as? PhoneAuthException)?.status == 429) waitText else failureText
+                } finally {
+                    sending = false
+                }
+            }
+        }, enabled = valid && !sending, loading = sending)
     }) {
         Row(Modifier.padding(top = 20.dp).height(60.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(
@@ -121,6 +150,7 @@ fun ChangePhoneScreen(onBack: () -> Unit, onSend: () -> Unit) {
                 )
             }
         }
+        failure?.let { Text(it, color = c.danger, modifier = Modifier.padding(top = 12.dp)) }
         Text(textYourCurrentNumberStaysActiveUntilYouVerifyTheNewOne, color = c.muted, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 14.dp))
     }
 
@@ -134,107 +164,168 @@ fun ChangePhoneScreen(onBack: () -> Unit, onSend: () -> Unit) {
 }
 
 @Composable
-fun VerifyNewNumberScreen(onBack: () -> Unit, onVerified: (String) -> Unit) {
-    val textPhoneNumberUpdated = stringResource(R.string.text_phone_number_updated)
-    val textVerifyNewNumber = stringResource(R.string.text_verify_new_number)
-    val textEnterThe6DigitCodeSentToValue = stringResource(R.string.text_enter_the_6_digit_code_sent_to_value)
-    val textVerify = stringResource(R.string.text_verify)
-    val textResendCodeInValue = stringResource(R.string.text_resend_code_in_value)
-    val textOtpResend = stringResource(R.string.otp_resend)
-
-    val c = RideTheme.colors
+fun VerifyNewNumberScreen(currentPhone: String, newPhone: String, changeId: String, onBack: () -> Unit,
+    onVerified: (String) -> Unit,
+) {
     val context = LocalContext.current
-    val prefs = context.prefs()
-    val pendingFull = remember { prefs.getString("pending_phone", "") ?: "" }
-    val country = remember { com.ridenow.app.ui.auth.Countries.byIso(prefs.getString("pending_iso", "US") ?: "US") }
-    val localDigits = pendingFull.removePrefix(country.dial)
-    val formatted = remember(localDigits) {
-        com.ridenow.app.ui.auth.PhoneTransformation(country.pattern).filter(AnnotatedString(localDigits)).text.text
-    }
-    val shown = "${country.dial} $formatted"
-    var code by rememberSaveable { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val c = RideTheme.colors
+    val updatedText = stringResource(R.string.text_phone_number_updated)
+    val failureText = stringResource(R.string.phone_change_failed)
+    val waitText = stringResource(R.string.phone_change_wait)
+    var currentCode by remember { mutableStateOf("") }
+    var newCode by remember { mutableStateOf("") }
     var verifying by remember { mutableStateOf(false) }
-    var round by remember { mutableIntStateOf(0) }
-    val left = key(round) { rememberCountdown(24) }
+    var resending by remember { mutableStateOf(false) }
+    var activeChangeId by rememberSaveable(changeId) { mutableStateOf(changeId) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+    val left = key(activeChangeId) { rememberCountdown(60) }
 
-    // Same as onboarding: as soon as the 6th digit is in, verify automatically.
-    LaunchedEffect(verifying) {
-        if (verifying) {
-            delay(900)
-            context.toast(textPhoneNumberUpdated)
-            onVerified(pendingFull)
+    fun verify(current: String, next: String) {
+        if (verifying || resending || current.length != 6 || next.length != 6 || activeChangeId.isBlank()) return
+        verifying = true
+        errorText = null
+        scope.launch {
+            try {
+                val verified = PhoneAuthApi.verifyPhoneChange(context, activeChangeId, current, next)
+                context.toast(updatedText)
+                onVerified(verified)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                errorText = failureText
+                currentCode = ""; newCode = ""
+            } finally {
+                verifying = false
+            }
         }
     }
-
-    MoreScaffold(textVerifyNewNumber, onBack, subtitle = textEnterThe6DigitCodeSentToValue.format(shown), bottom = {
-        RideButton(textVerify, { verifying = true }, enabled = code.length == 6 && !verifying, loading = verifying)
-    }) {
-        Box(Modifier.padding(top = 24.dp)) {
-            CodeField(code, { v -> code = v; if (v.length == 6) verifying = true }, 6)
-        }
-        if (left > 0) Text(textResendCodeInValue.format(mmss(left)), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 16.dp))
-        else Text(textOtpResend, color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp).heightIn(min = 48.dp).clickable(role = Role.Button) { round++; code = "" }.wrapContentHeight(Alignment.CenterVertically))
+    MoreScaffold(stringResource(R.string.text_verify_new_number), onBack,
+        subtitle = stringResource(R.string.phone_change_both_message), bottom = {
+            RideButton(stringResource(R.string.text_verify), { verify(currentCode, newCode) },
+                enabled = currentCode.length == 6 && newCode.length == 6 && !verifying && !resending, loading = verifying)
+        }) {
+        Text(stringResource(R.string.phone_change_current_code, currentPhone), color = c.fg, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
+        CodeField(currentCode, { if (!verifying && !resending) { currentCode = it; verify(it, newCode) } }, 6)
+        Text(stringResource(R.string.phone_change_new_code, newPhone), color = c.fg, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
+        CodeField(newCode, { if (!verifying && !resending) { newCode = it; verify(currentCode, it) } }, 6)
+        errorText?.let { Text(it, color = c.danger, modifier = Modifier.padding(top = 12.dp)) }
+        if (left > 0) Text(stringResource(R.string.text_resend_code_in_value).format(mmss(left)), color = c.muted, modifier = Modifier.padding(top = 16.dp))
+        else Text(stringResource(R.string.otp_resend), color = c.accent, modifier = Modifier.padding(top = 8.dp)
+            .heightIn(min = 48.dp).clickable(enabled = !verifying && !resending, role = Role.Button) {
+                resending = true
+                errorText = null
+                scope.launch {
+                    try {
+                        val result = PhoneAuthApi.requestPhoneChange(context, newPhone)
+                        activeChangeId = result.getString("changeId")
+                        currentCode = ""; newCode = ""
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        errorText = if ((error as? PhoneAuthException)?.status == 429) waitText else failureText
+                    } finally {
+                        resending = false
+                    }
+                }
+            }.wrapContentHeight(Alignment.CenterVertically))
     }
 }
 
 // ---------- Current city ----------
 
+@Suppress("DEPRECATION")
 @Composable
-fun CityPickerScreen(onBack: () -> Unit) {
-    val textOrbitCity = stringResource(R.string.text_orbit_city)
-    val textHelixCity = stringResource(R.string.text_helix_city)
-    val textNovaHarbor = stringResource(R.string.text_nova_harbor)
-    val textAuroraBay = stringResource(R.string.text_aurora_bay)
-    val textCurrentCity = stringResource(R.string.text_current_city)
-    val textSearchForYourCity = stringResource(R.string.text_search_for_your_city)
-    val textSave = stringResource(R.string.text_save)
-    val textCitySaved = stringResource(R.string.text_city_saved)
-    val textSearchCity = stringResource(R.string.text_search_city)
-    val textUseCurrentLocation = stringResource(R.string.text_use_current_location)
-    val textCouldNotDetectYourCity = stringResource(R.string.text_could_not_detect_your_city)
-    val textDetecting = stringResource(R.string.text_detecting)
-    val textDetectAutomatically = stringResource(R.string.text_detect_automatically)
-    val textResults = stringResource(R.string.text_results)
-    val textSelected = stringResource(R.string.text_selected)
-    val textNoMatchingCity = stringResource(R.string.text_no_matching_city)
-
+fun CityPickerScreen(onBack: () -> Unit, currentCity: String?, onSaved: (String?) -> Unit) {
+    val title = stringResource(R.string.text_current_city)
     val c = RideTheme.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val locationOn = rememberDeviceLocationEnabled()
     var locationRequested by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
-    var city by rememberSaveable { mutableStateOf(context.prefs().getString("city", textOrbitCity) ?: textOrbitCity) }
+    var selected by rememberSaveable { mutableStateOf(currentCity) }
+    var changed by rememberSaveable { mutableStateOf(false) }
     var detecting by remember { mutableStateOf(false) }
-    val all = listOf(textOrbitCity, textHelixCity, textNovaHarbor, textAuroraBay)
-    val shown = all.filter { it.contains(query.trim(), ignoreCase = true) }
+    var saving by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    var results by remember { mutableStateOf(emptyList<String>()) }
+    val noLocation = stringResource(R.string.text_could_not_detect_your_city)
+    val onExit = { if (!saving) onBack() }
+
+    fun detect() {
+        if (!deviceLocationEnabled(context)) {
+            locationRequested = true
+            return
+        }
+        if (detecting || saving) return
+        detecting = true
+        scope.launch {
+            try {
+                val found = detectCity(context)
+                if (!deviceLocationEnabled(context)) locationRequested = true
+                else if (found != null) { selected = found; changed = true; query = "" }
+                else context.toast(noLocation)
+            } finally { detecting = false }
+        }
+    }
+    val permission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
+    ) { if (it.values.any { granted -> granted }) detect() else context.toast(noLocation) }
+
+    LaunchedEffect(currentCity) { if (!changed) selected = currentCity }
+    LaunchedEffect(query) {
+        results = emptyList()
+        val value = query.trim()
+        if (value.length >= 3) {
+            delay(350)
+            results = withContext(Dispatchers.IO) {
+                runCatching { Geocoder(context).getFromLocationName(value, 6).orEmpty() }.getOrDefault(emptyList())
+                    .mapNotNull { it.locality ?: it.subAdminArea ?: it.adminArea }.map { it.take(100) }.distinct()
+            }
+        }
+    }
+    androidx.activity.compose.BackHandler(onBack = onExit)
     Box(Modifier.fillMaxSize()) {
-        MoreScaffold(textCurrentCity, onBack, subtitle = textSearchForYourCity, bottom = { RideButton(textSave, { context.prefs().edit().putString("city", city).apply(); context.toast(textCitySaved); onBack() }) }) {
-            RideTextField(query, { query = it.take(40) }, textSearchCity, RideIcons.Search, Modifier.padding(top = 16.dp))
+        MoreScaffold(title, onExit, subtitle = stringResource(R.string.text_search_for_your_city), bottom = {
+            RideButton(stringResource(R.string.text_save), {
+                saving = true
+                failed = false
+                scope.launch {
+                    try {
+                        val saved = RiderSettingsApi.updateCity(context, selected)
+                        onSaved(saved)
+                        onBack()
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { failed = true }
+                    finally { saving = false }
+                }
+            }, enabled = changed && !saving && !detecting, loading = saving)
+        }) {
+            RideTextField(query, { query = it.take(100) }, stringResource(R.string.text_search_city), RideIcons.Search, Modifier.padding(top = 16.dp))
             GroupCard(Modifier.padding(top = 12.dp)) {
-                NavRow(RideIcons.Pin, textUseCurrentLocation, {
-                    if (!deviceLocationEnabled(context)) {
-                        locationRequested = true
-                    } else if (!detecting) {
-                        detecting = true
-                        scope.launch {
-                            try {
-                                val found = withContext(Dispatchers.IO) { detectCity(context) }
-                                if (!deviceLocationEnabled(context)) locationRequested = true
-                                else if (found != null) city = found else context.toast(textCouldNotDetectYourCity)
-                            } finally {
-                                detecting = false
-                            }
-                        }
+                NavRow(RideIcons.Pin, stringResource(R.string.text_use_current_location), {
+                    if (!deviceLocationEnabled(context)) locationRequested = true
+                    else if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                        permission.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                    } else detect()
+                }, subtitle = stringResource(if (detecting) R.string.text_detecting else R.string.text_detect_automatically), trailing = {})
+            }
+            SectionLabel(stringResource(R.string.text_results))
+            val choices = (if (query.isBlank()) listOfNotNull(selected) else results + query.trim()).filter { it.isNotBlank() }.distinct()
+            if (choices.isNotEmpty()) GroupCard {
+                choices.forEachIndexed { i, city ->
+                    if (i > 0) RowDivider()
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        RadioRow(city, selected == city, { if (!saving) { selected = city; changed = true } })
                     }
-                }, subtitle = if (detecting) textDetecting else textDetectAutomatically, trailing = {})
+                }
             }
-            SectionLabel(textResults)
-            GroupCard {
-                val list = if (city !in all && query.isBlank()) listOf(city) + shown else shown
-                list.forEachIndexed { i, n -> if (i > 0) RowDivider(); Column(Modifier.padding(horizontal = 16.dp)) { RadioRow(n, city == n, { city = n }, if (city == n) textSelected else null) } }
-                if (list.isEmpty()) Text(textNoMatchingCity, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
+            if (selected != null) TextButton(onClick = { selected = null; query = ""; changed = true }, enabled = !saving) {
+                Text(stringResource(R.string.text_remove))
             }
+            if (failed) Text(stringResource(R.string.saved_settings_failed), color = c.danger, modifier = Modifier.padding(top = 8.dp))
         }
         if (locationRequested && !locationOn) {
             val dismiss = { locationRequested = false }
@@ -245,12 +336,18 @@ fun CityPickerScreen(onBack: () -> Unit) {
     LaunchedEffect(locationOn) { if (locationOn) locationRequested = false }
 }
 
-@Suppress("DEPRECATION", "MissingPermission")
-private fun detectCity(context: Context): String? = try {
-    val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    val loc = lm.getProviders(true).mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }.firstOrNull()
-    loc?.let { Geocoder(context).getFromLocation(it.latitude, it.longitude, 1)?.firstOrNull()?.let { a -> a.locality ?: a.subAdminArea } }
-} catch (e: Exception) { null }
+@Suppress("DEPRECATION")
+private suspend fun detectCity(context: Context): String? = try {
+    val point = fetchRiderPosition(context)
+    if (point == null) null else withContext(Dispatchers.IO) {
+        Geocoder(context).getFromLocation(point.latitude, point.longitude, 1)?.firstOrNull()?.let {
+            (it.locality ?: it.subAdminArea ?: it.adminArea)?.take(100)
+        }
+    }
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: Exception) { null }
+
 
 // ---------- Transaction history ----------
 
@@ -317,21 +414,38 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
 
     val c = RideTheme.colors
     val context = LocalContext.current
-    val push = rememberPref("n_push", true)
+    val options = rememberNotificationOptions()
     val items = listOf(
-        Triple("n_rides", textRideUpdates, textDriverMatchingArrivalTripUpdatesAndCompletion),
-        Triple("n_promo", textPromotionsOffers, textDiscountsSpecialOffersAndNewFeatures),
-        Triple("n_sched", textScheduledRides, textRemindersAndUpdatesForScheduledRides),
-        Triple("n_pay", textMenuPayments, textPaymentConfirmationsRefundsAndTransactionUpdates),
-        Triple("n_acct", textAccountUpdates, textProfileChangesSecurityAlertsAndImportantAccountInformation),
+        Triple("rides", textRideUpdates, textDriverMatchingArrivalTripUpdatesAndCompletion),
+        Triple("promotions", textPromotionsOffers, textDiscountsSpecialOffersAndNewFeatures),
+        Triple("scheduled", textScheduledRides, textRemindersAndUpdatesForScheduledRides),
+        Triple("payments", textMenuPayments, textPaymentConfirmationsRefundsAndTransactionUpdates),
+        Triple("account", textAccountUpdates, textProfileChangesSecurityAlertsAndImportantAccountInformation),
     )
-    val states = items.map { rememberPref(it.first, it.first != "n_promo") }
+    val push = options.isOn("push")
+    val editable = options.values != null && !options.busy
     MoreScaffold(textNotificationSettings, onBack, subtitle = textChooseWhatNotificationsYouWantToReceive) {
-        GroupCard(Modifier.padding(top = 16.dp)) { ToggleRow(textPushNotifications, textReceiveImportantUpdatesRideAlertsAndAccountNotifications, push.value, { push.set(context, "n_push", it) }) }
-        SectionLabel(textRideNotifications)
-        GroupCard { listOf(0, 1, 2).forEachIndexed { i, k -> if (i > 0) RowDivider(); ToggleRow(items[k].second, items[k].third, states[k].value && push.value, { states[k].set(context, items[k].first, it) }, enabled = push.value) } }
-        SectionLabel(textAccountNotifications)
-        GroupCard { listOf(3, 4).forEachIndexed { i, k -> if (i > 0) RowDivider(); ToggleRow(items[k].second, items[k].third, states[k].value && push.value, { states[k].set(context, items[k].first, it) }, enabled = push.value) } }
+        NotificationOptionsStatus(options)
+        if (options.values != null) {
+            GroupCard(Modifier.padding(top = 16.dp)) {
+                ToggleRow(textPushNotifications, textReceiveImportantUpdatesRideAlertsAndAccountNotifications,
+                    push, { options.update("push", it) }, enabled = editable)
+            }
+            SectionLabel(textRideNotifications)
+            GroupCard {
+                items.take(3).forEachIndexed { i, (key, title, sub) ->
+                    if (i > 0) RowDivider()
+                    ToggleRow(title, sub, options.isOn(key) && push, { options.update(key, it) }, enabled = push && editable)
+                }
+            }
+            SectionLabel(textAccountNotifications)
+            GroupCard {
+                items.drop(3).forEachIndexed { i, (key, title, sub) ->
+                    if (i > 0) RowDivider()
+                    ToggleRow(title, sub, options.isOn(key) && push, { options.update(key, it) }, enabled = push && editable)
+                }
+            }
+        }
         GroupCard(Modifier.padding(top = 16.dp)) {
             NavRow(RideIcons.Sliders, textPhoneNotificationSettings, { runCatching { context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }, subtitle = textSoundsChannelsAndTheLockScreen)
         }
@@ -436,46 +550,130 @@ fun PrivacyHubScreen(onBack: () -> Unit, open: (String) -> Unit) {
 // ---------- Manage devices ----------
 
 @Composable
-fun ManageDevicesScreen(onBack: () -> Unit) {
-    val textTablet = stringResource(R.string.text_tablet)
-    val textLastActive2DaysAgo = stringResource(R.string.text_last_active_2_days_ago)
-    val textManageDevices = stringResource(R.string.text_manage_devices)
-    val textDevicesWhereYouAreSignedIn = stringResource(R.string.text_devices_where_you_are_signed_in)
-    val textLogOutOfAllOtherDevices = stringResource(R.string.text_log_out_of_all_other_devices)
-    val textLoggedOutOfOtherDevices = stringResource(R.string.text_logged_out_of_other_devices)
-    val textThisDevice = stringResource(R.string.text_this_device)
-    val textThisPhone = stringResource(R.string.text_this_phone)
-    val textActiveNowOrbitCity = stringResource(R.string.text_active_now_orbit_city)
-    val textCurrent = stringResource(R.string.text_current)
-    val textOtherDevices = stringResource(R.string.text_other_devices)
-    val textNoOtherDevicesAreSignedIn = stringResource(R.string.text_no_other_devices_are_signed_in)
-    val textLogOutValue = stringResource(R.string.text_log_out_value)
-    val textLogOut = stringResource(R.string.text_log_out)
-
+fun ManageDevicesScreen(onBack: () -> Unit, onSessionExpired: () -> Unit) {
     val c = RideTheme.colors
     val context = LocalContext.current
-    val others = remember { mutableStateListOf(textTablet to textLastActive2DaysAgo) }
-    MoreScaffold(textManageDevices, onBack, subtitle = textDevicesWhereYouAreSignedIn, bottom = {
-        if (others.isNotEmpty()) DangerButton(textLogOutOfAllOtherDevices, { others.clear(); context.toast(textLoggedOutOfOtherDevices) })
-    }) {
-        SectionLabel(textThisDevice)
-        GroupCard {
-            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                RideIcon(RideIcons.Phone, c.accent); Column(Modifier.padding(start = 14.dp).weight(1f)) { Text(textThisPhone, color = c.fg, fontSize = 15.sp); Text(textActiveNowOrbitCity, color = c.muted, fontSize = 12.sp) }
-                Text(textCurrent, color = c.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            }
+    val scope = rememberCoroutineScope()
+    val title = stringResource(R.string.text_manage_devices)
+    val failure = stringResource(R.string.device_load_failed)
+    val logout = stringResource(R.string.text_log_out)
+    val logoutAll = stringResource(R.string.text_log_out_of_all_other_devices)
+    val loggedOutAll = stringResource(R.string.text_logged_out_of_other_devices)
+    val unknown = stringResource(R.string.device_unknown)
+    val riderApp = stringResource(R.string.device_rider_app)
+    val driverApp = stringResource(R.string.device_driver_app)
+    var devices by remember { mutableStateOf<List<PhoneAuthApi.SignedInDevice>?>(null) }
+    var error by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(true) }
+    var reload by remember { mutableIntStateOf(0) }
+    var confirm by remember { mutableStateOf<String?>(null) }
+    val others = devices.orEmpty().filterNot { it.current }
+    val current = devices.orEmpty().firstOrNull { it.current }
+
+    fun label(device: PhoneAuthApi.SignedInDevice) = device.name ?: unknown
+
+    fun details(device: PhoneAuthApi.SignedInDevice): String {
+        val appName = when (device.app) {
+            "RIDER" -> riderApp
+            "DRIVER" -> driverApp
+            else -> unknown
         }
-        SectionLabel(textOtherDevices)
-        if (others.isEmpty()) Text(textNoOtherDevicesAreSignedIn, color = c.muted, fontSize = 14.sp)
-        else GroupCard {
-            others.forEachIndexed { i, (n, s) ->
-                if (i > 0) RowDivider()
-                Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    RideIcon(RideIcons.Phone, c.muted); Column(Modifier.padding(start = 14.dp).weight(1f).padding(vertical = 12.dp)) { Text(n, color = c.fg, fontSize = 15.sp); Text(s, color = c.muted, fontSize = 12.sp) }
-                    Box(Modifier.heightIn(min = 48.dp).clickable(role = Role.Button) { others.removeAt(i) }.padding(horizontal = 16.dp).semantics { contentDescription = textLogOutValue.format(n) }, contentAlignment = Alignment.Center) { Text(textLogOut, color = c.danger, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+        val time = runCatching {
+            java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT)
+                .format(java.util.Date.from(java.time.Instant.parse(device.updatedAt)))
+        }.getOrDefault("")
+        return listOf(appName, device.id.takeLast(6).uppercase(), time).filter { it.isNotBlank() }.joinToString(" · ")
+    }
+
+    LaunchedEffect(reload) {
+        busy = true
+        error = false
+        try {
+            devices = PhoneAuthApi.listDevices(context, register = devices == null)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (exception: Exception) {
+            if ((exception as? PhoneAuthException)?.status == 401) onSessionExpired() else error = true
+        } finally {
+            busy = false
+        }
+    }
+
+    MoreScaffold(title, onBack, subtitle = stringResource(R.string.text_devices_where_you_are_signed_in), bottom = {
+        if (others.isNotEmpty() && !busy) DangerButton(logoutAll, { confirm = "" })
+    }) {
+        if (busy && devices == null) Text(stringResource(R.string.device_loading), color = c.muted, modifier = Modifier.padding(top = 12.dp))
+        if (error) {
+            Text(failure, color = c.danger, modifier = Modifier.padding(top = 12.dp))
+            TextButton(onClick = { reload++ }, enabled = !busy) { Text(stringResource(R.string.device_retry)) }
+        }
+        current?.let { device ->
+            SectionLabel(stringResource(R.string.text_this_device))
+            GroupCard {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RideIcon(RideIcons.Phone, c.accent)
+                    Column(Modifier.padding(start = 14.dp).weight(1f)) {
+                        Text(label(device), color = c.fg, fontSize = 15.sp)
+                        Text(details(device), color = c.muted, fontSize = 12.sp)
+                    }
+                    Text(stringResource(R.string.text_current), color = c.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
+        if (devices != null) {
+            SectionLabel(stringResource(R.string.text_other_devices))
+            if (others.isEmpty()) Text(stringResource(R.string.text_no_other_devices_are_signed_in), color = c.muted, fontSize = 14.sp)
+            else GroupCard {
+                others.forEachIndexed { i, device ->
+                    if (i > 0) RowDivider()
+                    Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        RideIcon(RideIcons.Phone, c.muted)
+                        Column(Modifier.padding(start = 14.dp).weight(1f).padding(vertical = 12.dp)) {
+                            Text(label(device), color = c.fg, fontSize = 15.sp)
+                            Text(details(device), color = c.muted, fontSize = 12.sp)
+                        }
+                        val description = stringResource(R.string.device_logout_named, label(device))
+                        Box(
+                            Modifier.heightIn(min = 48.dp).clickable(enabled = !busy, role = Role.Button) { confirm = device.id }
+                                .padding(horizontal = 16.dp).semantics { contentDescription = description },
+                            contentAlignment = Alignment.Center,
+                        ) { Text(logout, color = c.danger, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+    }
+    confirm?.let { target ->
+        val message = if (target.isEmpty()) logoutAll else
+            stringResource(R.string.device_logout_named, others.firstOrNull { it.id == target }?.let(::label) ?: unknown)
+        AlertDialog(
+            onDismissRequest = { confirm = null },
+            title = { Text(message) },
+            text = { Text(stringResource(R.string.device_logout_confirmation)) },
+            dismissButton = { TextButton(onClick = { confirm = null }) { Text(stringResource(R.string.device_cancel)) } },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirm = null
+                    busy = true
+                    error = false
+                    scope.launch {
+                        try {
+                            PhoneAuthApi.revokeDevice(context, target.ifEmpty { null })
+                            devices = devices?.filter { it.current || (target.isNotEmpty() && it.id != target) }
+                            if (target.isEmpty()) context.toast(loggedOutAll)
+                            devices = PhoneAuthApi.listDevices(context)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (exception: Exception) {
+                            if ((exception as? PhoneAuthException)?.status == 401) onSessionExpired() else error = true
+                        } finally {
+                            busy = false
+                        }
+                    }
+                }) { Text(logout) }
+            },
+        )
     }
 }
 
@@ -483,50 +681,168 @@ fun ManageDevicesScreen(onBack: () -> Unit) {
 
 @Composable
 fun TwoStepScreen(onBack: () -> Unit, phone: String) {
-    val textTwoStepVerification = stringResource(R.string.text_two_step_verification)
-    val textAddAnExtraLayerOfSecurity2 = stringResource(R.string.text_add_an_extra_layer_of_security_2)
-    val textRequireACodeOnNewDevices = stringResource(R.string.text_require_a_code_on_new_devices)
-    val textAskForACodeWhenSigningInElsewhere = stringResource(R.string.text_ask_for_a_code_when_signing_in_elsewhere)
-    val textMethod = stringResource(R.string.text_method)
-    val textMessageSms = stringResource(R.string.text_text_message_sms)
-    val textCodesSentToValue = stringResource(R.string.text_codes_sent_to_value)
-    val textAuthenticatorApp = stringResource(R.string.text_authenticator_app)
-    val textUseAOneTimeCodeApp = stringResource(R.string.text_use_a_one_time_code_app)
-    val textBackup = stringResource(R.string.text_backup)
-    val textRecoveryCodes = stringResource(R.string.text_recovery_codes)
-    val textUseTheseIfYouLoseYourPhone = stringResource(R.string.text_use_these_if_you_lose_your_phone)
-    val textEachCodeWorksOnceStoreThemSomewhereSafe = stringResource(R.string.text_each_code_works_once_store_them_somewhere_safe)
-    val textCopied = stringResource(R.string.text_copied)
-    val textCopy = stringResource(R.string.text_copy)
-    val textClose = stringResource(R.string.text_close)
-
     val c = RideTheme.colors
     val context = LocalContext.current
-    val on = rememberPref("ts_on", false)
-    var method by rememberSaveable { mutableIntStateOf(0) }
-    var codes by remember { mutableStateOf<List<String>?>(null) }
-    val clip = LocalClipboardManager.current
-    MoreScaffold(textTwoStepVerification, onBack, subtitle = textAddAnExtraLayerOfSecurity2) {
-        GroupCard(Modifier.padding(top = 16.dp)) { ToggleRow(textRequireACodeOnNewDevices, textAskForACodeWhenSigningInElsewhere, on.value, { on.set(context, "ts_on", it) }) }
-        SectionLabel(textMethod)
-        GroupCard {
-            Column(Modifier.padding(horizontal = 16.dp)) {
-                RadioRow(textMessageSms, method == 0, { method = 0 }, textCodesSentToValue.format(phone)); RowDivider()
-                RadioRow(textAuthenticatorApp, method == 1, { method = 1 }, textUseAOneTimeCodeApp)
+    val scope = rememberCoroutineScope()
+    val title = stringResource(R.string.text_two_step_verification)
+    val failureText = stringResource(R.string.two_step_settings_error)
+    val refresh = stringResource(R.string.device_retry)
+    val recoveryTitle = stringResource(R.string.text_recovery_codes)
+    val backupText = stringResource(R.string.text_use_these_if_you_lose_your_phone)
+    val copyText = stringResource(R.string.text_copy)
+    var enabled by remember { mutableStateOf<Boolean?>(null) }
+    var recoveryRemaining by remember { mutableIntStateOf(0) }
+    var setupSecret by remember { mutableStateOf<String?>(null) }
+    var recoveryCodes by remember { mutableStateOf<List<String>?>(null) }
+    var operation by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf(false) }
+
+    fun load() {
+        if (busy) return
+        busy = true
+        error = false
+        scope.launch {
+            try {
+                val info = PhoneAuthApi.twoStepSettings(context)
+                enabled = info.getBoolean("enabled")
+                recoveryRemaining = info.getInt("recoveryRemaining")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                error = true
+            } finally {
+                busy = false
             }
         }
-        SectionLabel(textBackup)
-        GroupCard { NavRow(RideIcons.Doc, textRecoveryCodes, { codes = List(8) { "%04d-%04d".format((0..9999).random(), (0..9999).random()) } }, subtitle = textUseTheseIfYouLoseYourPhone) }
+    }
+
+    fun beginSetup() {
+        if (busy) return
+        busy = true
+        error = false
+        scope.launch {
+            try {
+                setupSecret = PhoneAuthApi.twoStepSettings(context, "/setup").getString("secret")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                error = true
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun showCodes(response: JSONObject) {
+        val codes = response.getJSONArray("recoveryCodes")
+        recoveryCodes = List(codes.length()) { codes.getString(it) }
+        recoveryRemaining = codes.length()
+    }
+
+    LaunchedEffect(Unit) { load() }
+    MoreScaffold(title, onBack, subtitle = stringResource(R.string.text_add_an_extra_layer_of_security_2)) {
+        if (error) {
+            Text(failureText, color = c.danger, modifier = Modifier.padding(top = 12.dp))
+            TextButton(onClick = ::load, enabled = !busy) { Text(refresh) }
+        }
+        if (enabled == null && !error) Text(stringResource(R.string.two_step_loading), color = c.muted, modifier = Modifier.padding(top = 12.dp))
+        enabled?.let { on ->
+            GroupCard(Modifier.padding(top = 16.dp)) {
+                ToggleRow(title, stringResource(R.string.two_step_optional), on, { if (!busy) { if (on) operation = "/disable" else beginSetup() } })
+            }
+        }
+        SectionLabel(stringResource(R.string.text_method))
+        GroupCard {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.two_step_whatsapp, phone), color = c.fg)
+                Text(stringResource(R.string.two_step_authenticator_method), color = c.muted)
+            }
+        }
+        SectionLabel(stringResource(R.string.text_backup))
+        GroupCard {
+            if (enabled == true && !busy) NavRow(RideIcons.Doc, recoveryTitle, { operation = "/recovery" },
+                subtitle = stringResource(R.string.two_step_remaining, recoveryRemaining))
+            else Text(backupText, color = c.muted, modifier = Modifier.padding(16.dp))
+        }
         Spacer(Modifier.height(16.dp))
     }
-    codes?.let { list ->
+    setupSecret?.let { secret ->
+        var whatsappCode by remember { mutableStateOf("") }
+        var code by remember { mutableStateOf("") }
+        var invalid by remember { mutableStateOf(false) }
         AlertDialog(
-            onDismissRequest = { codes = null }, title = { Text(textRecoveryCodes) },
-            text = { Text(textEachCodeWorksOnceStoreThemSomewhereSafe + list.joinToString("\n")) },
-            confirmButton = { TextButton({ clip.setText(AnnotatedString(list.joinToString("\n"))); context.toast(textCopied); codes = null }) { Text(textCopy) } },
-            dismissButton = { TextButton({ codes = null }) { Text(textClose) } },
+            properties = secureFactorDialog,
+            onDismissRequest = { if (!busy) setupSecret = null },
+            title = { Text(stringResource(R.string.two_step_setup_title)) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.two_step_setup_help))
+                    SelectionContainer { Text(secret) }
+                    TextButton(enabled = !busy, onClick = { copySecurityText(context, secret) }) { Text(copyText) }
+                    VerificationCodeField(whatsappCode, { whatsappCode = it }, stringResource(R.string.two_step_whatsapp_code), !busy, true)
+                    VerificationCodeField(code, { code = it }, stringResource(R.string.two_step_app_code), !busy, true)
+                    if (invalid) Text(stringResource(R.string.two_step_setup_error), color = c.danger)
+                }
+            },
+            dismissButton = { TextButton(enabled = !busy, onClick = { setupSecret = null }) { Text(stringResource(R.string.two_step_cancel)) } },
+            confirmButton = {
+                TextButton(enabled = !busy && whatsappCode.length == 6 && code.length == 6, onClick = {
+                    busy = true
+                    invalid = false
+                    scope.launch {
+                        try {
+                            val response = PhoneAuthApi.twoStepSettings(context, "/enable",
+                                JSONObject().put("whatsappCode", whatsappCode).put("code", code))
+                            enabled = response.getBoolean("enabled")
+                            setupSecret = null
+                            showCodes(response)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            invalid = true
+                        } finally {
+                            busy = false
+                        }
+                    }
+                }) { Text(stringResource(R.string.two_step_confirm)) }
+            },
         )
     }
+    operation?.let { action ->
+        val operationTitle = stringResource(if (action == "/disable") R.string.two_step_disable else R.string.two_step_replace)
+        SecondFactorDialog(operationTitle, onDismiss = { operation = null }) { code ->
+            val response = PhoneAuthApi.twoStepSettings(context, action, JSONObject().put("code", code))
+            enabled = response.getBoolean("enabled")
+            operation = null
+            if (enabled == true) showCodes(response) else recoveryRemaining = 0
+        }
+    }
+    recoveryCodes?.let { codes ->
+        AlertDialog(
+            properties = secureFactorDialog,
+            onDismissRequest = { recoveryCodes = null },
+            title = { Text(recoveryTitle) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.two_step_save_codes))
+                    Text(codes.joinToString("\n"))
+                }
+            },
+            confirmButton = { TextButton(onClick = { copySecurityText(context, codes.joinToString("\n")) }) { Text(copyText) } },
+            dismissButton = { TextButton(onClick = { recoveryCodes = null }) { Text(stringResource(R.string.text_close)) } },
+        )
+    }
+}
+
+private fun copySecurityText(context: android.content.Context, value: String) {
+    val clip = android.content.ClipData.newPlainText("RideNow", value)
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+        clip.description.extras = android.os.PersistableBundle().apply {
+            putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+        }
+    }
+    context.getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(clip)
 }
 
 // ---------- App data & permissions ----------
@@ -677,24 +993,24 @@ fun DeleteAccountScreen(onBack: () -> Unit, onContinue: () -> Unit) {
     val textMenuSaved = stringResource(R.string.menu_saved)
     val textAllYourSavedLocations = stringResource(R.string.text_all_your_saved_locations)
     val textRideHistory2 = stringResource(R.string.text_ride_history_2)
-    val textAllYourPastRidesAndRelatedData = stringResource(R.string.text_all_your_past_rides_and_related_data)
+    val historyNotice = stringResource(R.string.account_delete_history)
     val textSettingsPayments = stringResource(R.string.settings_payments)
     val textAllSavedPaymentMethods = stringResource(R.string.text_all_saved_payment_methods)
     val textAppPreferences = stringResource(R.string.text_app_preferences)
     val textSettingsNotificationsAndOtherPreferences = stringResource(R.string.text_settings_notifications_and_other_preferences)
     val textDeleteAccount = stringResource(R.string.text_delete_account)
-    val textWeAreSorryToSeeYouGoDeletingYourAccountWillPermanentlyRemove = stringResource(R.string.text_we_are_sorry_to_see_you_go_deleting_your_account_will_permanently_remove)
+    val summary = stringResource(R.string.account_delete_summary)
     val textDeleteAccount2 = stringResource(R.string.text_delete_account_2)
     val textThisActionCannotBeUndone = stringResource(R.string.text_this_action_cannot_be_undone)
-    val textAllYourDataWillBePermanentlyDeleted = stringResource(R.string.text_all_your_data_will_be_permanently_deleted)
+    val retentionNotice = stringResource(R.string.account_delete_retention)
     val textWhatWillBeDeleted = stringResource(R.string.text_what_will_be_deleted)
     val textAnyPendingRidesPaymentsOrRefundsMustBeCompletedBeforeYouCanD = stringResource(R.string.text_any_pending_rides_payments_or_refunds_must_be_completed_before_you_can_d)
 
     val c = RideTheme.colors
-    val items = listOf(textYourProfile to textNamePhoneNumberAndAccountDetails, textMenuSaved to textAllYourSavedLocations, textRideHistory2 to textAllYourPastRidesAndRelatedData, textSettingsPayments to textAllSavedPaymentMethods, textAppPreferences to textSettingsNotificationsAndOtherPreferences)
-    MoreScaffold(textDeleteAccount, onBack, subtitle = textWeAreSorryToSeeYouGoDeletingYourAccountWillPermanentlyRemove, bottom = { DangerButton(textDeleteAccount2, onContinue) }) {
+    val items = listOf(textYourProfile to textNamePhoneNumberAndAccountDetails, textMenuSaved to textAllYourSavedLocations, textRideHistory2 to historyNotice, textSettingsPayments to textAllSavedPaymentMethods, textAppPreferences to textSettingsNotificationsAndOtherPreferences)
+    MoreScaffold(textDeleteAccount, onBack, subtitle = summary, bottom = { DangerButton(textDeleteAccount2, onContinue) }) {
         Row(Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.danger.copy(alpha = 0.12f)).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            RideIcon(RideIcons.Alert, c.danger); Column(Modifier.padding(start = 12.dp)) { Text(textThisActionCannotBeUndone, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold); Text(textAllYourDataWillBePermanentlyDeleted, color = c.muted, fontSize = 13.sp) }
+            RideIcon(RideIcons.Alert, c.danger); Column(Modifier.padding(start = 12.dp)) { Text(textThisActionCannotBeUndone, color = c.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold); Text(retentionNotice, color = c.muted, fontSize = 13.sp) }
         }
         SectionLabel(textWhatWillBeDeleted)
         GroupCard { items.forEachIndexed { i, (t, s) -> if (i > 0) RowDivider(); Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) { Text(t, color = c.fg, fontSize = 15.sp); Text(s, color = c.muted, fontSize = 12.sp) } } }
@@ -704,31 +1020,21 @@ fun DeleteAccountScreen(onBack: () -> Unit, onContinue: () -> Unit) {
 
 @Composable
 fun ConfirmDeletionScreen(phone: String, onBack: () -> Unit, onDeleted: () -> Unit) {
-    val textConfirmDeletion = stringResource(R.string.text_confirm_deletion)
-    val textEnterTheCodeSentToValueToDeleteYourAccount = stringResource(R.string.text_enter_the_code_sent_to_value_to_delete_your_account)
-    val textDeleteAccount2 = stringResource(R.string.text_delete_account_2)
-    val textKeepMyAccount = stringResource(R.string.text_keep_my_account)
-    val textResendCodeInValue = stringResource(R.string.text_resend_code_in_value)
-    val textOtpResend = stringResource(R.string.otp_resend)
-    val textThisPermanentlyDeletesYourDataAndCannotBeUndone = stringResource(R.string.text_this_permanently_deletes_your_data_and_cannot_be_undone)
-
-    val c = RideTheme.colors
     val context = LocalContext.current
     val appearance = LocalAppearance.current
-    var code by rememberSaveable { mutableStateOf("") }
-    var round by remember { mutableIntStateOf(0) }
-    val left = key(round) { rememberCountdown(24) }
-    MoreScaffold(textConfirmDeletion, onBack, subtitle = textEnterTheCodeSentToValueToDeleteYourAccount.format(phone), bottom = {
-        DangerButton(textDeleteAccount2, {
-            val seen = context.prefs().getBoolean("intro_seen", false)
-            context.prefs().edit().clear().putBoolean("intro_seen", seen).apply(); appearance?.reload(); onDeleted()
-        }, enabled = code.length == 6)
-        RideButton(textKeepMyAccount, onBack, Modifier.padding(top = 8.dp), style = RideButtonStyle.Text)
-    }) {
-        Box(Modifier.padding(top = 24.dp)) { CodeField(code, { code = it }, 6) }
-        if (left > 0) Text(textResendCodeInValue.format(mmss(left)), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 16.dp))
-        else Text(textOtpResend, color = c.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp).heightIn(min = 48.dp).clickable(role = Role.Button) { round++; code = "" }.wrapContentHeight(Alignment.CenterVertically))
-        Text(textThisPermanentlyDeletesYourDataAndCannotBeUndone, color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(top = 16.dp))
+    AccountDeletionVerification(phone, onBack, onDeleted = {
+        val seen = context.prefs().getBoolean("intro_seen", false)
+        context.prefs().edit().clear().putBoolean("intro_seen", seen).apply()
+        appearance?.reload()
+        onDeleted()
+    }) { title, back, busy, canConfirm, confirm, fields ->
+        MoreScaffold(title, back, bottom = {
+            DangerButton(stringResource(R.string.text_delete_account_2), confirm, enabled = canConfirm)
+            RideButton(stringResource(R.string.text_keep_my_account), back, Modifier.padding(top = 8.dp),
+                enabled = !busy, style = RideButtonStyle.Text)
+        }) {
+            Box(Modifier.padding(top = 24.dp)) { fields() }
+        }
     }
 }
 
