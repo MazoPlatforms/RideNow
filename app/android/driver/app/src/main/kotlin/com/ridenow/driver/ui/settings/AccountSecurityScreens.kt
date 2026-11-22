@@ -29,6 +29,7 @@ import com.ridenow.driver.ui.auth.secureFactorDialog
 import org.json.JSONObject
 import com.ridenow.driver.ui.auth.PhoneAuthApi
 import com.ridenow.driver.ui.auth.PhoneAuthException
+import com.ridenow.driver.ui.auth.rememberAccountDataDownload
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import com.ridenow.driver.ui.components.*
@@ -350,26 +351,35 @@ private fun copySecurityText(context: android.content.Context, value: String) {
 @Composable
 fun DownloadDataScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
+    val download = rememberAccountDataDownload()
+    val sections = listOf("PROFILE", "RIDES", "EARNINGS", "VEHICLES", "SUPPORT")
     val items = listOf(
-        Triple(RideIcons.Person, R.string.settings_profile, R.string.sec_dl_profile_sub), Triple(RideIcons.Clock, R.string.sec_dl_rides, R.string.sec_dl_rides_sub),
-        Triple(RideIcons.Wallet, R.string.sec_dl_earnings, R.string.sec_dl_earnings_sub), Triple(RideIcons.Car, R.string.sec_dl_vehicle, R.string.sec_dl_vehicle_sub),
+        Triple(RideIcons.Person, R.string.settings_profile, R.string.data_export_profile_details),
+        Triple(RideIcons.Clock, R.string.sec_dl_rides, R.string.sec_dl_rides_sub),
+        Triple(RideIcons.Wallet, R.string.sec_dl_earnings, R.string.sec_dl_earnings_sub),
+        Triple(RideIcons.Car, R.string.sec_dl_vehicle, R.string.data_export_vehicle_details),
+        Triple(RideIcons.Msg, R.string.data_export_support, R.string.data_export_support_details),
     )
-    val on = remember { mutableStateListOf(true, true, true, true) }
-    var requested by rememberSaveable { mutableStateOf(false) }
-    if (requested) {
-        SubScreen(str(R.string.priv_download), onBack, modifier, bottom = { RideButton(str(R.string.sec_done), onBack) }) {
-            InfoBanner(RideIcons.Check, str(R.string.sec_request_received), str(R.string.sec_notify_ready), Modifier.padding(top = 8.dp), Tone.Good)
-        }
-        return
-    }
+    var selected by rememberSaveable { mutableIntStateOf((1 shl sections.size) - 1) }
     SubScreen(str(R.string.priv_download), onBack, modifier, bottom = {
-        RideButton(str(R.string.sec_request_copy), { requested = true }, enabled = on.any { it })
-        Text(str(R.string.sec_notify_ready), color = c.muted, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+        RideButton(str(R.string.data_export_save), {
+            download.start(sections.filterIndexed { index, _ -> selected and (1 shl index) != 0 })
+        }, enabled = selected != 0, loading = download.busy)
+        download.feedback?.let {
+            Text(str(it), color = if (download.saved) c.fg else c.danger, fontSize = 13.sp, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+        }
     }) {
-        Intro(str(R.string.sec_dl_sub))
+        Intro(str(R.string.data_export_hint))
         SectionTitle(str(R.string.sec_include))
         GroupCard(Modifier.padding(bottom = 16.dp)) {
-            items.forEachIndexed { i, (icon, t, s) -> if (i > 0) RowDivider(); ToggleRow(icon, str(t), on[i], { on[i] = it }, subtitle = str(s)) }
+            items.forEachIndexed { index, (icon, title, subtitle) ->
+                val bit = 1 shl index
+                if (index > 0) RowDivider()
+                ToggleRow(icon, str(title), selected and bit != 0, {
+                    if (!download.busy) selected = selected xor bit
+                }, subtitle = str(subtitle))
+            }
         }
     }
 }

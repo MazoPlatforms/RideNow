@@ -65,7 +65,9 @@ import com.ridenow.app.ui.search.ChangePickupScreen
 import com.ridenow.app.ui.search.FriendScreen
 import com.ridenow.app.ui.share.ShareTripScreen
 import com.ridenow.app.ui.support.ContactSupportScreen
-import com.ridenow.app.ui.support.SupportChatScreen
+import com.ridenow.app.ui.post.ReportProblemScreen
+import com.ridenow.app.ui.support.SupportEntry
+import com.ridenow.app.ui.support.SupportWorkspaceScreen
 import androidx.compose.runtime.mutableStateListOf
 import com.ridenow.app.ui.payments.PaymentsScreen
 import com.ridenow.app.ui.permissions.LocationPermissionScreen
@@ -74,7 +76,6 @@ import com.ridenow.app.ui.permissions.deviceLocationEnabled
 import com.ridenow.app.ui.permissions.rememberDeviceLocationEnabled
 import com.ridenow.app.ui.permissions.NotificationPermissionScreen
 import com.ridenow.app.ui.post.RateDriverScreen
-import com.ridenow.app.ui.post.ReportProblemScreen
 import com.ridenow.app.ui.post.RideCompleteScreen
 import com.ridenow.app.ui.profile.EditProfileScreen
 import com.ridenow.app.ui.profile.ProfileScreen
@@ -89,7 +90,7 @@ import com.ridenow.app.ui.welcome.WelcomeScreen
 
 enum class Screen {
     Splash, Welcome, Phone, Otp, Details, Location, Notifications, Home, Search, Options, Schedule, Confirm, Finding, Trip,
-    Complete, Rate, Report, Profile, EditProfile, MyRides, Payments, Settings, Intro, Loading, Expired, ServerError, Notifs, Saved, Help, Legal, Doc, Support, Chat, Safety, Contacts, MapPick, ShareTrip, ChangePickup, Friend, AddAddr, ReportIssue, Stub,
+    Complete, Rate, Report, ReportDraft, Profile, EditProfile, MyRides, Payments, Settings, Intro, Loading, Expired, ServerError, Notifs, Saved, Help, Legal, Doc, Support, Chat, Safety, Contacts, MapPick, ShareTrip, ChangePickup, Friend, AddAddr, ReportIssue, Stub,
 }
 
 /** Survives activity recreation within one app process, so the splash does not replay on rotation or theme changes. */
@@ -260,6 +261,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     }
 
     val shownPhone = formatPhoneForDisplay(phone.ifBlank { "+1 555 012 3456" })
+    var reportSubject by rememberSaveable { mutableStateOf("") }
+    var reportMessage by rememberSaveable { mutableStateOf("") }
     val open = { label: String -> if (label == "Report an issue") nav(Screen.ReportIssue) else { stubBack = screen; stub = label; screen = Screen.Stub }; Unit }
     // Opens a destination by its menu or settings title; unknown titles show a placeholder.
     val go = { label: String ->
@@ -284,7 +287,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     val moreNav = MoreNav(
         back = { screen = stubBack }, exit = { screen = stubBack }, open = { open(it) }, home = { screen = Screen.Home }, options = { screen = Screen.Options },
         schedule = { scheduleFrom = Screen.Options; screen = Screen.Schedule }, finding = { screen = Screen.Finding }, trip = { screen = Screen.Trip },
-        complete = { rating = 0; screen = Screen.Complete }, report = { screen = Screen.Report }, support = { nav(Screen.Support) }, safety = { nav(Screen.Safety) },
+        complete = { rating = 0; screen = Screen.Complete }, report = { nav(Screen.Report) }, support = { nav(Screen.Support) }, safety = { nav(Screen.Safety) },
         setPhone = { phone = it }, setVehicle = { vehicle = it }, setScheduled = { scheduled = it }, confirm = { screen = Screen.Confirm },
         changeDrop = { pickDest(it, null, null) }, cancelScheduled = { scheduled = null; screen = Screen.Home }, signedOut = {
             phone = ""; name = textAlexMorgan; email = ""; profilePhoto = null
@@ -441,7 +444,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 BackHandler { }
                 RideCompleteScreen(
                     dest, Vehicles[vehicle], Vehicles[vehicle].fareFor(isReturn), rating,
-                    onReceipt = { open("Receipt PDF") }, onRate = { screen = Screen.Rate }, onReport = { screen = Screen.Report },
+                    onReceipt = { open("Receipt PDF") }, onRate = { screen = Screen.Rate }, onReport = { nav(Screen.Report) },
                     onDone = { scheduled = null; rating = 0; screen = Screen.Home },
                 )
             }
@@ -449,7 +452,14 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 BackHandler { screen = Screen.Complete }
                 RateDriverScreen(onBack = { screen = Screen.Complete }, onSubmit = { rating = it; screen = Screen.Complete })
             }
-            Screen.Report -> ReportProblemScreen(onBack = { screen = Screen.Complete }, onDone = { screen = Screen.Complete })
+            Screen.Report -> ReportProblemScreen(onBack = { back() }, onDone = { back() },
+                onCompose = { subject, message ->
+                    reportSubject = subject
+                    reportMessage = message
+                    nav(Screen.ReportDraft)
+                })
+            Screen.ReportDraft -> SupportWorkspaceScreen(SupportEntry.COMPLAINT, { back() },
+                initialSubject = reportSubject, initialMessage = reportMessage)
             Screen.Profile -> {
                 BackHandler { screen = Screen.Home }
                 ProfileScreen(
@@ -518,15 +528,21 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.Support -> {
                 BackHandler { back() }
-                ContactSupportScreen(onBack = { back() }, onChat = { screen = Screen.Chat }, onReport = { open("Report an issue") })
+                ContactSupportScreen(
+                    onBack = { back() }, onChat = { screen = Screen.Chat }, onReport = { open("Report an issue") },
+                    onTickets = { open("Support tickets") }, onTripReport = { nav(Screen.Report) },
+                )
             }
             Screen.ReportIssue -> {
                 BackHandler { back() }
-                ReportIssueScreen(onBack = { back() }, onDone = { back() })
+                SupportWorkspaceScreen(SupportEntry.COMPLAINT, { back() }, categories = listOf(
+                    R.string.help_report_cat_trip, R.string.help_report_cat_payment,
+                    R.string.help_report_cat_app, R.string.help_report_cat_other,
+                ))
             }
             Screen.Chat -> {
                 BackHandler { screen = Screen.Support }
-                SupportChatScreen(onBack = { screen = Screen.Support })
+                SupportWorkspaceScreen(SupportEntry.CHAT, { screen = Screen.Support })
             }
             Screen.Safety -> {
                 BackHandler { back() }

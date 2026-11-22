@@ -52,7 +52,10 @@ private const val SupportEmail = "support@ridenow.app"
 
 /** Ways to reach support. Call and email open the phone's own apps. */
 @Composable
-fun ContactSupportScreen(onBack: () -> Unit, onChat: () -> Unit, onReport: () -> Unit, modifier: Modifier = Modifier) {
+fun ContactSupportScreen(
+    onBack: () -> Unit, onChat: () -> Unit, onReport: () -> Unit, onTickets: () -> Unit,
+    onTripReport: () -> Unit, modifier: Modifier = Modifier,
+) {
     val textContactSupport = stringResource(R.string.text_contact_support)
     val textChooseHowYouWouldLikeToReachUs = stringResource(R.string.text_choose_how_you_would_like_to_reach_us)
     val textChatWithSupport = stringResource(R.string.text_chat_with_support)
@@ -61,8 +64,6 @@ fun ContactSupportScreen(onBack: () -> Unit, onChat: () -> Unit, onReport: () ->
     val textSpeakWithSomeone = stringResource(R.string.text_speak_with_someone)
     val textEmailUs = stringResource(R.string.text_email_us)
     val textAboutARecentTrip = stringResource(R.string.text_about_a_recent_trip)
-    val textHelixGardenPlaza = stringResource(R.string.text_helix_garden_plaza)
-    val textToday1680 = stringResource(R.string.text_today_16_80)
     val textReportAnIssue = stringResource(R.string.text_report_an_issue)
 
     val c = RideTheme.colors
@@ -74,10 +75,11 @@ fun ContactSupportScreen(onBack: () -> Unit, onChat: () -> Unit, onReport: () ->
             GroupCard(Modifier.padding(top = 16.dp)) {
                 NavRow(RideIcons.Message, textChatWithSupport, onChat, subtitle = textSendAMessageFromTheApp); RowDivider()
                 NavRow(RideIcons.Call, textCallSupport, { launch(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$SupportPhone"))) }, subtitle = textSpeakWithSomeone); RowDivider()
+                NavRow(RideIcons.Doc, stringResource(R.string.support_live_tickets), onTickets); RowDivider()
                 NavRow(RideIcons.Mail, textEmailUs, { launch(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$SupportEmail"))) }, subtitle = SupportEmail)
             }
             SectionLabel(textAboutARecentTrip)
-            GroupCard { NavRow(RideIcons.Car, textHelixGardenPlaza, onReport, subtitle = textToday1680) }
+            GroupCard { NavRow(RideIcons.Car, stringResource(R.string.support_live_report_trip), onTripReport) }
         }
         RideButton(textReportAnIssue, onReport, style = RideButtonStyle.Text, modifier = Modifier.padding(vertical = 12.dp).border(1.dp, c.border, RoundedCornerShape(28.dp)).height(52.dp))
     }

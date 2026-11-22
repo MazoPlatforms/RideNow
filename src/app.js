@@ -11,6 +11,8 @@ import { decrypt, encrypt } from './shared/crypto.js';
 import { idempotent } from './shared/idempotency.js';
 import { rateLimiter } from './shared/rate-limit.js';
 import { createRecaptchaVerifier } from './shared/recaptcha.js';
+import { mountSupport } from './modules/support.js';
+import { mountDataExport } from './modules/data-export.js';
 import { createAuth, permission } from './modules/auth.js';
 import { createMobilePreferences, cityInput, savedAddressInput, trustedContactInput, notificationApp, notificationChange } from './modules/mobile-preferences.js';
 import { quote } from './modules/pricing.js';
@@ -137,10 +139,11 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
   function route(
     method,
     path,
-    { body, access = 'user', idem = false, permission: perm, status = 200 } = {},
+    { body, query, authorize, middleware = [], noStore = false, access = 'user', idem = false, permission: perm, status = 200 } = {},
     fn,
   ) {
     const apiPath = path.replace(/:([A-Za-z]+)/g, '{$1}');
+    const querySchema = query && z.toJSONSchema(query, { unrepresentable: 'any' });
     paths[apiPath] ??= {};
     paths[apiPath][method] = {
       operationId: `${method}_${path.replace(/[^a-zA-Z0-9]/g, '_')}`,
@@ -161,6 +164,9 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
           in: 'path',
           required: true,
           schema: { type: 'string', format: 'uuid' },
+        })),
+        ...Object.entries(querySchema?.properties ?? {}).map(([name, schema]) => ({
+          name, in: 'query', required: querySchema.required?.includes(name) ?? false, schema,
         })),
         ...(idem
           ? [
@@ -188,11 +194,14 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
         ? []
         : [authenticate, rateLimiter(redis, config, { limit: 180, seconds: 60, prefix: 'user' })]),
       ...(path.startsWith('/v1/auth/') ? [sensitive] : []),
+      ...middleware,
       async (req, res) => {
         for (const value of Object.values(req.params)) uuid.parse(value);
         if (perm) ensure(permission(req.user, perm), 403, 'FORBIDDEN');
         if (access === 'driver') ensure(req.user.roles.includes('DRIVER'), 403, 'DRIVER_REQUIRED');
+        if (noStore) res.set('Cache-Control', 'no-store');
         const value = body ? body.parse(req.body) : {};
+        if (authorize) await authorize(req.user, value);
         const result = idem
           ? await idempotent(
               pool,
@@ -1311,6 +1320,8 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       };
     },
   );
+  mountSupport(route, config, storage);
+  mountDataExport(route, { pool, redis, config, storage, rateLimiter });
   app.get('/openapi.json', (req, res) =>
     res.json({
       openapi: '3.1.0',

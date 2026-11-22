@@ -67,7 +67,12 @@ private class Category(val icon: List<String>, val title: String, val hint: Stri
 
 /** Report a trip problem: choose a category, add details, submit. [onDone] is called after submitting or leaving. */
 @Composable
-fun ReportProblemScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifier = Modifier) {
+fun ReportProblemScreen(
+    onBack: () -> Unit,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+    onCompose: ((String, String) -> Unit)? = null,
+) {
     val textDriverBehavior = stringResource(R.string.text_driver_behavior)
     val textRudeUnsafeOrInappropriateConduct = stringResource(R.string.text_rude_unsafe_or_inappropriate_conduct)
     val textUnsafeDriving = stringResource(R.string.text_unsafe_driving)
@@ -183,7 +188,12 @@ fun ReportProblemScreen(onBack: () -> Unit, onDone: () -> Unit, modifier: Modifi
                     },
                 )
             }
-            RideButton(textSubmitReport, { submitted = true }, enabled = picked.isNotEmpty() || details.isNotBlank(), modifier = Modifier.padding(vertical = 12.dp))
+            RideButton(
+                if (onCompose == null) textSubmitReport else stringResource(R.string.support_live_continue), {
+                    if (onCompose == null) submitted = true
+                    else onCompose(k.title, (picked.toList() + details.trim()).filter { it.isNotEmpty() }.joinToString("\n"))
+                }, enabled = picked.isNotEmpty() || details.isNotBlank(), modifier = Modifier.padding(vertical = 12.dp),
+            )
         }
     }
 }

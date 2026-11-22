@@ -72,20 +72,23 @@ export async function finishJob(pool, job, error) {
 }
 export async function processJobs(deps) {
   const { pool, storage, push, logger } = deps;
+  const kinds = ['scan', 'scan_support', 'purge_account_storage'];
+  if (push) kinds.push('push');
   for (let i = 0; i < 20; i++) {
     // Disabled external push must not consume retries or falsely record delivery.
     // Existing jobs remain pending until an external push provider is enabled.
-    const job = await claimJob(pool, push ? ['scan', 'push', 'purge_account_storage'] : ['scan', 'purge_account_storage']);
+    const job = await claimJob(pool, kinds);
     if (!job) break;
     try {
-      if (job.kind === 'scan') {
-        const doc = await one(pool, 'SELECT * FROM documents WHERE id=$1', [
+      if (job.kind === 'scan' || job.kind === 'scan_support') {
+        const table = job.kind === 'scan' ? 'documents' : 'support_attachments';
+        const doc = await one(pool, `SELECT * FROM ${table} WHERE id=$1`, [
           job.payload.documentId,
         ]);
         if (doc?.scan_status === 'PENDING') {
           const result = await storage.scan(doc);
           const updated = await pool.query(
-            "UPDATE documents SET scan_status=$2,object_version=$3,object_key=COALESCE($4,object_key) WHERE id=$1 AND scan_status='PENDING'",
+            `UPDATE ${table} SET scan_status=$2,object_version=$3,object_key=COALESCE($4,object_key) WHERE id=$1 AND scan_status='PENDING'`,
             [doc.id, result.status, result.version ?? null, result.verifiedKey ?? null],
           );
           if (!updated.rowCount && result.verifiedKey) {
@@ -111,12 +114,13 @@ export async function processJobs(deps) {
         { jobId: job.id, kind: job.kind, code: e.code ?? 'PROVIDER_FAILURE' },
         'Job retry',
       );
-      if (job.kind === 'scan' && job.attempts >= 8) {
+      if ((job.kind === 'scan' || job.kind === 'scan_support') && job.attempts >= 8) {
+        const table = job.kind === 'scan' ? 'documents' : 'support_attachments';
         await transaction(pool, async (db) => {
           const leased = await one(db, 'SELECT id FROM jobs WHERE id=$1 AND lease_token=$2 FOR UPDATE',
             [job.id, job.lease_token]);
           if (!leased) return;
-          await db.query("UPDATE documents SET scan_status='FAILED' WHERE id=$1 AND scan_status='PENDING'",
+          await db.query(`UPDATE ${table} SET scan_status='FAILED' WHERE id=$1 AND scan_status='PENDING'`,
             [job.payload.documentId]);
           await finishJob(db, job, e);
         });
@@ -172,6 +176,17 @@ export async function maintenance(pool) {
       "DELETE FROM jobs WHERE (done_at IS NOT NULL OR dead) AND run_at<now()-interval '90 days'",
     );
     await db.query("DELETE FROM mobile_login_steps WHERE expires_at<=now()");
+    await db.query(`WITH abandoned AS (
+      DELETE FROM support_attachments WHERE id IN (
+        SELECT id FROM support_attachments WHERE message_id IS NULL AND created_at<now()-interval '1 day'
+        ORDER BY created_at LIMIT 200 FOR UPDATE SKIP LOCKED
+      ) RETURNING id,user_id
+    )
+    INSERT INTO jobs(kind,payload)
+    SELECT 'purge_account_storage',jsonb_build_object('prefix',prefix)
+    FROM abandoned CROSS JOIN LATERAL (
+      VALUES ('support/' || user_id || '/' || id || '/'),('verified/' || id || '/')
+    ) AS keys(prefix)`);
     await db.query("DELETE FROM notifications WHERE created_at<now()-interval '90 days'");
     await db.query(
       "DELETE FROM fare_quotes q WHERE q.created_at<now()-interval '90 days' AND NOT EXISTS(SELECT 1 FROM rides r WHERE r.quote_id=q.id)",

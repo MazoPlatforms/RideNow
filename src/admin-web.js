@@ -7,12 +7,12 @@ import { rateLimiter } from './shared/rate-limit.js';
 
 const root = fileURLToPath(new URL('../admin/', import.meta.url));
 const releaseLock = "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) else return 0 end";
-const pages = ['overview', 'users', 'drivers', 'rides', 'areas', 'pricing', 'finance', 'staff', 'audit', 'security'];
+const pages = ['overview', 'users', 'drivers', 'rides', 'support-rider', 'support-driver', 'areas', 'pricing', 'finance', 'staff', 'audit', 'security'];
 const publicPages = ['login', 'verify', 'recovery'];
 function landing(user) {
   if (user.roles.includes('ADMIN')) return '/admin/';
   return [['rides.monitor','/admin/'],['users.manage','/admin/users/'],['drivers.review','/admin/drivers/'],
-    ['config.manage','/admin/areas/'],['finance.manage','/admin/finance/'],['audit.read','/admin/audit/']]
+    ['rides.support','/admin/support-rider/'],['config.manage','/admin/areas/'],['finance.manage','/admin/finance/'],['audit.read','/admin/audit/']]
     .find(([permission]) => user.permissions.includes(permission))?.[1] ?? '/admin/security/';
 }
 
@@ -188,11 +188,16 @@ export function mountAdminWeb(app, { pool, redis, config, auth, captchaVerifier 
   for (const page of [...pages, 'recovery-saved']) {
     const paths = page === 'overview' ? ['/admin', '/admin/', '/admin/overview/'] : [`/admin/${page}`, `/admin/${page}/`];
     app.get(paths, async (req, res) => {
-      try { await session(req); }
+      try {
+        const { user } = await session(req);
+        if (page.startsWith('support-') && !user.roles.includes('ADMIN') && !user.permissions.includes('rides.support'))
+          return res.sendStatus(403);
+      }
       catch (error) {
         if ([401, 403].includes(error.status)) return res.redirect(303, '/admin/login/');
         throw error;
       }
+      if (page.startsWith('support-')) res.set('Cache-Control', 'no-store');
       res.sendFile(`${page}.html`, { root });
     });
   }

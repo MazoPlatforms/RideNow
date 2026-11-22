@@ -189,8 +189,9 @@ test('non-versioned storage publishes only scanned bytes under a server-only ver
         })
       ).ok,
     );
-    const published = await fetch(await storage.download(clean.verifiedKey));
+    const published = await fetch(await storage.download(clean.verifiedKey, null, { attachment: 'Receipt (1).pdf' }));
     assert.equal(await published.text(), first.toString());
+    assert.match(published.headers.get('content-disposition'), /^attachment; filename\*=UTF-8''Receipt%20%281%29\.pdf$/);
     const infected = Buffer.from('%PDF-1.7 EICAR fixture');
     const infectedUpload = await storage.upload(key, 'application/pdf', infected.length);
     assert(

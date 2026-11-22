@@ -34,7 +34,7 @@ fun FaqItem(question: String, answer: String) {
 @Composable
 fun SupportCenterScreen(
     unread: Int, initials: String, onTab: (MainTab) -> Unit, onBell: () -> Unit, onProfile: () -> Unit,
-    onTopic: (Int) -> Unit, onContact: () -> Unit, onTickets: () -> Unit, onFaqs: () -> Unit, modifier: Modifier = Modifier,
+    onTopic: (Int) -> Unit, onContact: () -> Unit, onTickets: () -> Unit, onFaqs: () -> Unit, onReport: (() -> Unit)? = null, modifier: Modifier = Modifier,
 ) {
     val c = RideTheme.colors
     var query by rememberSaveable { mutableStateOf("") }
@@ -69,6 +69,10 @@ fun SupportCenterScreen(
             NavRow(RideIcons.Msg, str(R.string.sc_contact), onContact, subtitle = str(R.string.sc_contact_sub)); RowDivider()
             NavRow(RideIcons.Doc, str(R.string.sc_tickets), onTickets, subtitle = str(R.string.sc_tickets_sub)); RowDivider()
             NavRow(RideIcons.Help, str(R.string.sc_faqs), onFaqs, subtitle = str(R.string.sc_faqs_sub))
+            if (onReport != null) {
+                RowDivider()
+                NavRow(RideIcons.Flag, str(R.string.report_title), onReport)
+            }
         }
     }
 }

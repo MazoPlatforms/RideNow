@@ -34,9 +34,10 @@ export function createAccountDeletion(pool, config, { lockPhones, queueOtp, twoS
 
   async function eraseAccount(db, user) {
     const id = user.id;
-    const refs = (await db.query(`SELECT id FROM profile_photo_uploads WHERE user_id=$1
-      UNION SELECT id FROM documents WHERE driver_id=$1`, [id])).rows;
-    const prefixes = [`profiles/${id}/`, `drivers/${id}/`, ...refs.map(ref => `verified/${ref.id}/`)];
+    const refs = (await db.query(`SELECT id,false AS support FROM profile_photo_uploads WHERE user_id=$1
+      UNION SELECT id,false FROM documents WHERE driver_id=$1
+      UNION SELECT id,true FROM support_attachments WHERE user_id=$1`, [id])).rows;
+    const prefixes = [`profiles/${id}/`, `drivers/${id}/`, ...(refs.some(ref => ref.support) ? [`support/${id}/`] : []), ...refs.map(ref => `verified/${ref.id}/`)];
     await db.query(`INSERT INTO jobs(kind,payload,run_at)
       SELECT 'purge_account_storage', jsonb_build_object('prefix',prefix), now()+interval '10 minutes'
       FROM unnest($1::text[]) AS prefix`, [prefixes]);
@@ -58,6 +59,8 @@ export function createAccountDeletion(pool, config, { lockPhones, queueOtp, twoS
     await db.query('DELETE FROM sessions WHERE user_id=$1', [id]);
     await db.query('DELETE FROM mobile_login_steps WHERE user_id=$1', [id]);
     await db.query('DELETE FROM device_tokens WHERE user_id=$1', [id]);
+    await db.query('DELETE FROM support_attachments WHERE user_id=$1', [id]);
+    await db.query('DELETE FROM support_tickets WHERE user_id=$1', [id]);
     await db.query('DELETE FROM saved_addresses WHERE user_id=$1', [id]);
     await db.query('DELETE FROM trusted_contacts WHERE user_id=$1', [id]);
     await db.query('DELETE FROM notification_preferences WHERE user_id=$1', [id]);

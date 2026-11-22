@@ -1,0 +1,12 @@
+<resources>
+    <string name="data_export_save">ZIP கோப்பைச் சேமிக்கவும்</string>
+    <string name="data_export_hint">சேர்க்க வேண்டிய தரவைத் தேர்ந்தெடுக்கவும். இந்த ZIP கோப்பில் தனிப்பட்ட கணக்குத் தகவல் இருக்கும்.</string>
+    <string name="data_export_saved">தேர்ந்தெடுத்த இடத்தில் தரவு சேமிக்கப்பட்டது.</string>
+    <string name="data_export_failed">தரவைச் சேமிக்க முடியவில்லை. மீண்டும் முயலவும்.</string>
+    <string name="data_export_sign_in">தரவைப் பதிவிறக்க மீண்டும் உள்நுழையவும்.</string>
+    <string name="data_export_rate_limit">அதிகமான பதிவிறக்கக் கோரிக்கைகள். சில நிமிடங்களில் மீண்டும் முயலவும்.</string>
+    <string name="data_export_support">ஆதரவு</string>
+    <string name="data_export_support_details">ஆதரவுக் கோரிக்கைகள், பதில்கள் மற்றும் இணைப்புகள்</string>
+    <string name="data_export_vehicle_details">வாகன விவரங்கள் மற்றும் சரிபார்க்கப்பட்ட வாகன ஆவணங்கள்</string>
+    <string name="data_export_profile_details">சுயவிவரத் தகவல் மற்றும் கணக்கு அமைப்புகள்</string>
+</resources>

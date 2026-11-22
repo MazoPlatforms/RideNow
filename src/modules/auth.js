@@ -299,7 +299,7 @@ export function createAuth(pool, config) {
       }
       const user = await one(
         pool,
-        `SELECT u.*,s.id AS session_id FROM users u JOIN sessions s ON s.user_id=u.id WHERE u.id=$1 AND s.id=$2 AND s.revoked_at IS NULL AND s.expires_at>now() AND NOT u.suspended AND u.deleted_at IS NULL`,
+        `SELECT u.*,s.id AS session_id,s.device_app AS session_app FROM users u JOIN sessions s ON s.user_id=u.id WHERE u.id=$1 AND s.id=$2 AND s.revoked_at IS NULL AND s.expires_at>now() AND NOT u.suspended AND u.deleted_at IS NULL`,
         [payload.sub, payload.sid],
       );
       ensure(user, 401, 'SESSION_REVOKED');

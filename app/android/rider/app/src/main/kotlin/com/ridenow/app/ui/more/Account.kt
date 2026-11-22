@@ -15,6 +15,7 @@ import com.ridenow.app.ui.notifications.rememberNotificationOptions
 import com.ridenow.app.ui.notifications.NotificationOptionsStatus
 import com.ridenow.app.ui.auth.PhoneAuthApi
 import com.ridenow.app.ui.auth.PhoneAuthException
+import com.ridenow.app.ui.auth.rememberAccountDataDownload
 import kotlinx.coroutines.CancellationException
 import com.ridenow.app.ui.permissions.RiderLocationOffScreen
 import com.ridenow.app.ui.permissions.deviceLocationEnabled
@@ -951,36 +952,35 @@ fun LocationDataScreen(onBack: () -> Unit) {
 
 @Composable
 fun DownloadDataScreen(onBack: () -> Unit) {
-    val textSettingsProfile = stringResource(R.string.settings_profile)
-    val textNamePhoneNumberAndEmail = stringResource(R.string.text_name_phone_number_and_email)
-    val textRideHistory = stringResource(R.string.text_ride_history)
-    val textTripsAndReceipts = stringResource(R.string.text_trips_and_receipts)
-    val textMenuPayments = stringResource(R.string.menu_payments)
-    val textTransactionsAndPaymentMethods = stringResource(R.string.text_transactions_and_payment_methods)
-    val textSavedPlaces = stringResource(R.string.text_saved_places)
-    val textMenuSavedSub = stringResource(R.string.menu_saved_sub)
-    val textDownloadMyData = stringResource(R.string.text_download_my_data)
-    val textDone = stringResource(R.string.text_done)
-    val textRequestReceived = stringResource(R.string.text_request_received)
-    val textYouWillGetANotificationWhenYourFileIsReadyToDownload = stringResource(R.string.text_you_will_get_a_notification_when_your_file_is_ready_to_download)
-    val textGetACopyOfYourAccountData2 = stringResource(R.string.text_get_a_copy_of_your_account_data_2)
-    val textRequestDataCopy = stringResource(R.string.text_request_data_copy)
-    val textInclude = stringResource(R.string.text_include)
-
     val c = RideTheme.colors
-    val items = listOf(textSettingsProfile to textNamePhoneNumberAndEmail, textRideHistory to textTripsAndReceipts, textMenuPayments to textTransactionsAndPaymentMethods, textSavedPlaces to textMenuSavedSub)
-    val on = remember { mutableStateListOf(true, true, true, true) }
-    var requested by rememberSaveable { mutableStateOf(false) }
-    if (requested) {
-        MoreScaffold(textDownloadMyData, onBack, bottom = { RideButton(textDone, onBack) }) { Hero(RideIcons.Check, textRequestReceived, textYouWillGetANotificationWhenYourFileIsReadyToDownload) }
-        return
-    }
-    MoreScaffold(textDownloadMyData, onBack, subtitle = textGetACopyOfYourAccountData2, bottom = {
-        RideButton(textRequestDataCopy, { requested = true }, enabled = on.any { it })
-        Text(textYouWillGetANotificationWhenYourFileIsReadyToDownload, color = c.muted, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+    val download = rememberAccountDataDownload()
+    val items = listOf(
+        Triple("PROFILE", R.string.settings_profile, R.string.data_export_profile_details),
+        Triple("RIDES", R.string.text_ride_history, R.string.text_trips_and_receipts),
+        Triple("PAYMENTS", R.string.menu_payments, R.string.text_transactions_and_payment_methods),
+        Triple("SAVED_PLACES", R.string.text_saved_places, R.string.menu_saved_sub),
+        Triple("SUPPORT", R.string.data_export_support, R.string.data_export_support_details),
+    )
+    var selected by rememberSaveable { mutableIntStateOf((1 shl items.size) - 1) }
+    MoreScaffold(stringResource(R.string.text_download_my_data), onBack, subtitle = stringResource(R.string.data_export_hint), bottom = {
+        RideButton(stringResource(R.string.data_export_save), {
+            download.start(items.filterIndexed { index, _ -> selected and (1 shl index) != 0 }.map { it.first })
+        }, enabled = selected != 0, loading = download.busy)
+        download.feedback?.let {
+            Text(stringResource(it), color = if (download.saved) c.fg else c.danger, fontSize = 13.sp,
+                textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+        }
     }) {
-        SectionLabel(textInclude)
-        GroupCard { items.forEachIndexed { i, (t, s) -> if (i > 0) RowDivider(); ToggleRow(t, s, on[i], { on[i] = it }) } }
+        SectionLabel(stringResource(R.string.text_include))
+        GroupCard {
+            items.forEachIndexed { index, (_, title, subtitle) ->
+                val bit = 1 shl index
+                if (index > 0) RowDivider()
+                ToggleRow(stringResource(title), stringResource(subtitle), selected and bit != 0, {
+                    selected = selected xor bit
+                }, enabled = !download.busy)
+            }
+        }
     }
 }
 

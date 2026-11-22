@@ -95,12 +95,13 @@ export function createStorage(config) {
         { expiresIn: 300 },
       );
     },
-    download(Key, VersionId) {
+    download(Key, VersionId, { attachment } = {}) {
       if (mode === 'immutable') ensure(VERIFIED.test(Key), 409, 'DOCUMENT_RESCAN_REQUIRED');
       if (mode === 'versioned') ensure(VersionId && VersionId !== 'null', 409, 'DOCUMENT_RESCAN_REQUIRED');
       return getSignedUrl(
         signer,
-        new GetObjectCommand({ Bucket, Key, ...(mode === 'versioned' ? { VersionId } : {}) }),
+        new GetObjectCommand({ Bucket, Key, ...(mode === 'versioned' ? { VersionId } : {}),
+          ...(attachment ? { ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(attachment).replace(/['()*]/g, c => '%' + c.charCodeAt(0).toString(16))}` } : {}) }),
         { expiresIn: 120 },
       );
     },
@@ -114,7 +115,8 @@ export function createStorage(config) {
       await send(new DeleteObjectCommand({ Bucket, Key, ...(mode === 'versioned' ? { VersionId } : {}) }));
     },
     async purgeAccountPrefix(Prefix) {
-      ensure(/^(?:profiles|drivers|verified)\/[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}\/$/.test(Prefix),
+      const uuid = '[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}';
+      ensure(new RegExp(`^(?:(?:profiles|drivers|verified|support)/${uuid}/|support/${uuid}/${uuid}/)$`).test(Prefix),
         400, 'INVALID_ACCOUNT_STORAGE_PREFIX');
       // Listing again from the start allows a retry to resume after a partially deleted batch.
       const page = mode === 'versioned'

@@ -6,6 +6,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.ridenow.app.ui.booking.MapPickerScreen
+import com.ridenow.app.ui.support.SupportEntry
+import com.ridenow.app.ui.support.SupportWorkspaceScreen
 import java.time.LocalDate
 
 /** Labels the app shell can open through [MoreHost]. Anything else keeps its placeholder. */
@@ -117,13 +119,16 @@ private fun MoreScreen(label: String, ctx: MoreCtx, nav: MoreNav) {
             "Confirm deletion" -> ConfirmDeletionScreen(ctx.phone, nav.back) { nav.open("Account deleted") }
             "Account deleted" -> AccountDeletedScreen(nav.signedOut)
             // Support tickets
-            "Support tickets" -> com.ridenow.app.ui.support.TicketsScreen(nav.back, { com.ridenow.app.ui.support.TicketStore.selectedId = it.id; nav.open("Ticket conversation") }, { nav.open("New ticket") })
-            "New ticket" -> com.ridenow.app.ui.support.NewTicketScreen(nav.back, { com.ridenow.app.ui.support.TicketStore.selectedId = it.id; nav.open("Ticket conversation") })
-            "Ticket conversation" -> com.ridenow.app.ui.support.TicketStore.tickets.firstOrNull { it.id == com.ridenow.app.ui.support.TicketStore.selectedId }
-                ?.let { com.ridenow.app.ui.support.TicketConversationScreen(it, nav.back) } ?: nav.back()
+            "Support tickets", "Ticket conversation" -> SupportWorkspaceScreen(SupportEntry.LIST, nav.back)
+            "New ticket" -> SupportWorkspaceScreen(SupportEntry.TICKET, nav.back)
             // Help
             "Help Center" -> HelpCenterScreen(nav.exit, nav.open)
-            "Report a safety issue" -> ReportSafetyScreen(nav.back, nav.safety)
+            "Report a safety issue" -> SupportWorkspaceScreen(
+                SupportEntry.SAFETY, nav.back, categories = listOf(
+                    R.string.text_unsafe_driving, R.string.text_harassment, R.string.text_accident,
+                    R.string.text_vehicle_or_driver_mismatch, R.string.reason_other,
+                ), onSafety = nav.safety,
+            )
         }
     }
 }

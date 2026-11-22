@@ -1,0 +1,12 @@
+<resources>
+    <string name="data_export_save">Save ZIP</string>
+    <string name="data_export_hint">Choose what to include. Your ZIP contains private account information.</string>
+    <string name="data_export_saved">Data saved to the selected location.</string>
+    <string name="data_export_failed">Could not save your data. Please try again.</string>
+    <string name="data_export_sign_in">Sign in again to download your data.</string>
+    <string name="data_export_rate_limit">Too many export requests. Try again in a few minutes.</string>
+    <string name="data_export_support">Support</string>
+    <string name="data_export_support_details">Support requests, replies and attachments</string>
+    <string name="data_export_vehicle_details">Vehicle details and verified vehicle documents</string>
+    <string name="data_export_profile_details">Profile information and account settings</string>
+</resources>

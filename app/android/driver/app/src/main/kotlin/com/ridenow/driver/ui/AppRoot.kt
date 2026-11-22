@@ -98,16 +98,16 @@ import com.ridenow.driver.ui.settings.ManageDevicesScreen
 import com.ridenow.driver.ui.settings.TwoStepScreen
 import com.ridenow.driver.ui.settings.DownloadDataScreen
 import com.ridenow.driver.ui.settings.SettingsScreen
+import com.ridenow.driver.ui.components.MainHeader
+import com.ridenow.driver.ui.home.MainBottomBar
+import com.ridenow.driver.ui.support.SupportEntry
+import com.ridenow.driver.ui.support.SupportWorkspaceScreen
 import com.ridenow.driver.ui.support.EmergencyAssistScreen
 import com.ridenow.driver.ui.support.FaqScreen
 import com.ridenow.driver.ui.support.HelpSafetyScreen
-import com.ridenow.driver.ui.support.NewTicketScreen
-import com.ridenow.driver.ui.support.ReportIssueScreen
 import com.ridenow.driver.ui.support.SafetyCenterScreen
 import com.ridenow.driver.ui.support.ShareTripScreen
 import com.ridenow.driver.ui.support.SupportCenterScreen
-import com.ridenow.driver.ui.support.TicketConversationScreen
-import com.ridenow.driver.ui.support.TicketsScreen
 import com.ridenow.driver.ui.system.LocationOffScreen
 import com.ridenow.driver.ui.system.NoInternetScreen
 import com.ridenow.driver.ui.system.NotificationsOffScreen
@@ -126,7 +126,7 @@ enum class Screen {
     ActionRequired, Rejected, Approved, Home, Earnings, Rides, Support, Account, Trip, TripComplete, DriverProfile, EditProfile,
     NotificationCenter, EarningsDetails, RideDetails, VehicleDetails, VehicleDocuments, Payouts, BankManage, BankForm,
     Settings, Appearance, LanguageSettings, NotificationSettings, Privacy, DeleteAccount, PaymentMethods, ManageDevices, TwoStep, DownloadData,
-    Faq, Tickets, Conversation, NewTicket, HelpSafety, SafetyCenter, Emergency, ShareTrip, ReportIssue, Legal, LegalDoc,
+    Faq, Tickets, Conversation, NewTicket, SupportChat, HelpSafety, SafetyCenter, Emergency, ShareTrip, ReportIssue, Legal, LegalDoc,
 }
 
 /** Survives activity recreation within one app process, so the splash does not replay on rotation or theme changes. */
@@ -314,7 +314,6 @@ fun AppRoot(appearance: AppearanceState) {
     val driverName = app.profileName.ifBlank { app.summaries[STEP_PERSONAL].orEmpty() }
     val initials = initialsOf(driverName)
     var selRide by rememberSaveable { mutableStateOf("") }
-    var selTicket by rememberSaveable { mutableStateOf("") }
     var selTopic by rememberSaveable { mutableStateOf(-1) }
     var selDoc by rememberSaveable { mutableStateOf("") }
     var reportCat by rememberSaveable { mutableStateOf(0) }
@@ -575,9 +574,9 @@ fun AppRoot(appearance: AppearanceState) {
                     Screen.ActionRequired -> ActionRequiredScreen(
                         // Fixing returns to Review, then Submit sends the application again.
                         onFix = { i -> editing = true; screen = if (i == 0) Screen.Identity else Screen.VehicleDocs },
-                        onUpdate = { editing = true; screen = Screen.Identity }, onSupport = { },
+                        onUpdate = { editing = true; screen = Screen.Identity }, onSupport = { go(Screen.Tickets) },
                     )
-                    Screen.Rejected -> RejectedScreen(onReapply = { editing = false; screen = Screen.Terms }, onSupport = { })
+                    Screen.Rejected -> RejectedScreen(onReapply = { editing = false; screen = Screen.Terms }, onSupport = { go(Screen.Tickets) })
                     Screen.Approved -> ApprovedScreen(onOpenHome = { screen = Screen.Home }, onExplore = { screen = Screen.Home })
                     Screen.Home -> HomeScreen(
                         online = app.online, bankSaved = app.bankSaved, driverName = driverName,
@@ -611,7 +610,8 @@ fun AppRoot(appearance: AppearanceState) {
                         BackHandler { tab(MainTab.Home) }
                         SupportCenterScreen(
                             store.unreadCount, initials, { tab(it) }, { go(Screen.NotificationCenter) }, { go(Screen.DriverProfile) },
-                            onTopic = { selTopic = it; go(Screen.Faq) }, onContact = { go(Screen.NewTicket) }, onTickets = { go(Screen.Tickets) }, onFaqs = { selTopic = -1; go(Screen.Faq) },
+                            onTopic = { selTopic = it; go(Screen.Faq) }, onContact = { go(Screen.SupportChat) }, onTickets = { go(Screen.Tickets) }, onFaqs = { selTopic = -1; go(Screen.Faq) },
+                            onReport = { reportCat = -1; go(Screen.ReportIssue) },
                         )
                     }
                     Screen.Trip -> {
@@ -754,27 +754,31 @@ fun AppRoot(appearance: AppearanceState) {
                         )
                     }
                     Screen.Faq -> { BackHandler { back() }; FaqScreen(selTopic, { back() }, { go(Screen.NewTicket) }) }
-                    Screen.Tickets -> {
-                        BackHandler { back() }
-                        TicketsScreen(store, store.unreadCount, initials, { tab(it) }, { go(Screen.NotificationCenter) }, { go(Screen.DriverProfile) }, { selTicket = it.id; go(Screen.Conversation) }, { go(Screen.NewTicket) })
-                    }
-                    Screen.Conversation -> {
-                        BackHandler { back() }
-                        val t = store.tickets.firstOrNull { it.id == selTicket }
-                        if (t == null) LaunchedEffect(Unit) { back() } else TicketConversationScreen(t, { back() })
-                    }
-                    Screen.NewTicket -> { BackHandler { back() }; NewTicketScreen(store, { back() }, onCreated = { t -> selTicket = t.id; screen = Screen.Conversation }) }
+                    Screen.Tickets, Screen.Conversation -> SupportWorkspaceScreen(SupportEntry.LIST, { back() },
+                        chrome = { header ->
+                            if (header) MainHeader(store.unreadCount, initials, { go(Screen.NotificationCenter) }, { go(Screen.DriverProfile) })
+                            else MainBottomBar(MainTab.Support, { tab(it) })
+                        })
+                    Screen.NewTicket -> SupportWorkspaceScreen(SupportEntry.TICKET, { back() })
+                    Screen.SupportChat -> SupportWorkspaceScreen(SupportEntry.CHAT, { back() })
                     Screen.HelpSafety -> {
                         BackHandler { back() }
                         HelpSafetyScreen(
                             { back() }, onTopic = { selTopic = it; go(Screen.Faq) }, onSafetyCenter = { go(Screen.SafetyCenter) }, onEmergency = { go(Screen.Emergency) },
-                            onShareTrip = { go(Screen.ShareTrip) }, onReportSafety = { reportCat = 5; go(Screen.ReportIssue) }, onContact = { go(Screen.NewTicket) },
+                            onShareTrip = { go(Screen.ShareTrip) }, onReportSafety = { reportCat = 5; go(Screen.ReportIssue) }, onContact = { go(Screen.SupportChat) },
                         )
                     }
                     Screen.SafetyCenter -> { BackHandler { back() }; SafetyCenterScreen({ back() }, { go(Screen.Emergency) }, { go(Screen.ShareTrip) }, { reportCat = 5; go(Screen.ReportIssue) }) }
                     Screen.Emergency -> { BackHandler { back() }; EmergencyAssistScreen({ back() }, { reportCat = 5; go(Screen.ReportIssue) }) }
                     Screen.ShareTrip -> { BackHandler { back() }; ShareTripScreen({ back() }) }
-                    Screen.ReportIssue -> { BackHandler { back() }; ReportIssueScreen(store, reportCat, { back() }, { screen = Screen.Tickets }) }
+                    Screen.ReportIssue -> SupportWorkspaceScreen(
+                        if (reportCat == 5) SupportEntry.SAFETY else SupportEntry.COMPLAINT, { back() },
+                        categories = if (reportCat == 5) listOf(R.string.cat_safety) else listOf(
+                            R.string.cat_ride, R.string.cat_payments, R.string.cat_account, R.string.cat_maps,
+                            R.string.cat_bug, R.string.cat_safety, R.string.cat_service, R.string.cat_other,
+                        ),
+                        initialCategory = if (reportCat == 5) 0 else reportCat,
+                    )
                     Screen.Legal -> { BackHandler { back() }; LegalAboutScreen({ back() }, { selDoc = it; go(Screen.LegalDoc) }) }
                     Screen.LegalDoc -> {
                         BackHandler { back() }

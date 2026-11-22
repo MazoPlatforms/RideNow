@@ -1862,6 +1862,14 @@ test('account deletion OTP is scoped to its owner and session family, then erase
   const token = 'push-token-' + randomUUID();
   await request('put', '/v1/me/devices', owner, { token }).expect(200);
   const photo = (await request('post', '/v1/me/profile-photo', owner, { mime: 'image/jpeg', bytes: 91 }).expect(200)).body;
+  const support = '/v1/me/support';
+  const file = (await request('post', support + '/attachments', owner, {
+    app: 'RIDER', name: 'private.pdf', mime: 'application/pdf', bytes: 64,
+  }).expect(201)).body;
+  await request('post', support + '/attachments/' + file.id + '/submit', owner, { app: 'RIDER' }).expect(200);
+  const ticket = (await request('post', support + '/tickets', owner, {
+    app: 'RIDER', kind: 'TICKET', subject: 'Private support ticket', body: 'Goodbye', attachments: [file.id],
+  }).expect(201)).body;
   const { challenge, code } = await startAccountDeletion(owner);
   const payload = { challengeId: challenge.challengeId, code };
   assert.equal(challenge.twoStepRequired, false);
@@ -1888,11 +1896,14 @@ test('account deletion OTP is scoped to its owner and session family, then erase
   assert.equal(erased.email, '');
   assert.equal(erased.rider_city, null);
   assert.equal(await one(pool, 'SELECT id FROM profile_photo_uploads WHERE user_id=$1', [id]), undefined);
+  assert.equal(await one(pool, 'SELECT id FROM support_attachments WHERE id=$1', [file.id]), undefined);
+  assert.equal(await one(pool, 'SELECT id FROM support_messages WHERE ticket_id=$1', [ticket.id]), undefined);
+  assert.equal(await one(pool, 'SELECT id FROM support_tickets WHERE id=$1', [ticket.id]), undefined);
   assert.equal(await one(pool, 'SELECT token FROM device_tokens WHERE user_id=$1', [id]), undefined);
   assert.equal(await one(pool, 'SELECT id FROM otp_challenges WHERE phone=$1 OR owner_id=$2', [owner.user.phone, id]), undefined);
   const targets = (await pool.query("SELECT payload->>'prefix' AS prefix FROM jobs WHERE kind='purge_account_storage' AND run_at>now()")).rows;
   assert.deepEqual(new Set(targets.map(target => target.prefix)), new Set([
-    `profiles/${id}/`, `drivers/${id}/`, `verified/${photo.photoId}/`,
+    `profiles/${id}/`, `drivers/${id}/`, `verified/${photo.photoId}/`, `support/${id}/`, `verified/${file.id}/`,
   ]));
   const newProof = await twoStepOtp(owner.user.phone);
   const newAccount = await auth.verifyOtp(newProof.challengeId, newProof.code);
@@ -2026,4 +2037,191 @@ test('notification preferences are app-specific and enforce notifications and in
   await request('post', '/v1/me/notifications/clear', account, { app: 'DRIVER' }).expect(200);
   assert.equal((await request('get', '/v1/me/notifications?app=DRIVER', account).expect(200)).body.items.length, 0);
   assert.equal((await request('get', '/v1/me/notifications?app=RIDER', account).expect(200)).body.items.length, 1);
+});
+
+test('support queues separate rider and driver requests, persist messages and restrict attachment access', async () => {
+  const owner = await login(), outsider = await login(), staff = await login(), admin = await login();
+  const rider = await signInDevice(owner.user.phone, { installationId: randomUUID(), name: 'Rider phone', app: 'RIDER' });
+  const driverApp = await signInDevice(owner.user.phone, { installationId: randomUUID(), name: 'Driver phone', app: 'DRIVER' });
+  await pool.query("UPDATE users SET roles=ARRAY['STAFF'] WHERE id=$1", [staff.user.id]);
+  await pool.query("UPDATE users SET roles=ARRAY['ADMIN'] WHERE id=$1", [admin.user.id]);
+  const mobile = '/v1/me/support', portal = '/v1/admin/support';
+  const attachment = { app: 'RIDER', name: 'receipt.pdf', mime: 'application/pdf', bytes: 250 };
+  await request('post', mobile + '/attachments', rider, { ...attachment, name: '../receipt.pdf' }).expect(400);
+  await request('post', mobile + '/attachments', rider, { ...attachment, bytes: 8388609 }).expect(400);
+  const staged = (await request('post', mobile + '/attachments', rider, attachment).expect(201)).body;
+  const filePath = mobile + '/attachments/' + staged.id;
+  const draft = { app: 'RIDER', kind: 'COMPLAINT', subject: 'Receipt request', body: 'Please check my receipt.', attachments: [staged.id] };
+  await request('post', mobile + '/tickets', outsider, draft).expect(409);
+  await request('post', mobile + '/tickets', rider, draft).expect(409);
+  await request('post', filePath + '/submit', outsider, { app: 'RIDER' }).expect(404);
+  await request('post', filePath + '/submit', rider, { app: 'RIDER' }).expect(200);
+  const key = randomUUID();
+  const ticket = (await request('post', mobile + '/tickets', rider, draft, key).expect(201)).body;
+  assert.equal((await request('post', mobile + '/tickets', rider, draft, key).expect(201)).body.id, ticket.id);
+  await request('post', mobile + '/tickets', rider, draft).expect(409);
+  await request('post', mobile + '/tickets', driverApp, draft, key).expect(403);
+  assert.notEqual((await one(pool,'SELECT subject_encrypted FROM support_tickets WHERE id=$1',[ticket.id])).subject_encrypted,draft.subject);
+  assert.notEqual((await one(pool,'SELECT body_encrypted FROM support_messages WHERE ticket_id=$1',[ticket.id])).body_encrypted,draft.body);
+  const chat = (await request('post', mobile + '/tickets', driverApp, {
+    app: 'DRIVER', kind: 'CHAT', subject: 'Driver support', body: 'Need help with onboarding.',
+  }).expect(201)).body;
+  const sameChat = (await request('post', mobile + '/tickets', driverApp, {
+    app: 'DRIVER', kind: 'CHAT', subject: 'New chat tap', body: 'This should continue the open conversation.',
+  }).expect(201)).body;
+  assert.equal(sameChat.id, chat.id);
+  assert.equal((await request('get', mobile + '/tickets?app=DRIVER&kind=CHAT&active=true', driverApp).expect(200)).body.items.length, 1);
+  await request('get', mobile + '/tickets?app=DRIVER', rider).expect(403);
+  await request('get', mobile + '/tickets/' + ticket.id + '?app=RIDER', outsider).expect(404);
+  const initial = (await request('get', mobile + '/tickets/' + ticket.id + '?app=RIDER', rider).expect(200)).body;
+  assert.equal(initial.messages[0].body, draft.body);
+  assert.equal(initial.messages[0].attachments[0].scan_status,'PENDING');
+  await request('get', filePath + '?app=RIDER', rider).expect(409);
+  await request('get', filePath + '?app=RIDER', outsider).expect(404);
+  await request('get', portal + '/attachments/' + staged.id + '?app=RIDER', staff).expect(403);
+  await request('get', portal + '/tickets?app=RIDER', staff).expect(403);
+  assert.deepEqual((await request('get', portal + '/tickets?app=RIDER&kind=COMPLAINT', admin).expect(200)).body.items.map(t=>t.id), [ticket.id]);
+  assert.deepEqual((await request('get', portal + '/tickets?app=DRIVER&kind=CHAT', admin).expect(200)).body.items.map(t=>t.id), [chat.id]);
+  await request('get', portal + '/tickets/' + ticket.id + '?app=DRIVER', admin).expect(404);
+  await processJobs({pool,storage,logger});
+  assert.equal((await request('get', filePath + '?app=RIDER', rider).expect(200)).body.downloadUrl, 'http://storage.test/download');
+  await request('get', portal + '/attachments/' + staged.id + '?app=RIDER', admin).expect(200);
+  await request('get', portal + '/attachments/' + staged.id + '?app=DRIVER', admin).expect(404);
+
+  const adminTicket = portal + '/tickets/' + ticket.id;
+  const reply = { app: 'RIDER', body: 'We found your receipt.' }, replyKey = randomUUID();
+  const first = (await request('post', adminTicket + '/messages', admin, reply, replyKey).expect(200)).body;
+  assert.equal((await request('post', adminTicket + '/messages', admin, reply, replyKey).expect(200)).body.id, first.id);
+  const answered = (await request('get', mobile + '/tickets/' + ticket.id + '?app=RIDER', rider).expect(200)).body;
+  assert.equal(answered.ticket.status, 'IN_PROGRESS');
+  assert.deepEqual(answered.messages.map(m => [m.sender,m.body]), [['CUSTOMER', draft.body], ['SUPPORT', reply.body]]);
+  await request('patch', adminTicket, admin, { app: 'RIDER', status: 'RESOLVED' }).expect(200);
+  const mobileReply = { app: 'RIDER', body: 'Thank you.' };
+  await request('post', mobile + '/tickets/' + ticket.id + '/messages', rider, mobileReply).expect(409);
+  await request('patch', adminTicket, admin, { app: 'RIDER', status: 'OPEN' }).expect(200);
+  await request('post', mobile + '/tickets/' + ticket.id + '/messages', rider, mobileReply).expect(200);
+  const payload = (await one(pool,"SELECT payload FROM outbox_events WHERE type='support.updated' AND aggregate_id=$1",[ticket.id])).payload;
+  assert.deepEqual(payload, { ticketId: ticket.id, app: 'RIDER' });
+});
+
+test('support rejects access to quarantined attachments for both customer and admin', async () => {
+  const rider = await login(), admin = await login();
+  await pool.query("UPDATE users SET roles=ARRAY['ADMIN'] WHERE id=$1", [admin.user.id]);
+  const base = '/v1/me/support';
+  const staged = (await request('post', base + '/attachments', rider, { app: 'RIDER', name: 'unsafe.png', mime: 'image/png', bytes: 32 }).expect(201)).body;
+  await request('post', base + '/attachments/' + staged.id + '/submit', rider, { app: 'RIDER' }).expect(200);
+  await request('post', base + '/tickets', rider, { app: 'RIDER', kind: 'SAFETY', subject: 'Safety concern', body: '', attachments: [staged.id] }).expect(201);
+  await processJobs({pool,storage:{...storage,scan:async()=>({status:'INFECTED'})},logger});
+  await request('get', base + '/attachments/' + staged.id + '?app=RIDER', rider).expect(409);
+  await request('get', '/v1/admin/support/attachments/' + staged.id + '?app=RIDER', admin).expect(409);
+});
+
+
+test('admin support browser manages independent rider and driver queues', { skip: process.env.ADMIN_BROWSER_TEST !== '1' }, async () => {
+  const { chromium } = await import('@playwright/test');
+  const a = await webAdmin();
+  await web(a.client, 'post', 'begin', { phone: a.phone, password: a.password }).expect(200);
+  await web(a.client, 'post', 'send-otp', {}).expect(200);
+  const verified = await web(a.client, 'post', 'verify', { code: await webOtp() }).expect(200);
+  const session = verified.headers['set-cookie'].find(value => value.startsWith('ridenow-admin='));
+  const base = `http://localhost:${server.address().port}`;
+  const d=await driver(), r=await login();
+  const driverTicket=(await request('post','/v1/me/support/tickets',d,{app:'DRIVER',kind:'CHAT',subject:'Driver queue sample',body:'Driver chat message'}).expect(201)).body;
+  const riderTicket=(await request('post','/v1/me/support/tickets',r,{app:'RIDER',kind:'COMPLAINT',subject:'Rider queue sample',body:'Rider complaint message'}).expect(201)).body;
+  const executablePath = process.env.CHROMIUM_PATH ?? (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined);
+  const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
+  try {
+    const context = await browser.newContext({ viewport: { width: 390, height: 840 } });
+    await context.addCookies([{ name: 'ridenow-admin', value: session.split(';')[0].slice('ridenow-admin='.length), url: base }]);
+    const page = await context.newPage();
+    await page.goto(base+'/admin/support-rider/');
+    await page.getByText('Rider queue sample',{exact:true}).waitFor();
+    assert.equal(await page.getByText('Driver queue sample',{exact:true}).count(),0);
+    await page.getByRole('button',{name:'Open',exact:true}).click();
+    const ticketDialog=page.getByRole('dialog');
+    await ticketDialog.getByText('Rider complaint message',{exact:true}).waitFor();
+    await ticketDialog.getByLabel('Reply to customer').fill('Reply from the rider queue');
+    await ticketDialog.getByRole('button',{name:'Send reply'}).click();
+    await ticketDialog.getByText('Reply from the rider queue',{exact:true}).waitFor();
+    await ticketDialog.getByRole('button',{name:'Resolve',exact:true}).click();
+    await ticketDialog.getByRole('button',{name:'Reopen',exact:true}).waitFor();
+    assert.equal((await request('get','/v1/me/support/tickets/'+riderTicket.id+'?app=RIDER',r).expect(200)).body.ticket.status,'RESOLVED');
+    await page.goto(base+'/admin/support-driver/');
+    await page.getByText('Driver queue sample',{exact:true}).waitFor();
+    assert.equal(await page.getByText('Rider queue sample',{exact:true}).count(),0);
+    await page.getByRole('button',{name:'Open',exact:true}).click();
+    await ticketDialog.getByText('Driver chat message',{exact:true}).waitFor();
+    assert.equal((await request('get','/v1/me/support/tickets/'+driverTicket.id+'?app=DRIVER',d).expect(200)).body.ticket.status,'OPEN');
+  } finally {
+    await browser.close();
+  }
+});
+
+test('account data export honors app and section scope and excludes private credentials', async () => {
+  const owner = await login(), other = await login();
+  const rider = await signInDevice(owner.user.phone, { installationId: randomUUID(), name: 'Rider phone', app: 'RIDER' });
+  const driverSession = await signInDevice(owner.user.phone, { installationId: randomUUID(), name: 'Driver phone', app: 'DRIVER' });
+  const exportPath = '/v1/me/data-export';
+  const selections = { app: 'RIDER', sections: ['PROFILE','SAVED_PLACES','SUPPORT','RIDES','PAYMENTS'] };
+  await api.post(exportPath).send(selections).expect(401);
+  await request('post', exportPath, rider, { ...selections, userId: other.user.id }).expect(400);
+  await request('post', exportPath, rider, { app: 'RIDER', sections: ['EARNINGS'] }).expect(400);
+  await request('post', exportPath, driverSession, selections).expect(403);
+  await request('patch', '/v1/me', rider, { name: 'Export owner', city: 'Kattankudy' }).expect(200);
+  await pool.query("UPDATE users SET password_hash='private-hash', profile_photo_key='owned-avatar',profile_photo_version='profile-version' WHERE id=$1", [owner.user.id]);
+  await request('post', '/v1/me/saved-addresses', rider, {
+    kind: 'HOME', label: 'Home', address: 'Export owner address', coordinates: [81.7, 7.7],
+  }).expect(200);
+  await request('post', '/v1/me/saved-addresses', other, { kind: 'HOME', address: 'Someone else address' }).expect(200);
+  const mine = await booking(rider);
+  const others = await booking(other);
+
+  const support = '/v1/me/support';
+  const file = (await request('post', support + '/attachments', rider, { app: 'RIDER', name: 'Proof.pdf', mime: 'application/pdf', bytes: 32 }).expect(201)).body;
+  await request('post', support + '/attachments/' + file.id + '/submit', rider, { app: 'RIDER' }).expect(200);
+  await request('post', support + '/tickets', rider, {
+    app: 'RIDER', kind: 'TICKET', subject: 'Exported ticket', body: 'Exported message', attachments: [file.id],
+  }).expect(201);
+  await request('post', support + '/tickets', driverSession, { app: 'DRIVER', kind: 'CHAT', subject: 'Driver only chat', body: 'Driver only message' }).expect(201);
+  const filePath = exportPath + '/files/' + file.id + '?app=RIDER&type=support';
+  await request('get', filePath, rider).expect(404);
+  await processJobs({ pool, storage, logger });
+
+  const result = (await request('post', exportPath, rider, selections).expect(200).expect('Cache-Control', 'no-store')).body;
+  assert.equal(result.schemaVersion, 1);
+  assert.equal(result.data.profile.name, 'Export owner');
+  assert.deepEqual(result.data.profile.devices.map(device => device.name), ['Rider phone']);
+  assert.deepEqual(result.data.savedPlaces.addresses.map(address => address.address), ['Export owner address']);
+  assert.deepEqual(result.data.rides.map(ride => ride.id), [mine.rideId]);
+  assert.equal(result.data.support[0].messages[0].body, 'Exported message');
+  assert.deepEqual(result.files.map(file => file.type), ['avatar','support']);
+  const serialized = JSON.stringify(result);
+  for (const value of ['private-hash', 'Someone else address', others.rideId, 'Driver only chat', 'pin_encrypted', 'pin_hash', 'token_hash', 'profile-version', 'object_key', 'downloadUrl', other.user.phone])
+    assert(!serialized.includes(value), 'export exposed ' + value);
+  await request('get', filePath, other).expect(404);
+  await request('get', filePath, rider).expect(200).expect('Cache-Control', 'no-store');
+  await request('get', filePath, driverSession).expect(403);
+  await request('get', exportPath + '/files/' + owner.user.id + '?app=RIDER&type=avatar', other).expect(404);
+  const driverExport = (await request('post', exportPath, driverSession, { app: 'DRIVER', sections: ['SUPPORT'] }).expect(200)).body;
+  assert.deepEqual(Object.keys(driverExport.data), ['support']);
+  assert.deepEqual(driverExport.data.support.map(ticket => ticket.subject), ['Driver only chat']);
+  await pool.query('UPDATE users SET suspended=true WHERE id=$1', [owner.user.id]);
+  await request('post', exportPath, rider, selections).expect(401);
+});
+
+test('driver export includes their own vehicle and verified documents and rate limits export generation', async () => {
+  const d = await driver(), other = await driver();
+  const exportPath = '/v1/me/data-export';
+  const body = { app: 'DRIVER', sections: ['VEHICLES','PROFILE','EARNINGS'] };
+  const result = (await request('post', exportPath, d, body).expect(200)).body;
+  assert.equal(result.data.vehicleRecords.vehicles.length, 1);
+  assert.equal(result.data.vehicleRecords.vehicles[0].status, 'APPROVED');
+  assert.equal(result.data.earnings.currency, 'LKR');
+  assert.equal(result.data.profile.driver.status, 'APPROVED');
+  const file = result.files.find(file => file.type === 'document');
+  assert(file);
+  await request('get', exportPath + '/files/' + file.id + '?app=DRIVER&type=document', d).expect(200);
+  await request('get', exportPath + '/files/' + file.id + '?app=DRIVER&type=document', other).expect(404);
+  for (let i = 1; i < 6; i++) await request('post', exportPath, d, { app: 'DRIVER', sections: ['EARNINGS'] }).expect(200);
+  await request('post', exportPath, d, body).expect(429);
 });
