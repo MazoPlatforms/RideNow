@@ -4,6 +4,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Build a universal APK and four standalone device APKs by default.
+val abiMode = providers.gradleProperty("rideNowAbiMode").orElse("both").get()
+require(abiMode in setOf("both", "universal", "split")) {
+    "rideNowAbiMode must be both, universal, or split"
+}
+
 android {
     namespace = "com.ridenow.driver"
     compileSdk = 35
@@ -15,10 +21,27 @@ android {
         versionCode = 1
         versionName = "1.0.0"
     }
+    splits {
+        abi {
+            isEnable = abiMode != "universal"
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = abiMode == "both"
+        }
+    }
+    packaging {
+        // Compress the native map engine in downloadable APKs. Android extracts it at install.
+        jniLibs.useLegacyPackaging = true
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        create("preview") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
