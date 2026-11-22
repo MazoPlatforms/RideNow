@@ -4,9 +4,9 @@ import androidx.compose.ui.res.stringResource
 import com.ridenow.app.R
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.remember
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.rememberCameraPositionState
+import com.ridenow.app.ui.map.CameraPosition
+import com.ridenow.app.ui.map.LatLng
+import com.ridenow.app.ui.map.rememberCameraPositionState
 import com.ridenow.app.ui.map.MapPin
 import com.ridenow.app.ui.map.PinKind
 import com.ridenow.app.ui.map.RideMap

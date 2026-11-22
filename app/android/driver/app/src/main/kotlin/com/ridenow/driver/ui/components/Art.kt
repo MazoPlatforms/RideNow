@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ridenow.driver.ui.data.DocType
+import com.ridenow.driver.ui.map.DriverRouteMap
+import androidx.compose.foundation.layout.PaddingValues
 import com.ridenow.driver.ui.theme.LocalMapStyle
 import com.ridenow.driver.ui.theme.MapStyle
 import com.ridenow.driver.ui.theme.RideTheme
@@ -105,41 +107,17 @@ private fun pinPath(cx: Float, tipY: Float, r: Float): Path = Path().apply {
  */
 @Composable
 fun RouteMap(
-    pickup: String, drop: String, modifier: Modifier = Modifier, areaLabel: String? = null, showCar: Boolean = true,
+    pickup: String, drop: String, modifier: Modifier = Modifier, areaLabel: String? = null,
     corner: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     val c = RideTheme.colors
-    val style = LocalMapStyle.current
-    val pal = palette(style)
-    BoxWithConstraints(modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))) {
-        val w = maxWidth; val h = maxHeight
-        Canvas(Modifier.fillMaxSize()) {
-            drawMapBase(style)
-            val a = Offset(size.width * 0.30f, size.height * 0.26f)
-            val b = Offset(size.width * 0.66f, size.height * 0.74f)
-            val path = Path().apply {
-                moveTo(a.x, a.y)
-                cubicTo(size.width * 0.30f, size.height * 0.62f, size.width * 0.58f, size.height * 0.38f, b.x, b.y)
-            }
-            drawPath(path, Color.Black.copy(alpha = 0.18f), style = Stroke(9.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-            drawPath(path, c.fill, style = Stroke(6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-            val r = 7.dp.toPx()
-            drawPath(pinPath(a.x, a.y + r * 1.3f, r), Color(0xFF22B35A)); drawCircle(Color.White, r * 0.45f, Offset(a.x, a.y + r * 1.3f - r * 2.1f))
-            drawPath(pinPath(b.x, b.y + r * 1.3f, r), Color(0xFFE5393B)); drawCircle(Color.White, r * 0.45f, Offset(b.x, b.y + r * 1.3f - r * 2.1f))
-            if (showCar) {
-                val m = PathMeasure().apply { setPath(path, false) }
-                val mid = m.getPosition(m.length * 0.5f)
-                val t = m.getTangent(m.length * 0.5f)
-                val deg = Math.toDegrees(Math.atan2(t.y.toDouble(), t.x.toDouble())).toFloat() + 90f
-                rotate(deg, mid) {
-                    drawRoundRect(Color(0xFF0A0C10), Offset(mid.x - 7.dp.toPx(), mid.y - 12.dp.toPx()), Size(14.dp.toPx(), 24.dp.toPx()), CornerRadius(5.dp.toPx()))
-                    drawRoundRect(Color(0xFFBFD6E8), Offset(mid.x - 5.dp.toPx(), mid.y - 6.dp.toPx()), Size(10.dp.toPx(), 7.dp.toPx()), CornerRadius(2.dp.toPx()))
-                }
-            }
-        }
-        Text(pickup, color = pal.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.offset(x = w * 0.30f + 14.dp, y = h * 0.26f - 14.dp))
-        Text(drop, color = pal.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.offset(x = w * 0.66f + 14.dp, y = h * 0.74f - 14.dp))
-        if (areaLabel != null) Text(areaLabel, color = pal.label.copy(alpha = 0.8f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.offset(x = w * 0.08f, y = h * 0.4f))
+    Box(modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))) {
+        DriverRouteMap(pickup, drop, Modifier.fillMaxSize(), bottomPadding = PaddingValues(bottom = 24.dp))
+        Text("$pickup → $drop", color = c.fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            modifier = Modifier.align(Alignment.BottomStart).padding(5.dp)
+                .clip(RoundedCornerShape(6.dp)).background(c.field).padding(horizontal = 8.dp, vertical = 3.dp))
+        if (areaLabel != null) Text(areaLabel, color = c.fg, fontSize = 12.sp,
+            modifier = Modifier.align(Alignment.TopStart).padding(5.dp).background(c.field).padding(4.dp))
         if (corner != null) Box(Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.TopEnd) { corner() }
     }
 }

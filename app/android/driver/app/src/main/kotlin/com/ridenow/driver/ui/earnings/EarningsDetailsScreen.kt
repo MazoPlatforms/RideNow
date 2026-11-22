@@ -24,7 +24,7 @@ fun EarningsDetailsScreen(ride: RideRecord, sample: Boolean, onBack: () -> Unit,
     val c = RideTheme.colors
     val context = LocalContext.current
     SubScreen(str(R.string.earn_details), onBack, modifier, trailing = { RideMenu({ shareRide(context, ride, sample, "RideNow") }, onReport) }) {
-        RouteMap(ride.pickup.substringBefore(","), ride.drop.substringBefore(","), Modifier.padding(top = 4.dp).height(150.dp), areaLabel = "Batticaloa", showCar = false)
+        RouteMap(ride.pickup.substringBefore(","), ride.drop.substringBefore(","), Modifier.padding(top = 4.dp).height(150.dp), areaLabel = "Batticaloa")
         GroupCard(Modifier.padding(top = 12.dp)) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {

@@ -1,0 +1,4 @@
+<resources>
+    <string name="sifric_retry_map">வரைபடத்தை மீண்டும் ஏற்றவும்</string>
+    <string name="sifric_search_unavailable">இடத் தேடல் தற்போது கிடைக்கவில்லை. வரைபடத்தில் இடத்தைக் குறிக்கலாம்.</string>
+</resources>

@@ -4,10 +4,10 @@ import com.ridenow.app.ui.components.localizedLabel
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalContext
-import com.google.android.gms.maps.model.LatLng
+import com.ridenow.app.ui.map.LatLng
 import com.ridenow.app.R
 import com.ridenow.app.ui.booking.MapPickerScreen
-import com.ridenow.app.ui.map.GoogleApi
+import com.ridenow.app.ui.map.SifricApi
 import com.ridenow.app.ui.map.fetchRiderPosition
 import android.Manifest
 import android.content.pm.PackageManager
@@ -89,7 +89,7 @@ fun AddAddressScreen(
                 if (point == null) {
                     error = gpsUnavailable
                 } else {
-                    query = GoogleApi.reverse(point) ?: "%.6f, %.6f".format(java.util.Locale.ROOT, point.latitude, point.longitude)
+                    query = SifricApi.reverse(context, point) ?: "%.6f, %.6f".format(java.util.Locale.ROOT, point.latitude, point.longitude)
                     selection = query
                     placeId = null
                     coordinate = point
@@ -107,7 +107,7 @@ fun AddAddressScreen(
         hits = emptyList()
         if (query.trim().length >= 3 && selection == null) {
             delay(350)
-            hits = GoogleApi.autocomplete(query.trim(), near).orEmpty()
+            hits = SifricApi.autocomplete(context, query.trim(), near).orEmpty()
         }
     }
     BackHandler { if (!busy) { if (mapOpen) mapOpen = false else onBack() } }
@@ -185,7 +185,7 @@ fun AddAddressScreen(
                 error = null
                 scope.launch {
                     try {
-                        val point = coordinate ?: placeId?.let { GoogleApi.placeLatLng(it) }
+                        val point = coordinate ?: placeId?.let { SifricApi.placeLatLng(context, it) }
                         onSave(kind, customLabel.trim().takeIf { kind == "OTHER" && it.isNotEmpty() }, query.trim(), point)
                     } catch (cancelled: CancellationException) {
                         throw cancelled

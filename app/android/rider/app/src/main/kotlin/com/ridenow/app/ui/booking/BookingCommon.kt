@@ -7,11 +7,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.LatLngBounds
-import com.google.maps.android.compose.rememberCameraPositionState
+import com.ridenow.app.ui.map.CameraUpdateFactory
+import com.ridenow.app.ui.map.CameraPosition
+import com.ridenow.app.ui.map.LatLng
+import org.maplibre.android.geometry.LatLngBounds
+import com.ridenow.app.ui.map.rememberCameraPositionState
 import com.ridenow.app.ui.map.MapPin
 import com.ridenow.app.ui.map.PinKind
 import com.ridenow.app.ui.map.RideMap
@@ -91,7 +91,7 @@ fun VehicleArt(style: Int, width: Dp, modifier: Modifier = Modifier) {
     }
 }
 
-/** Google map showing the route between [from] and [to], fitted to the visible area, with an optional distance chip. */
+/** Sifric map showing the route between [from] and [to], fitted to the visible area, with an optional distance chip. */
 @Composable
 fun RouteMap(modifier: Modifier = Modifier, from: LatLng, to: LatLng?, route: RouteInfo?, chip: String?, bottomPadding: Dp = 0.dp, topPadding: Dp = 70.dp) {
     val c = RideTheme.colors

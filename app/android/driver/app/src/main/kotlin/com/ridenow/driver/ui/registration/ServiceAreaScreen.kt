@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.*
 import com.ridenow.driver.R
+import com.ridenow.driver.ui.map.*
 import com.ridenow.driver.ui.components.*
 import com.ridenow.driver.ui.theme.RideNowTheme
 import com.ridenow.driver.ui.theme.RideTheme
@@ -97,15 +98,24 @@ fun ServiceAreaContent(onValid: (Boolean) -> Unit, onSummary: (String) -> Unit, 
 private fun AreaPreview(city: String, km: Int) {
     val c = RideTheme.colors
     val shape = RoundedCornerShape(20.dp)
-    Box(Modifier.fillMaxWidth().height(170.dp).clip(shape).background(c.bg).border(1.dp, c.border, shape)) {
-        Canvas(Modifier.fillMaxSize()) {
-            drawCityStreets(c, 0.9f)
-            val centre = Offset(size.width / 2f, size.height / 2f)
-            val r = (28.dp + 70.dp * ((km - 5) / 45f)).toPx()
-            drawCircle(c.accent.copy(alpha = 0.14f), r, centre)
-            drawCircle(c.accent, r, centre, style = Stroke(2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 14f))))
-            drawCircle(c.fill, 8.dp.toPx(), centre); drawCircle(c.fg, 8.dp.toPx(), centre, style = Stroke(3.dp.toPx()))
+    val context = LocalContext.current
+    var center by remember(city) { mutableStateOf<LatLng?>(null) }
+    val camera = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(defaultMapCenter, 10f) }
+    LaunchedEffect(city) {
+        if (city.trim().length >= 3) {
+            kotlinx.coroutines.delay(400)
+            center = SifricApi.geocode(context, city)
         }
+    }
+    LaunchedEffect(center, km) {
+        val point = center ?: defaultMapCenter
+        val zoom = (13.0 - kotlin.math.log2(km.toDouble())).toFloat()
+        camera.animate(CameraUpdateFactory.newLatLngZoom(point, zoom))
+    }
+    Box(Modifier.fillMaxWidth().height(170.dp).clip(shape).background(c.bg).border(1.dp, c.border, shape)) {
+        RideMap(Modifier.fillMaxSize(), camera,
+            pins = listOfNotNull(center?.let { MapPin(it, PinKind.Pickup) }),
+            area = center?.let { ServiceRadius(it, km.toDouble()) })
         Text(
             stringResource(R.string.area_map_label, city.ifBlank { "\u2014" }, km), color = c.bg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.align(Alignment.BottomStart).padding(10.dp).clip(CircleShape).background(c.fg).padding(horizontal = 12.dp, vertical = 6.dp),

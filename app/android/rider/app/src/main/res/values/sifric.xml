@@ -1,0 +1,4 @@
+<resources>
+    <string name="sifric_retry_map">Reload map</string>
+    <string name="sifric_search_unavailable">Place search is unavailable. You can set a pin on the map instead.</string>
+</resources>

@@ -673,15 +673,29 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     transaction(pool, (db) => drivers.location(db, user, body)),
   );
   route('get', '/v1/maps/coverage', {}, () => maps.coverage());
-  route('get', '/v1/maps/places', {}, ({ req }) => {
-    const q = z.string().min(2).max(100).parse(req.query.q);
-    return maps.searchPlaces({ query: q });
+  const placeQuery = z.object({
+    q: z.string().trim().min(2).max(100),
+    lon: z.coerce.number().min(-180).max(180).optional(),
+    lat: z.coerce.number().min(-90).max(90).optional(),
+  }).refine(({ lon, lat }) => (lon === undefined) === (lat === undefined));
+  const placeIdQuery = z.object({ id: z.string().regex(/^\d{1,16}$/) });
+  const reverseQuery = z.object({ lon: z.coerce.number().min(-180).max(180), lat: z.coerce.number().min(-90).max(90) });
+  const mapsLimit = rateLimiter(redis, config, { limit: 60, seconds: 60, prefix: 'map-requests' });
+  const mapRequest = { middleware: [mapsLimit] };
+  route('get', '/v1/maps/places', { ...mapRequest, query: placeQuery }, ({ req }) => {
+    const { q, lon, lat } = placeQuery.parse(req.query);
+    return maps.searchPlaces({ query: q, near: lon === undefined ? undefined : [lon, lat] });
+  });
+  route('get', '/v1/maps/place', { ...mapRequest, query: placeIdQuery }, ({ req }) => maps.findPlace(placeIdQuery.parse(req.query).id));
+  route('get', '/v1/maps/reverse', { ...mapRequest, query: reverseQuery }, ({ req }) => {
+    const { lon, lat } = reverseQuery.parse(req.query);
+    return maps.reverse([lon, lat]);
   });
   route(
     'post',
     '/v1/maps/route',
-    { body: z.object({ waypoints: z.array(coordinate).min(2).max(3), category }).strict() },
-    ({ body }) => maps.route({ waypoints: body.waypoints, vehicleCategory: body.category }),
+    { ...mapRequest, body: z.object({ waypoints: z.array(coordinate).min(2).max(3), category }).strict() },
+    ({ body }) => maps.route({ waypoints: body.waypoints, vehicleCategory: body.category, preview: true }),
   );
   route('post', '/v1/fare-quotes', { body: quoteSchema, status: 201 }, ({ user, body }) =>
     transaction(pool, (db) => quote(db, maps, user, body)),

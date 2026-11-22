@@ -15,6 +15,7 @@ export function loadConfig(env = process.env) {
       MAP_GRAPH_PATH: z.string().default('data/kattankudy-routing.json'),
       MAP_MANIFEST_PATH: z.string().default('data/kattankudy-routing-manifest.json'),
       MAP_CATEGORY_APPROVALS: z.string().default(''),
+      SIFRIC_MAPS_TOKEN: z.string().trim().min(1).optional(),
       FCM_ENABLED: z.enum(['true', 'false']).default('false'),
       RECAPTCHA_V2_SITE_KEY: z.string().default(''),
       RECAPTCHA_V2_SECRET_KEY: z.string().default(''),

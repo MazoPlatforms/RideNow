@@ -3,11 +3,11 @@ package com.ridenow.app.ui.trip
 import com.ridenow.app.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.PaddingValues
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.LatLngBounds
-import com.google.maps.android.compose.rememberCameraPositionState
+import com.ridenow.app.ui.map.CameraUpdateFactory
+import com.ridenow.app.ui.map.CameraPosition
+import com.ridenow.app.ui.map.LatLng
+import org.maplibre.android.geometry.LatLngBounds
+import com.ridenow.app.ui.map.rememberCameraPositionState
 import com.ridenow.app.ui.map.MapPin
 import com.ridenow.app.ui.map.PinKind
 import com.ridenow.app.ui.map.RideMap

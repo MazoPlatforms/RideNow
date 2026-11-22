@@ -1,104 +1,248 @@
 package com.ridenow.app.ui.map
 
-import kotlin.coroutines.resume
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.ridenow.app.ui.permissions.rememberDeviceLocationEnabled
-import com.google.android.gms.maps.model.BitmapDescriptor
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.maps.android.compose.CameraPositionState
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberMarkerState
+import kotlin.coroutines.resume
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.ridenow.app.R
 import com.ridenow.app.ui.theme.LocalMapStyle
 import com.ridenow.app.ui.theme.MapStyle
 import com.ridenow.app.ui.theme.RideTheme
+import org.maplibre.android.MapLibre
+import org.maplibre.android.camera.CameraUpdate
+import org.maplibre.android.camera.CameraUpdateFactory as NativeCameraUpdates
+import org.maplibre.android.camera.CameraPosition as NativeCameraPosition
+import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapLibreMapOptions
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.PropertyFactory.*
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.Point
 
-enum class PinKind { Pickup, Drop, Vehicle }
-data class MapPin(val at: LatLng, val kind: PinKind)
-class UserLocation(val position: LatLng, val real: Boolean)
+typealias LatLng = org.maplibre.android.geometry.LatLng
 
-private const val DarkStyle = """[{"elementType":"geometry","stylers":[{"color":"#0e1218"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#9aa3ae"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#0a0c10"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#1a202a"}]},{"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#252d3a"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#2c3442"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#0a1520"}]},{"featureType":"poi","stylers":[{"visibility":"off"}]},{"featureType":"transit","stylers":[{"visibility":"off"}]}]"""
-private const val LightStyle = """[{"featureType":"poi","stylers":[{"visibility":"off"}]},{"featureType":"transit","stylers":[{"visibility":"off"}]}]"""
-
-private fun dot(fill: Int, ring: Int, px: Int, center: Int? = null): BitmapDescriptor {
-    val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-    val c = Canvas(bmp); val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    p.color = ring; c.drawCircle(px / 2f, px / 2f, px / 2f, p)
-    p.color = fill; c.drawCircle(px / 2f, px / 2f, px / 2f - px * 0.14f, p)
-    if (center != null) { p.color = center; c.drawCircle(px / 2f, px / 2f, px * 0.14f, p) }
-    return BitmapDescriptorFactory.fromBitmap(bmp)
+object CameraPosition {
+    fun fromLatLngZoom(point: LatLng, zoom: Float): NativeCameraPosition =
+        NativeCameraPosition.Builder().target(point).zoom(zoom.toDouble()).build()
 }
 
-/** Google map themed for RideNow. Pins: yellow dot (pickup), yellow marker (drop), dark dot (vehicle). */
+object CameraUpdateFactory {
+    fun newLatLngZoom(point: LatLng, zoom: Float): CameraUpdate = NativeCameraUpdates.newLatLngZoom(point, zoom.toDouble())
+    fun newLatLngBounds(bounds: LatLngBounds, padding: Int): CameraUpdate = NativeCameraUpdates.newLatLngBounds(bounds, padding)
+}
+
+class CameraPositionState {
+    var position by mutableStateOf(CameraPosition.fromLatLngZoom(LatLng(7.6842, 81.7335), 14f))
+    var isMoving by mutableStateOf(false)
+        internal set
+    internal var map: MapLibreMap? = null
+    private var pending: CameraUpdate? = null
+
+    fun animate(update: CameraUpdate) {
+        val native = map
+        if (native == null) pending = update else native.animateCamera(update)
+    }
+
+    internal fun attach(native: MapLibreMap) {
+        native.cameraPosition = position
+        map = native
+        pending?.let { animate(it) }
+        pending = null
+    }
+}
+
+@Composable
+fun rememberCameraPositionState(setup: CameraPositionState.() -> Unit): CameraPositionState =
+    remember { CameraPositionState().apply(setup) }
+
+enum class PinKind { Pickup, Drop, Vehicle, Location }
+data class MapPin(val at: LatLng, val kind: PinKind)
+
+private const val STYLE = "https://maps.sifric.workers.dev/api/v1/native-style.json"
+private val emptyFeatures = FeatureCollection.fromFeatures(emptyArray<Feature>())
+private fun LatLng.point(): Point = Point.fromLngLat(longitude, latitude)
+
+private fun Style.rideLayers(color: Int) {
+    addSource(GeoJsonSource("ride-route", emptyFeatures))
+    addSource(GeoJsonSource("ride-pins", emptyFeatures))
+    addLayer(LineLayer("ride-route-shadow", "ride-route").withProperties(lineColor(color), lineWidth(11f), lineOpacity(0.3f), lineCap("round")))
+    addLayer(LineLayer("ride-route-line", "ride-route").withProperties(lineColor(color), lineWidth(5f), lineCap("round"), lineJoin("round")))
+    for (kind in PinKind.entries) {
+        val fill = when (kind) {
+            PinKind.Location -> 0xff1877f2.toInt()
+            PinKind.Vehicle -> 0xff0a0c10.toInt()
+            else -> color
+        }
+        addLayer(CircleLayer("ride-pin-${kind.name}", "ride-pins")
+            .withFilter(Expression.eq(Expression.get("kind"), Expression.literal(kind.name)))
+            .withProperties(circleColor(fill), circleRadius(if (kind == PinKind.Drop) 9f else 7f),
+                circleStrokeColor(0xffffffff.toInt()), circleStrokeWidth(2f)))
+    }
+}
+
+/** Public Sifric basemap. Ride searches and route requests use the authenticated RideNow API. */
 @Composable
 fun RideMap(
-    modifier: Modifier = Modifier, camera: CameraPositionState, pins: List<MapPin> = emptyList(), route: List<LatLng> = emptyList(),
-    myLocation: Boolean = false, padding: PaddingValues = PaddingValues(), onLoaded: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    camera: CameraPositionState,
+    pins: List<MapPin> = emptyList(),
+    route: List<LatLng> = emptyList(),
+    myLocation: LatLng? = null,
+    padding: PaddingValues = PaddingValues(),
+    onLoaded: () -> Unit = {},
 ) {
-    val c = RideTheme.colors
-    val mapKind = LocalMapStyle.current
-    // Default follows the app theme; Dark is always dark; Satellite uses the satellite imagery with no custom style.
-    val dark = mapKind == MapStyle.Dark || (mapKind == MapStyle.Default && c.isDark)
-    val style = remember(dark) { MapStyleOptions(if (dark) DarkStyle else LightStyle) }
-    GoogleMap(
-        modifier, cameraPositionState = camera, contentPadding = padding, onMapLoaded = onLoaded,
-        properties = MapProperties(isMyLocationEnabled = myLocation, mapStyleOptions = style.takeIf { mapKind != MapStyle.Satellite }, mapType = if (mapKind == MapStyle.Satellite) com.google.maps.android.compose.MapType.SATELLITE else com.google.maps.android.compose.MapType.NORMAL),
-        uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = false, compassEnabled = false, mapToolbarEnabled = false),
-    ) {
-        val d = LocalDensity.current.density
-        val pickupIcon = remember(d) { dot(0xFFFEC604.toInt(), 0xFFFFFFFF.toInt(), (24 * d).toInt()) }
-        val carIcon = remember(d) { dot(0xFF0A0C10.toInt(), 0xFFFFFFFF.toInt(), (30 * d).toInt(), 0xFFFEC604.toInt()) }
-        val dropIcon = remember { BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_YELLOW) }
-        if (route.size > 1) {
-            Polyline(route, color = c.accent.copy(alpha = 0.25f), width = 24f)
-            Polyline(route, color = c.accent, width = 10f)
-        }
-        pins.forEachIndexed { i, p ->
-            key(i, p.kind) {
-                val st = rememberMarkerState(position = p.at)
-                SideEffect { st.position = p.at }
-                when (p.kind) {
-                    PinKind.Drop -> Marker(state = st, icon = dropIcon)
-                    PinKind.Pickup -> Marker(state = st, icon = pickupIcon, anchor = Offset(0.5f, 0.5f))
-                    PinKind.Vehicle -> Marker(state = st, icon = carIcon, anchor = Offset(0.5f, 0.5f), zIndex = 2f)
+    val colors = RideTheme.colors
+    if (LocalInspectionMode.current) {
+        Box(modifier.background(colors.field))
+        return
+    }
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val density = LocalDensity.current
+    val direction = LocalLayoutDirection.current
+    val styleChoice = LocalMapStyle.current
+    val dark = styleChoice == MapStyle.Dark || colors.isDark
+    val theme = if (dark) "dark" else "light"
+    val type = if (styleChoice == MapStyle.Satellite) "satellite" else "default"
+    val styleUrl = "$STYLE?type=$type&theme=$theme"
+    val loaded by rememberUpdatedState(onLoaded)
+    val view = remember(context) {
+        MapLibre.getInstance(context.applicationContext)
+        MapView(context, MapLibreMapOptions.createFromAttributes(context).textureMode(true))
+    }
+    var map by remember(view) { mutableStateOf<MapLibreMap?>(null) }
+    var style by remember(view) { mutableStateOf<Style?>(null) }
+    var error by remember(view) { mutableStateOf(false) }
+    var attempt by remember(view) { mutableIntStateOf(0) }
+
+    DisposableEffect(view, lifecycle, camera) {
+        var released = false
+        val fail = MapView.OnDidFailLoadingMapListener { if (!released) error = true }
+        view.addOnDidFailLoadingMapListener(fail)
+        view.onCreate(null)
+        view.getMapAsync { native ->
+            if (!released) {
+                native.uiSettings.isCompassEnabled = false
+                native.uiSettings.isLogoEnabled = false
+                native.uiSettings.isAttributionEnabled = true
+                native.addOnCameraMoveStartedListener { camera.isMoving = true }
+                native.addOnCameraIdleListener {
+                    camera.position = native.cameraPosition
+                    camera.isMoving = false
                 }
+                camera.attach(native)
+                map = native
             }
+        }
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> view.onStart()
+                Lifecycle.Event.ON_RESUME -> view.onResume()
+                Lifecycle.Event.ON_PAUSE -> view.onPause()
+                Lifecycle.Event.ON_STOP -> view.onStop()
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            released = true
+            lifecycle.removeObserver(observer)
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view.onPause()
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) view.onStop()
+            camera.map = null
+            camera.isMoving = false
+            view.removeOnDidFailLoadingMapListener(fail)
+            view.onDestroy()
+        }
+    }
+    DisposableEffect(map, styleUrl, colors.accent, attempt) {
+        var current = true
+        style = null
+        error = false
+        val native = map
+        native?.setStyle(Style.Builder().fromUri(styleUrl)) { ready ->
+            if (current) {
+                ready.rideLayers(colors.accent.toArgb())
+                style = ready
+                loaded()
+            }
+        }
+        onDispose { current = false }
+    }
+    LaunchedEffect(style, pins, route, myLocation) {
+        val active = style ?: return@LaunchedEffect
+        val line = if (route.size >= 2) listOf(Feature.fromGeometry(LineString.fromLngLats(route.map { it.point() }))) else emptyList()
+        val displayedPins = pins + listOfNotNull(myLocation?.let { MapPin(it, PinKind.Location) })
+        active.getSourceAs<GeoJsonSource>("ride-route")?.setGeoJson(FeatureCollection.fromFeatures(line))
+        active.getSourceAs<GeoJsonSource>("ride-pins")?.setGeoJson(FeatureCollection.fromFeatures(displayedPins.map { pin ->
+            Feature.fromGeometry(pin.at.point()).also { it.addStringProperty("kind", pin.kind.name) }
+        }))
+    }
+
+    Box(modifier.background(colors.field)) {
+        AndroidView(factory = { view }, modifier = Modifier.fillMaxSize(), update = {
+            val left = padding.calculateStartPadding(direction)
+            val right = padding.calculateEndPadding(direction)
+            with(density) {
+                val actualLeft = if (direction == androidx.compose.ui.unit.LayoutDirection.Ltr) left else right
+                val actualRight = if (direction == androidx.compose.ui.unit.LayoutDirection.Ltr) right else left
+                map?.setPadding(actualLeft.roundToPx(), padding.calculateTopPadding().roundToPx(),
+                    actualRight.roundToPx(), padding.calculateBottomPadding().roundToPx())
+            }
+        })
+        Text("© Sifric Maps", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding() + 4.dp)
+            .background(colors.field.copy(alpha = 0.88f)).padding(horizontal = 5.dp), color = colors.fg,
+            style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
+        if (error) TextButton(onClick = { attempt++ }, modifier = Modifier.align(Alignment.Center).background(colors.field)) {
+            Text(stringResource(R.string.sifric_retry_map), color = colors.fg)
         }
     }
 }
+
+class UserLocation(val position: LatLng, val real: Boolean)
 
 /** The rider's current position, or a default city until permission and a fix are available. */
 @SuppressLint("MissingPermission")
 @Composable
 fun rememberUserLocation(
-    default: LatLng = LatLng(37.7749, -122.4194),
+    default: LatLng = LatLng(7.6842, 81.7335),
     locationOn: Boolean = rememberDeviceLocationEnabled(),
 ): UserLocation {
     val context = LocalContext.current

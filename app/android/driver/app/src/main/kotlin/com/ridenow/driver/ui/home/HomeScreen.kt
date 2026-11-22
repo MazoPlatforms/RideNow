@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -59,7 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.ridenow.driver.R
 import com.ridenow.driver.ui.components.RideIcon
 import com.ridenow.driver.ui.components.RideIcons
-import com.ridenow.driver.ui.components.drawMapBase
+import com.ridenow.driver.ui.map.*
 import com.ridenow.driver.ui.theme.RideNowTheme
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.preview.PreviewConfig
@@ -85,9 +86,7 @@ fun HomeScreen(
 ) {
     val c = RideTheme.colors
     val context = LocalContext.current
-    val reduceMotion = rememberReducedMotion()
     val locationOk = hasBackgroundLocation(context)
-    val mapStyle = com.ridenow.driver.ui.theme.LocalMapStyle.current
 
     // Re-read the clock every 15 seconds while online so "Online time" keeps moving.
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
@@ -102,28 +101,14 @@ fun HomeScreen(
     val totalMinutes = ((bankedMillis + if (online) (now - onlineSince).coerceAtLeast(0) else 0L) / 60_000L).toInt()
     val money = remember(earnings) { com.ridenow.driver.ui.util.Money.fmt(earnings) }
 
-    val pulse by rememberInfiniteTransition(label = "home").animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearOutSlowInEasing)), label = "pulse")
-    val ping = if (reduceMotion) 0f else pulse
+    val position = rememberDriverMapLocation()
+    val mapCamera = rememberCameraPositionState { this.position = CameraPosition.fromLatLngZoom(defaultMapCenter, 14f) }
+    LaunchedEffect(position != null) {
+        mapCamera.animate(CameraUpdateFactory.newLatLngZoom(position ?: defaultMapCenter, 14f))
+    }
 
     Box(modifier.fillMaxSize().background(c.bg)) {
-        // Map
-        Canvas(Modifier.fillMaxSize()) {
-            drawMapBase(mapStyle)
-            val me = Offset(size.width / 2f, size.height * 0.34f)
-            if (online) {
-                val dash = PathEffect.dashPathEffect(floatArrayOf(12f, 14f))
-                for ((pos, r) in listOf(Offset(size.width * 0.28f, size.height * 0.46f) to 62.dp, Offset(size.width * 0.78f, size.height * 0.22f) to 46.dp)) {
-                    drawCircle(c.accent.copy(alpha = 0.12f), r.toPx(), pos)
-                    drawCircle(c.accent, r.toPx(), pos, style = Stroke(1.5.dp.toPx(), pathEffect = dash))
-                }
-                drawCircle(c.accent.copy(alpha = 0.25f * (1f - ping)), (24.dp + 46.dp * ping).toPx(), me)
-            }
-            drawCircle(c.accent.copy(alpha = 0.2f), 22.dp.toPx(), me)
-            rotate(-25f, me) {
-                drawRoundRect(Color(0xFF0A0C10), Offset(me.x - 9.dp.toPx(), me.y - 16.dp.toPx()), Size(18.dp.toPx(), 32.dp.toPx()), CornerRadius(7.dp.toPx()))
-                drawRoundRect(Color(0xFFBFD6E8), Offset(me.x - 6.dp.toPx(), me.y - 8.dp.toPx()), Size(12.dp.toPx(), 9.dp.toPx()), CornerRadius(3.dp.toPx()))
-            }
-        }
+        RideMap(Modifier.fillMaxSize(), mapCamera, myLocation = position, padding = PaddingValues(bottom = 240.dp))
 
         // Top bar and chips
         Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp)) {

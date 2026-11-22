@@ -26,14 +26,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.rememberCameraPositionState
+import com.ridenow.app.ui.map.CameraUpdateFactory
+import com.ridenow.app.ui.map.CameraPosition
+import com.ridenow.app.ui.map.LatLng
+import com.ridenow.app.ui.map.rememberCameraPositionState
 import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
-import com.ridenow.app.ui.map.GoogleApi
+import com.ridenow.app.ui.map.SifricApi
+import androidx.compose.ui.platform.LocalContext
 import com.ridenow.app.ui.map.RideMap
 import com.ridenow.app.ui.map.rememberUserLocation
 import com.ridenow.app.ui.permissions.rememberDeviceLocationEnabled
@@ -42,12 +43,13 @@ import com.ridenow.app.ui.theme.Ink
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 
-/** Drag the Google map under a fixed pin. The address comes from reverse geocoding the map centre. */
+/** Drag the Sifric map under a fixed pin. The address comes from reverse geocoding the map centre. */
 @Composable
 fun MapPickerScreen(
     title: String, confirmLabel: String, onBack: () -> Unit, onConfirm: (String, LatLng) -> Unit,
     modifier: Modifier = Modifier, onLocationOff: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     val textMapMoving = stringResource(R.string.map_moving)
 
     val c = RideTheme.colors
@@ -63,10 +65,13 @@ fun MapPickerScreen(
     LaunchedEffect(me.position) { if (first && me.real) { first = false; cam.animate(CameraUpdateFactory.newLatLngZoom(me.position, 16f)) } }
     val moving = cam.isMoving
     val lift by animateDpAsState(if (moving) 14.dp else 0.dp, label = "lift")
-    LaunchedEffect(moving) { if (!moving) address = GoogleApi.reverse(cam.position.target) ?: selectedLabel }
+    val center = cam.position.target ?: me.position
+    LaunchedEffect(moving, center) {
+        if (!moving) address = SifricApi.reverse(context, center) ?: selectedLabel
+    }
 
     Box(modifier.fillMaxSize().background(c.bg)) {
-        RideMap(Modifier.fillMaxSize(), cam, myLocation = me.real, padding = PaddingValues(bottom = 190.dp))
+        RideMap(Modifier.fillMaxSize(), cam, myLocation = me.position.takeIf { me.real }, padding = PaddingValues(bottom = 190.dp))
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val tipY = (maxHeight - 190.dp) / 2
             Canvas(Modifier.fillMaxSize()) {
@@ -78,14 +83,14 @@ fun MapPickerScreen(
         }
         Box(Modifier.statusBarsPadding().padding(20.dp).size(48.dp).clip(CircleShape).background(c.bg).border(1.dp, c.line, CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = backLabel }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }
         Text(stringResource(R.string.map_move), color = c.muted, fontSize = 13.sp, modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 28.dp).clip(RoundedCornerShape(50)).background(c.bg).border(1.dp, c.line, RoundedCornerShape(50)).padding(horizontal = 16.dp, vertical = 10.dp))
-        Box(Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 210.dp).navigationBarsPadding().size(48.dp).clip(CircleShape).background(c.bg).border(1.dp, c.line, CircleShape).clickable(role = Role.Button) { if (!locationOn) onLocationOff() }.semantics { contentDescription = recenterLabel }, contentAlignment = Alignment.Center) { RideIcon(listOf("M10,10m-5,0a5,5 0 1,0 10,0a5,5 0 1,0 -10,0", "M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3"), c.accent, size = 22.dp) }
+        Box(Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 210.dp).navigationBarsPadding().size(48.dp).clip(CircleShape).background(c.bg).border(1.dp, c.line, CircleShape).clickable(role = Role.Button) { if (!locationOn) onLocationOff() else if (me.real) cam.animate(CameraUpdateFactory.newLatLngZoom(me.position, 16f)) }.semantics { contentDescription = recenterLabel }, contentAlignment = Alignment.Center) { RideIcon(listOf("M10,10m-5,0a5,5 0 1,0 10,0a5,5 0 1,0 -10,0", "M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3"), c.accent, size = 22.dp) }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(c.bg).border(1.dp, c.line, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).navigationBarsPadding().padding(20.dp)) {
             Text(title, color = c.fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             Row(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 RideIcon(RideIcons.Pin, c.accent); Spacer(Modifier.width(12.dp))
                 Text(if (moving) textMapMoving else address, color = c.fg, fontSize = 15.sp, maxLines = 2)
             }
-            RideButton(confirmLabel, { onConfirm(address, cam.position.target) }, enabled = !moving, modifier = Modifier.padding(top = 14.dp))
+            RideButton(confirmLabel, { onConfirm(address, center) }, enabled = !moving, modifier = Modifier.padding(top = 14.dp))
         }
     }
 }

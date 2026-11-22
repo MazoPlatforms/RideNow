@@ -91,7 +91,7 @@ Integration and load scripts create their own databases and reset their fixtures
 
 The default integration port is `5432`, default Redis integration DB is `15`, and load DB is `14`. Override them with `TEST_REDIS_URL` and `LOAD_REDIS_URL`. These Redis databases are flushed during testing, so use a separate test Redis instance.
 
-PostgreSQL/PostGIS, transactions, locks, constraints, migrations, Redis, and WebSocket are exercised against real services. Deterministic adapters are used for WhatsApp/FCM delivery. The separate `test:storage` suite uses actual versioned S3-compatible storage and a controlled ClamAV TCP fixture; real malware-engine signatures must be smoke-tested separately. The Mazo graph is real. The [benchmark report](docs/load-report.json) reflects a local 1,000-driver test, not a production SLA guarantee.
+PostgreSQL/PostGIS, transactions, locks, constraints, migrations, Redis, and WebSocket are exercised against real services. Deterministic adapters are used for WhatsApp/FCM delivery. The separate `test:storage` suite uses actual versioned S3-compatible storage and a controlled ClamAV TCP fixture; real malware-engine signatures must be smoke-tested separately. Offline tests use the bundled Mazo graph. The running application uses Sifric and reads its developer token from the backend environment. The [benchmark report](docs/load-report.json) reflects a local 1,000-driver test, not a production SLA guarantee.
 
 ## Production readiness
 

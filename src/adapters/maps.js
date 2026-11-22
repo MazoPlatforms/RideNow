@@ -3,7 +3,15 @@ import { createHash } from 'node:crypto';
 import { findLocalRoutes, validateRoutingGraph } from '../../vendor/mazo/routing-graph.mjs';
 import { decodeSearchIndex } from '../../vendor/mazo/place-delivery.mjs';
 import { ensure } from '../shared/errors.js';
+import { createSifricMaps } from './sifric-maps.js';
+
 export async function createMaps(config) {
+  // Preserve deterministic routing and pricing for the offline automated test suite.
+  if (config.NODE_ENV !== 'test' || config.SIFRIC_MAPS_TOKEN) return createSifricMaps(config);
+  return createFixtureMaps(config);
+}
+
+async function createFixtureMaps(config) {
   const bytes = await readFile(config.MAP_GRAPH_PATH),
     manifest = JSON.parse(await readFile(config.MAP_MANIFEST_PATH, 'utf8'));
   ensure(
@@ -66,6 +74,10 @@ export async function createMaps(config) {
       }
       return result;
     },
+    async findPlace(id) {
+      return { item: places.find(place => String(place.id) === id) ?? null };
+    },
+    async reverse() { return { item: null }; },
     async searchPlaces({ query }) {
       const q = query.toLocaleLowerCase();
       return {

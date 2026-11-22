@@ -13,6 +13,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.*
 import com.ridenow.driver.R
+import com.ridenow.driver.ui.map.DriverRouteMap
+import com.ridenow.driver.ui.map.rememberDriverMapLocation
 import com.ridenow.driver.ui.components.*
 import com.ridenow.driver.ui.theme.RideNowTheme
 import com.ridenow.driver.ui.theme.RideTheme
@@ -42,26 +44,8 @@ fun TripScreen(trip: TripRequest, phase: TripPhase, onAdvance: () -> Unit, onCan
     val button = stringResource(when (phase) { TripPhase.ToPickup -> R.string.trip_btn_arrived; TripPhase.Arrived -> R.string.trip_btn_start; TripPhase.InTrip -> R.string.trip_btn_complete })
 
     Box(modifier.fillMaxSize().background(c.bg)) {
-        Canvas(Modifier.fillMaxSize()) {
-            drawCityStreets(c, 0.9f)
-            val start = Offset(size.width * 0.2f, size.height * 0.40f)
-            val pickup = Offset(size.width * 0.58f, size.height * 0.30f)
-            val drop = Offset(size.width * 0.82f, size.height * 0.12f)
-            val route = Path().apply {
-                moveTo(start.x, start.y); cubicTo(size.width * 0.32f, size.height * 0.30f, size.width * 0.45f, size.height * 0.36f, pickup.x, pickup.y)
-                cubicTo(size.width * 0.66f, size.height * 0.24f, size.width * 0.72f, size.height * 0.20f, drop.x, drop.y)
-            }
-            drawPath(route, c.accent.copy(alpha = 0.2f), style = Stroke(10.dp.toPx(), cap = StrokeCap.Round))
-            drawPath(route, c.accent, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(2f, 16f))))
-            drawCircle(c.fill, 9.dp.toPx(), pickup); drawCircle(c.fg, 9.dp.toPx(), pickup, style = Stroke(3.dp.toPx()))
-            drawRoundRect(c.fg, Offset(drop.x - 9.dp.toPx(), drop.y - 9.dp.toPx()), Size(18.dp.toPx(), 18.dp.toPx()), CornerRadius(4.dp.toPx()))
-            val car = when (phase) { TripPhase.ToPickup -> start; TripPhase.Arrived -> pickup; TripPhase.InTrip -> Offset((pickup.x + drop.x) / 2f, (pickup.y + drop.y) / 2f) }
-            drawCircle(c.accent.copy(alpha = 0.2f), 22.dp.toPx(), car)
-            rotate(-25f, car) {
-                drawRoundRect(c.fg, Offset(car.x - 9.dp.toPx(), car.y - 16.dp.toPx()), Size(18.dp.toPx(), 32.dp.toPx()), CornerRadius(7.dp.toPx()))
-                drawRoundRect(c.bg, Offset(car.x - 6.dp.toPx(), car.y - 8.dp.toPx()), Size(12.dp.toPx(), 9.dp.toPx()), CornerRadius(3.dp.toPx()))
-            }
-        }
+        DriverRouteMap(trip.pickup, trip.drop, Modifier.fillMaxSize(),
+            location = rememberDriverMapLocation(), bottomPadding = PaddingValues(bottom = 240.dp))
         val shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(c.field, shape).border(1.dp, c.border, shape).navigationBarsPadding().padding(20.dp)) {
             Text(title, color = c.fg, fontSize = 22.sp, fontWeight = FontWeight.Light, modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Polite })

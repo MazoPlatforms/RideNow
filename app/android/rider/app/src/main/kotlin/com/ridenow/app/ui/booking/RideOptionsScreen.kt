@@ -1,6 +1,6 @@
 package com.ridenow.app.ui.booking
 
-import com.google.android.gms.maps.model.LatLng
+import com.ridenow.app.ui.map.LatLng
 import com.ridenow.app.ui.map.RouteInfo
 
 import androidx.compose.foundation.background

@@ -2,8 +2,9 @@ package com.ridenow.app.ui.search
 
 import com.ridenow.app.ui.components.offsetByStartDirection
 
-import com.google.android.gms.maps.model.LatLng
-import com.ridenow.app.ui.map.GoogleApi
+import com.ridenow.app.ui.map.LatLng
+import com.ridenow.app.ui.map.SifricApi
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
 
 import androidx.compose.foundation.background
@@ -95,6 +96,7 @@ fun SearchScreen(
     val textNovaTerminalGate4 = stringResource(R.string.text_nova_terminal_gate_4)
     val textSector12OrbitRing = stringResource(R.string.text_sector_12_orbit_ring)
 
+    val context = LocalContext.current
     val c = RideTheme.colors
     val backLabel = stringResource(R.string.search_back)
     var returnTrip by rememberSaveable { mutableStateOf(false) }
@@ -103,12 +105,15 @@ fun SearchScreen(
     LaunchedEffect(Unit) { focus.requestFocus() }
     val q = query.trim()
     var remote by remember { mutableStateOf<List<Place>?>(null) }
-    LaunchedEffect(q) {
+    var searchFailed by remember { mutableStateOf(false) }
+    LaunchedEffect(q, near) {
+        searchFailed = false
         remote = null
         if (q.length >= 2) {
             delay(250)
-            val r = GoogleApi.autocomplete(q, near)
-            remote = r?.map { Place(it.name, it.area, "", it.placeId) } ?: Places.filter { it.name.contains(q, true) || it.area.contains(q, true) }
+            val r = SifricApi.autocomplete(context, q, near)
+            searchFailed = r == null
+            remote = r.orEmpty().map { Place(it.name, it.area, "", it.placeId) }
         }
     }
     val results = remote ?: emptyList()
@@ -161,6 +166,8 @@ fun SearchScreen(
                 item { OptionRow(RideIcons.Clock, textNovaTerminalGate4, textSector12OrbitRing, chevron = true) { onPlace(Places[4], returnTrip) } }
             }
             loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator(Modifier.size(28.dp), color = c.accent, strokeWidth = 3.dp) }
+            searchFailed -> Text(stringResource(R.string.sifric_search_unavailable), color = c.muted,
+                modifier = Modifier.padding(vertical = 16.dp))
             results.isEmpty() -> EmptyResults(q, onMap, Modifier.weight(1f))
             else -> LazyColumn(Modifier.weight(1f).padding(top = 6.dp)) {
                 items(results, key = { it.placeId ?: it.name }) { p -> SuggestionRow(p, q) { onPlace(p, returnTrip) } }

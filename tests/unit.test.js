@@ -213,3 +213,57 @@ test('R2 selects immutable verified copies without changing versioned S3 default
     code: 'R2_HTTPS_REQUIRED',
   });
 });
+
+test('Sifric maps signs private requests, preserves coordinates and maps provider failures', async () => {
+  const { createSifricMaps } = await import('../src/adapters/sifric-maps.js');
+  const points = [[81.69736, 7.706], [81.70059, 7.70997]];
+  const original = structuredClone(points);
+  const place = { id: 1235, name: 'Kattankudy', lon: points[0][0], lat: points[0][1], kind: 'town' };
+  const routeReply = {
+    graphVersion: 'sifric-r1',
+    waypoints: [{ distance: 1 }, { distance: 75 }],
+    routes: [{ distance: 700, duration: 55, geometry: { type: 'LineString', coordinates: points } }],
+  };
+  const calls = [];
+  const provider = async (url, options) => {
+    assert.equal(options.headers.Authorization, 'Bearer fixture-backend-token');
+    assert.equal(options.redirect, 'error');
+    const { pathname, searchParams } = new URL(url);
+    const body = options.body && JSON.parse(options.body);
+    calls.push({ pathname, searchParams, body });
+    if (pathname.endsWith('/places/search')) return Response.json({ items: [place] });
+    if (pathname.endsWith('/places/1235')) return Response.json(place);
+    if (pathname.endsWith('/geocode/reverse')) return Response.json({ items: [{ ...place, distanceMeters: 125 }] });
+    if (pathname.endsWith('/routes')) return Response.json(routeReply);
+    if (pathname.endsWith('/matrix')) return Response.json({
+      distances: [[700], [null]], durations: [[55], [null]],
+      sources: [{ distance: 1 }, null], destinations: [{ distance: 12 }],
+    });
+    throw new Error('Unexpected endpoint');
+  };
+  const maps = createSifricMaps({ NODE_ENV: 'production', SIFRIC_MAPS_TOKEN: 'fixture-backend-token',
+    MAP_CATEGORY_APPROVALS: 'TUK' }, provider);
+  assert.equal(maps.coverage().provider, 'sifric');
+  assert.equal((await maps.searchPlaces({ query: 'Kattankudy', near: points[0] })).items[0].id, '1235');
+  assert.equal(calls[0].searchParams.get('lon'), String(points[0][0]));
+  assert.deepEqual((await maps.findPlace('1235')).item.coordinates, points[0]);
+  assert.equal((await maps.reverse(points[0])).item, null);
+  const route = await maps.route({ waypoints: [...points, points[0]], vehicleCategory: 'TUK' });
+  assert.equal(route.provider, 'sifric');
+  assert.equal(route.legs.length, 2);
+  assert.equal(route.distanceMeters, 1400);
+  assert.deepEqual(calls[4].body.coordinates, points.toReversed());
+  assert.deepEqual(points, original);
+  assert.deepEqual(await maps.matrix({ origins: points, destination: points[0], vehicleCategory: 'TUK' }),
+    [{ distanceMeters: 700, durationSeconds: 55 }, null]);
+  assert.equal(calls.at(-1).body.allowUnsnapped, true);
+  await assert.rejects(maps.route({ waypoints: points, vehicleCategory: 'CAR' }), { code: 'CATEGORY_MAP_NOT_APPROVED' });
+  await maps.route({ waypoints: points, vehicleCategory: 'VAN', preview: true });
+  assert.equal(calls.at(-1).body.mode, 'drive');
+  routeReply.waypoints[1].distance = 500;
+  await assert.rejects(maps.route({ waypoints: points, vehicleCategory: 'TUK' }), { code: 'ROUTE_UNAVAILABLE' });
+  const missing = createSifricMaps({ NODE_ENV: 'production' }, provider);
+  await assert.rejects(missing.searchPlaces({ query: 'Colombo' }), { code: 'MAPS_PROVIDER_NOT_CONFIGURED' });
+  const failure = createSifricMaps({ SIFRIC_MAPS_TOKEN: 'fixture' }, async () => new Response(null, { status: 401 }));
+  await assert.rejects(failure.searchPlaces({ query: 'Colombo' }), { code: 'MAPS_PROVIDER_UNAVAILABLE' });
+});

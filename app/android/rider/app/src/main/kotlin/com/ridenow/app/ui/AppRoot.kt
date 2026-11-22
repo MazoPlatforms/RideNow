@@ -18,8 +18,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
-import com.google.android.gms.maps.model.LatLng
-import com.ridenow.app.ui.map.GoogleApi
+import com.ridenow.app.ui.map.LatLng
+import com.ridenow.app.ui.map.SifricApi
 import com.ridenow.app.ui.map.RouteInfo
 import com.ridenow.app.ui.map.rememberUserLocation
 import kotlinx.coroutines.launch
@@ -151,6 +151,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         locationRequested = false
         if (screen == Screen.Location) screen = Screen.Notifications
     }
+    val context = LocalContext.current
     val me = rememberUserLocation(locationOn = locationOn)
     var destLat by rememberSaveable { mutableStateOf(0.0) }
     var destLng by rememberSaveable { mutableStateOf(0.0) }
@@ -158,16 +159,19 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var pickupPoint by rememberSaveable { mutableStateOf<LatLng?>(null) }
     val routePickup = pickupPoint ?: me.position
     var routeInfo by remember { mutableStateOf<RouteInfo?>(null) }
-    LaunchedEffect(destLat, destLng, routePickup) { routeInfo = null; destLL?.let { routeInfo = GoogleApi.route(routePickup, it) } }
+    LaunchedEffect(destLL, routePickup, vehicle, isReturn) {
+        routeInfo = null
+        val category = listOf("TUK", "CAR", "VAN").getOrElse(vehicle) { "CAR" }
+        destLL?.let { routeInfo = SifricApi.route(context, routePickup, it, category, isReturn) }
+    }
     val pickDest = { name: String, placeId: String?, ll: LatLng? ->
         dest = name; destLat = 0.0; destLng = 0.0
         scope.launch {
-            val p = ll ?: (placeId?.let { GoogleApi.placeLatLng(it) } ?: GoogleApi.geocode(name))
+            val p = ll ?: (placeId?.let { SifricApi.placeLatLng(context, it) } ?: SifricApi.geocode(context, name))
             if (p != null) { destLat = p.latitude; destLng = p.longitude }
         }
         Unit
     }
-    val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("ridenow", 0) }
     val allowCurrentLocation = {
         deviceLocationEnabled(context).also { enabled -> if (!enabled) locationRequested = true }
@@ -583,7 +587,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     val saved = savedAddresses.firstOrNull { it.address == address }
                     pickupPoint = saved?.point ?: me.position.takeIf { me.real && address == places.firstOrNull { it.first == "Current location" }?.second }
                     if (pickupPoint == null && saved != null) scope.launch {
-                        val found = GoogleApi.geocode(address)
+                        val found = SifricApi.geocode(context, address)
                         if (pickup == address) pickupPoint = found
                     }
                     back()

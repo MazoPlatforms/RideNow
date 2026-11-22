@@ -1,7 +1,7 @@
 package com.ridenow.app.ui.saved
 
 import android.content.Context
-import com.google.android.gms.maps.model.LatLng
+import com.ridenow.app.ui.map.LatLng
 import com.ridenow.app.ui.auth.PhoneAuthApi
 import com.ridenow.app.ui.safety.Contact
 import org.json.JSONArray

@@ -13,10 +13,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.PaddingValues
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.rememberCameraPositionState
+import com.ridenow.app.ui.map.CameraUpdateFactory
+import com.ridenow.app.ui.map.CameraPosition
+import com.ridenow.app.ui.map.LatLng
+import com.ridenow.app.ui.map.rememberCameraPositionState
 import com.ridenow.app.ui.map.MapPin
 import com.ridenow.app.ui.map.PinKind
 import com.ridenow.app.ui.map.RideMap
@@ -91,7 +91,7 @@ import com.ridenow.app.ui.util.rememberReducedMotion
 
 /**
  * Home ("Where to?"): full-screen map, menu and notification buttons, and a bottom sheet.
- * The map is a drawn placeholder with moving vehicles; swap [CityMap] for a Google Maps view later.
+ * The Sifric map shows the current pickup area behind the booking sheet.
  */
 @Composable
 fun HomeScreen(
@@ -120,7 +120,7 @@ fun HomeScreen(
     LaunchedEffect(me.position) { cam.animate(CameraUpdateFactory.newLatLngZoom(me.position, 15.5f)) }
     val cars = remember(me.position) { listOf(0.003 to 0.004, -0.004 to 0.002, 0.002 to -0.005, -0.003 to -0.003).map { (a, b) -> MapPin(LatLng(me.position.latitude + a, me.position.longitude + b), PinKind.Vehicle) } }
     Box(modifier.fillMaxSize().background(c.bg)) {
-        RideMap(Modifier.fillMaxSize(), cam, pins = cars, myLocation = me.real, padding = PaddingValues(bottom = 300.dp))
+        RideMap(Modifier.fillMaxSize(), cam, pins = cars, myLocation = me.position.takeIf { me.real }, padding = PaddingValues(bottom = 300.dp))
 
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0), horizontalArrangement = Arrangement.SpaceBetween) {
             RoundButton(RideIcons.Menu, stringResource(R.string.home_menu), onMenu)
