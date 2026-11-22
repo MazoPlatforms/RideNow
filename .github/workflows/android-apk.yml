@@ -20,8 +20,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/main'
-    environment: production
+    if: github.ref == 'refs/heads/codex/optimized-apk-release'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
