@@ -459,6 +459,76 @@ test('instant ride completes, cash is idempotent and driver owes commission', as
   assert.equal(empty.all.totalMinor, '0');
   assert.equal(empty.all.rides, 0);
 });
+test('mobile ride flow exposes a scoped offer, live GPS and rider PIN, then recovers unsettled cash', async () => {
+  const rider = await login();
+  const outsider = await login();
+  const operator = await driver();
+  const waypointLabels = ['Library entrance', 'Town bus station'];
+  const booked = await booking(rider, { waypointLabels });
+  const riderPath = '/v1/mobile/ride?app=RIDER';
+  const driverPath = '/v1/mobile/ride?app=DRIVER';
+  await request('get', driverPath, rider).expect(403);
+  await request('get', riderPath + '&id=' + booked.rideId, outsider).expect(404);
+  let state = (await request('get', riderPath, rider).expect(200)).body.ride;
+  assert.equal(state.state, 'SEARCHING');
+  assert.deepEqual(state.waypoint_labels, waypointLabels);
+  assert.equal(Object.hasOwn(state, 'ridePin'), false);
+  assert.equal(Object.hasOwn(state, 'pin_encrypted'), false);
+
+  await dispatchTick(pool, maps);
+  const offerPath = '/v1/mobile/ride-offers';
+  const offer = (await request('get', offerPath, operator).expect(200)).body.items[0];
+  assert.ok(offer && Date.parse(offer.expires_at) > Date.now());
+  assert.deepEqual(offer.waypoint_labels, waypointLabels);
+  assert.equal(Object.hasOwn(offer, 'driver_id'), false);
+  await request('get', offerPath, outsider).expect(403);
+  await request('post', `/v1/driver-offers/${offer.id}/respond`, operator, { accept: true }).expect(200);
+  assert.deepEqual((await request('get', offerPath, operator).expect(200)).body.items, []);
+  assert.equal((await request('get', driverPath, operator).expect(200)).body.availability, 'RESERVED');
+
+  state = (await request('get', riderPath, rider).expect(200)).body.ride;
+  assert.equal(state.state, 'DRIVER_ASSIGNED');
+  assert.equal(state.ridePin, booked.ridePin);
+  assert.deepEqual(state.driverLocation, pickup);
+  const driverState = (await request('get', driverPath, operator).expect(200)).body.ride;
+  assert.equal(driverState.id, booked.rideId);
+  assert.equal(Object.hasOwn(driverState, 'ridePin'), false);
+  assert.equal(Object.hasOwn(driverState, 'pin_encrypted'), false);
+  await request('get', driverPath + '&id=' + booked.rideId, await driver()).expect(404);
+
+  await act(operator, booked, 'EN_ROUTE').then(response => assert.equal(response.status, 200));
+  await act(operator, booked, 'ARRIVE').then(response => assert.equal(response.status, 200));
+  await act(operator, booked, 'START', { pin: booked.ridePin }).then(response => assert.equal(response.status, 200));
+  state = (await request('get', riderPath, rider).expect(200)).body.ride;
+  assert.equal(state.state, 'IN_PROGRESS');
+  assert.equal(Object.hasOwn(state, 'ridePin'), false);
+  await teleport(operator, dropoff, 2);
+  await act(operator, booked, 'COMPLETE').then(response => assert.equal(response.status, 200));
+  state = (await request('get', driverPath, operator).expect(200)).body.ride;
+  assert.equal(state.state, 'COMPLETED');
+  assert.equal(state.payment_status, 'DUE');
+  await request('put', '/v1/drivers/availability', operator, { availability: 'AVAILABLE' }).expect(409);
+  await request('post', `/v1/rides/${booked.rideId}/cash`, operator).expect(200);
+  assert.equal((await request('get', driverPath, operator).expect(200)).body.ride, null);
+  state = (await request('get', riderPath + '&id=' + booked.rideId, rider).expect(200)).body.ride;
+  assert.equal(state.payment_status, 'COLLECTED');
+  assert.equal(Object.hasOwn(state, 'driverLocation'), false);
+});
+
+test('mobile history can open a scheduled booking and reload its updated pickup time', async () => {
+  const rider = await login();
+  const firstTime = new Date(Date.now() + 3600000).toISOString();
+  const secondTime = new Date(Date.now() + 7200000).toISOString();
+  const ride = await booking(rider, { scheduledAt: firstTime });
+  const path = '/v1/mobile/ride?app=RIDER';
+  assert.equal((await request('get', path, rider).expect(200)).body.ride, null);
+  const idPath = path + '&id=' + ride.rideId;
+  assert.equal((await request('get', idPath, rider).expect(200)).body.ride.scheduled_at, firstTime);
+  const next = await makeQuote(rider, { scheduledAt: secondTime });
+  await request('post', `/v1/rides/${ride.rideId}/reschedule`, rider, { quoteId: next.id }).expect(200);
+  assert.equal((await request('get', idPath, rider).expect(200)).body.ride.scheduled_at, secondTime);
+});
+
 test('return trip bills both legs, excludes stop waiting from driving, and returns to pickup', async () => {
   const s = await login(),
     d = await driver(),

@@ -39,6 +39,7 @@ enum class RideStatus(val label: String) { Completed("Completed"), Scheduled("Sc
 data class RideItem(
     val id: String, val date: String, val pickup: String, val destination: String, val meta: String,
     val fare: String, val status: RideStatus, val payment: String?, val distanceMeters: Double?,
+    val destinationPoint: com.ridenow.app.ui.map.LatLng?,
 )
 
 @Composable

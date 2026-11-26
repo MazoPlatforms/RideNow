@@ -25,14 +25,15 @@ internal object RideHistoryApi {
         val date = row.optValue("started_at") ?: row.optValue("scheduled_at") ?: row.getString("created_at")
         val local = Instant.parse(date).atZone(ZoneId.systemDefault())
         val points = row.getJSONArray("waypoints")
+        val labels = row.optJSONArray("waypoint_labels")
         val dropIndex = points.length() - if (row.optString("trip_type") == "RETURN") 2 else 1
         return DriverHistoryRide(
             id = row.getString("id"),
             state = state,
             ageDays = ChronoUnit.DAYS.between(local.toLocalDate(), LocalDate.now()).toInt(),
             startMinute = local.hour * 60 + local.minute,
-            pickup = pointLabel(points, 0),
-            drop = pointLabel(points, dropIndex),
+            pickup = labels?.optString(0)?.takeIf(String::isNotBlank) ?: pointLabel(points, 0),
+            drop = labels?.optString(1)?.takeIf(String::isNotBlank) ?: pointLabel(points, dropIndex),
             category = row.getString("category"),
             amountMinor = (row.optValue("final_minor") ?: row.optValue("estimated_minor"))?.toLongOrNull(),
             payment = row.optValue("payment_status"),

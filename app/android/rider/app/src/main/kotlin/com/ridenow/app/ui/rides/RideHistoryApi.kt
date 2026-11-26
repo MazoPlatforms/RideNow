@@ -13,8 +13,8 @@ import java.util.Currency
 import java.util.Locale
 
 internal object RideHistoryApi {
-    suspend fun list(context: Context, cursor: String?): RidePage {
-        val path = "/v1/rides?app=RIDER&limit=30" + (cursor?.let { "&cursor=$it" } ?: "")
+    suspend fun list(context: Context, cursor: String?, limit: Int = 30): RidePage {
+        val path = "/v1/rides?app=RIDER&limit=$limit" + (cursor?.let { "&cursor=$it" } ?: "")
         return PhoneAuthApi.authorized(context, "GET", path) { result ->
             val items = result.getJSONArray("items")
             RidePage(List(items.length()) { parse(items.getJSONObject(it)) }, result.optValue("nextCursor"))
@@ -37,6 +37,7 @@ internal object RideHistoryApi {
         val points = item.getJSONArray("waypoints")
         val isReturn = item.optString("trip_type") == "RETURN"
         val dropIndex = if (isReturn) points.length() - 2 else points.length() - 1
+        val labels = item.optJSONArray("waypoint_labels")
         val date = Instant.parse(item.optValue("scheduled_at") ?: item.getString("created_at"))
         val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
         val amountMinor = item.optValue("final_minor") ?: item.optValue("estimated_minor")
@@ -48,13 +49,16 @@ internal object RideHistoryApi {
         return RideItem(
             id = item.getString("id"),
             date = formatter.format(date.atZone(ZoneId.systemDefault())),
-            pickup = pointLabel(points, 0),
-            destination = pointLabel(points, dropIndex),
+            pickup = labels?.optString(0)?.takeIf(String::isNotBlank) ?: pointLabel(points, 0),
+            destination = labels?.optString(1)?.takeIf(String::isNotBlank) ?: pointLabel(points, dropIndex),
             meta = item.getString("category"),
             fare = amountMinor?.toLongOrNull()?.let { fare.format(it.toBigDecimal().movePointLeft(2)) } ?: "—",
             status = status,
             payment = item.optValue("payment_status"),
             distanceMeters = item.optValue("distance_meters")?.toDoubleOrNull(),
+            destinationPoint = points.optJSONArray(dropIndex)?.let {
+                com.ridenow.app.ui.map.LatLng(it.getDouble(1), it.getDouble(0))
+            },
         )
     }
 

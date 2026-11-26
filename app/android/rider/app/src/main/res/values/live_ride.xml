@@ -32,4 +32,6 @@
     <string name="live_cancelled">Ride cancelled</string>
     <string name="live_no_show">Pickup missed</string>
     <string name="live_no_driver">No driver was available</string>
+    <string name="live_own_bookings">Live bookings currently support one trip for yourself. Repeats and reminders are unavailable.</string>
+    <string name="live_ok">OK</string>
 </resources>

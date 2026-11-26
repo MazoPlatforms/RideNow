@@ -74,7 +74,7 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 
-data class Place(val name: String, val area: String, val distance: String, val placeId: String? = null)
+data class Place(val name: String, val area: String, val distance: String, val placeId: String? = null, val point: LatLng? = null)
 
 private val Places = listOf(
     Place("Helix Garden Plaza", "Sector 9, Garden Loop", "6.2 km"),
@@ -91,11 +91,8 @@ private val Places = listOf(
 @Composable
 fun SearchScreen(
     onBack: () -> Unit, onPlace: (Place, Boolean) -> Unit, onFriend: () -> Unit, onEditPickup: () -> Unit,
-    onSaved: () -> Unit, onMap: () -> Unit, onAdd: (String) -> Unit, modifier: Modifier = Modifier, scheduled: String? = null, pickup: String? = null, friend: String? = null, near: LatLng? = null, savedHome: String? = null, savedWork: String? = null,
+    onSaved: (Boolean) -> Unit, onMap: (Boolean) -> Unit, onAdd: (String, Boolean) -> Unit, modifier: Modifier = Modifier, scheduled: String? = null, pickup: String? = null, friend: String? = null, near: LatLng? = null, savedHome: String? = null, savedWork: String? = null,
 ) {
-    val textNovaTerminalGate4 = stringResource(R.string.text_nova_terminal_gate_4)
-    val textSector12OrbitRing = stringResource(R.string.text_sector_12_orbit_ring)
-
     val context = LocalContext.current
     val c = RideTheme.colors
     val backLabel = stringResource(R.string.search_back)
@@ -113,7 +110,7 @@ fun SearchScreen(
             delay(250)
             val r = SifricApi.autocomplete(context, q, near)
             searchFailed = r == null
-            remote = r.orEmpty().map { Place(it.name, it.area, "", it.placeId) }
+            remote = r.orEmpty().map { Place(it.name, it.area, "", it.placeId, it.point) }
         }
     }
     val results = remote ?: emptyList()
@@ -159,16 +156,15 @@ fun SearchScreen(
 
         when {
             q.isEmpty() -> LazyColumn(Modifier.weight(1f).padding(top = 10.dp)) {
-                item { OptionRow(RideIcons.Heart, stringResource(R.string.search_saved), null, chevron = true, onClick = onSaved) }
-                item { OptionRow(RideIcons.Map, stringResource(R.string.search_map), null, chevron = true, onClick = onMap) }
-                item { OptionRow(RideIcons.Home, stringResource(if (savedHome == null) R.string.search_add_home else R.string.home_saved_home), savedHome, plus = savedHome == null) { onAdd("Home") } }
-                item { OptionRow(RideIcons.Work, stringResource(if (savedWork == null) R.string.search_add_work else R.string.home_saved_work), savedWork, plus = savedWork == null) { onAdd("Work") } }
-                item { OptionRow(RideIcons.Clock, textNovaTerminalGate4, textSector12OrbitRing, chevron = true) { onPlace(Places[4], returnTrip) } }
+                item { OptionRow(RideIcons.Heart, stringResource(R.string.search_saved), null, chevron = true) { onSaved(returnTrip) } }
+                item { OptionRow(RideIcons.Map, stringResource(R.string.search_map), null, chevron = true) { onMap(returnTrip) } }
+                item { OptionRow(RideIcons.Home, stringResource(if (savedHome == null) R.string.search_add_home else R.string.home_saved_home), savedHome, plus = savedHome == null) { onAdd("Home", returnTrip) } }
+                item { OptionRow(RideIcons.Work, stringResource(if (savedWork == null) R.string.search_add_work else R.string.home_saved_work), savedWork, plus = savedWork == null) { onAdd("Work", returnTrip) } }
             }
             loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator(Modifier.size(28.dp), color = c.accent, strokeWidth = 3.dp) }
             searchFailed -> Text(stringResource(R.string.sifric_search_unavailable), color = c.muted,
                 modifier = Modifier.padding(vertical = 16.dp))
-            results.isEmpty() -> EmptyResults(q, onMap, Modifier.weight(1f))
+            results.isEmpty() -> EmptyResults(q, { onMap(returnTrip) }, Modifier.weight(1f))
             else -> LazyColumn(Modifier.weight(1f).padding(top = 6.dp)) {
                 items(results, key = { it.placeId ?: it.name }) { p -> SuggestionRow(p, q) { onPlace(p, returnTrip) } }
             }
@@ -321,8 +317,8 @@ private fun EmptyResults(query: String, onMap: () -> Unit, modifier: Modifier = 
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun SearchDarkPreview() = RideNowTheme(darkTheme = true) { SearchScreen({}, { _, _ -> }, {}, {}, {}, {}, {}) }
+private fun SearchDarkPreview() = RideNowTheme(darkTheme = true) { SearchScreen({}, { _, _ -> }, {}, {}, {}, {}, { _, _ -> }) }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun SearchLightPreview() = RideNowTheme(darkTheme = false) { SearchScreen({}, { _, _ -> }, {}, {}, {}, {}, {}) }
+private fun SearchLightPreview() = RideNowTheme(darkTheme = false) { SearchScreen({}, { _, _ -> }, {}, {}, {}, {}, { _, _ -> }) }

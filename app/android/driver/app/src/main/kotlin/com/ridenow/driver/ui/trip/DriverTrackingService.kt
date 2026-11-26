@@ -36,7 +36,7 @@ internal object DriverGps {
 
     suspend fun publish(context: Context): Boolean = lock.withLock {
         if (!permitted(context)) return false
-        val manager = context.getSystemService(LocationManager::class.java)
+        val manager = context.getSystemService(LocationManager::class.java) ?: return false
         if (!manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) return false
         if (acceptedAt > 0 && SystemClock.elapsedRealtime() - acceptedAt < 8_000L) return true
         val fix = freshFix(context, manager) ?: return false
@@ -80,7 +80,10 @@ class DriverTrackingService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        val manager = getSystemService(NotificationManager::class.java)
+        val manager = getSystemService(NotificationManager::class.java) ?: run {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         manager.createNotificationChannel(NotificationChannel(CHANNEL, getString(R.string.live_tracking), NotificationManager.IMPORTANCE_LOW))
         manager.createNotificationChannel(NotificationChannel(OFFERS, getString(R.string.live_offer), NotificationManager.IMPORTANCE_HIGH))
         val appIntent = packageManager.getLaunchIntentForPackage(packageName)
@@ -149,7 +152,7 @@ class DriverTrackingService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
-        getSystemService(NotificationManager::class.java).cancel(52)
+        getSystemService(NotificationManager::class.java)?.cancel(52)
         requested = false
         super.onDestroy()
     }

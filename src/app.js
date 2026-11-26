@@ -715,7 +715,7 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
                    OR ($4::text IS DISTINCT FROM 'RIDER' AND r.driver_id=$1))`;
     const items = (await db.query(
       `SELECT r.id,r.state,r.version,r.scheduled_at,r.final_minor,r.created_at,r.started_at,r.completed_at,
-              q.category,q.trip_type,q.waypoints,q.estimated_minor,
+              q.category,q.trip_type,q.waypoints,q.waypoint_labels,q.estimated_minor,
               q.route->'distanceMeters' AS distance_meters,q.route->'durationSeconds' AS duration_seconds,
               p.status AS payment_status
          FROM rides r JOIN fare_quotes q ON q.id=r.quote_id

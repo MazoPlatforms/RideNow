@@ -32,4 +32,6 @@
     <string name="live_cancelled">பயணம் ரத்துசெய்யப்பட்டது</string>
     <string name="live_no_show">புறப்படும் நேரம் தவறியது</string>
     <string name="live_no_driver">ஓட்டுநர் கிடைக்கவில்லை</string>
+    <string name="live_own_bookings">தற்போது உங்களுக்காக ஒரு பயணத்தை முன்பதிவு செய்யலாம். தொடர்ச்சியான முன்பதிவுகளும் நினைவூட்டல்களும் இப்போது கிடைக்காது.</string>
+    <string name="live_ok">சரி</string>
 </resources>
