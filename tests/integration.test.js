@@ -478,7 +478,7 @@ test('mobile ride history separates rider and driver records and paginates by re
   const driven = await assigned(rider, dualRole);
   const scheduledAt = new Date(Date.now() + 3600000).toISOString();
   const first = await booking(dualRole, { scheduledAt });
-  const second = await booking(dualRole, { scheduledAt });
+  const second = await booking(dualRole, { scheduledAt: new Date(Date.now() + 3 * 3600000).toISOString() });
   await pool.query("UPDATE rides SET created_at=now()-interval '2 minutes' WHERE id=$1", [first.rideId]);
 
   const riderPath = '/v1/rides?app=RIDER&limit=1';
