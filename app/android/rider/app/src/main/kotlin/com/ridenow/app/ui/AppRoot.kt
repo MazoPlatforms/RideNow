@@ -148,6 +148,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var quoteAttempt by remember { mutableIntStateOf(0) }
     var quoting by remember { mutableStateOf(false) }
     var booking by remember { mutableStateOf(false) }
+    var quoteSubmitted by remember { mutableStateOf(false) }
     var bookingKey by remember { mutableStateOf("") }
     var destinationJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var scheduleFrom by rememberSaveable { mutableStateOf(Screen.Home) }
@@ -228,7 +229,20 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     val currentLocationLabel = stringResource(R.string.search_current)
     var pickup by rememberSaveable { mutableStateOf(currentLocationLabel) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val chosenPickup = rescheduling?.pickup ?: pickupPoint ?: me.position.takeIf { me.real }
+    val chosenPickup = rescheduling?.pickup ?: pickupPoint ?: me.position.takeIf { me.real && pickup == currentLocationLabel }
+    var recentRides by remember(phone) { mutableStateOf<List<RideItem>>(emptyList()) }
+    var bookingNotice by remember { mutableStateOf(false) }
+    var rideReturnScreen by remember { mutableStateOf(Screen.Home) }
+
+    LaunchedEffect(phone, profileComplete, screen) {
+        if (phone.isNotBlank() && profileComplete && screen == Screen.Home) {
+            try {
+                recentRides = RideHistoryApi.list(context, null, 10).items.filter { it.status == RideStatus.Completed && it.destinationPoint != null }
+                    .distinctBy { it.destinationPoint }.take(2)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { }
+        }
+    }
     val chosenDrop = rescheduling?.destination ?: destLL
 
     LaunchedEffect(phone, profileComplete, screen, online, lifecycle) {
@@ -246,6 +260,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     LaunchedEffect(screen, chosenPickup, chosenDrop, vehicle, isReturn, scheduleInstant, quoteAttempt) {
         if (screen != Screen.Confirm || booking) return@LaunchedEffect
         quote = null
+        quoteSubmitted = false
         quoteError = null
         if (chosenPickup == null || chosenDrop == null) {
             quoteError = R.string.live_need_points
@@ -268,6 +283,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     }
 
     fun showRide(id: String) {
+        rideReturnScreen = if (screen == Screen.MyRides) Screen.MyRides else Screen.Home
         viewRideId = id
         rescheduling = null
         scheduled = null
@@ -331,7 +347,6 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     }
     fun chooseAddress(address: SavedAddress) {
         pickDest(address.address, null, address.point)
-        isReturn = false
         screen = Screen.Options
     }
     fun quickAddress(kind: String) {
@@ -380,6 +395,15 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         },
     )
     Box(Modifier.fillMaxSize()) {
+    if (bookingNotice) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { bookingNotice = false },
+            text = { Text(stringResource(R.string.live_own_bookings)) },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { bookingNotice = false }) {
+                Text(stringResource(R.string.live_ok))
+            } },
+        )
+    }
     pendingRemove?.let { item ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { pendingRemove = null },
@@ -473,9 +497,18 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                             screen = Screen.Schedule
                         }
                     },
-                    onEditPickup = { nav(Screen.ChangePickup) }, onSaved = { quickAddress(it.uppercase(java.util.Locale.ROOT)) }, pickup = pickup,
-                    onRecent = { currentRideId?.let(::showRide) ?: run { pickDest(it, null, null); isReturn = false; screen = Screen.Options } },
+                    onEditPickup = { nav(Screen.ChangePickup) }, onSaved = { isReturn = false; quickAddress(it.uppercase(java.util.Locale.ROOT)) }, pickup = pickup,
+                    onRecent = { id ->
+                        val existing = currentRideId
+                        if (existing != null) showRide(existing)
+                        else recentRides.firstOrNull { it.id == id }?.let { recent ->
+                            pickDest(recent.destination, null, recent.destinationPoint)
+                            isReturn = false
+                            screen = Screen.Options
+                        }
+                    },
                     onActiveRide = currentRideId?.let { id -> { showRide(id) } },
+                    recentRides = recentRides.map { it.id to it.destination },
                 )
                 MenuDrawer(
                     open = drawer, name = name, phone = shownPhone, onClose = { drawer = false },
@@ -487,9 +520,11 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 BackHandler { scheduled = null; scheduleInstant = null; screen = Screen.Home }
                 SearchScreen(
                     onBack = { scheduled = null; scheduleInstant = null; screen = Screen.Home }, scheduled = scheduled,
-                    onPlace = { place, ret -> pickDest(place.name, place.placeId, null); isReturn = ret; screen = Screen.Options },
-                    onFriend = { nav(Screen.Friend) }, onEditPickup = { nav(Screen.ChangePickup) }, pickup = pickup, friend = friend, near = me.position,
-                    onSaved = { nav(Screen.Saved) }, onMap = { mapFor = "drop"; nav(Screen.MapPick) }, onAdd = { quickAddress(it.uppercase(java.util.Locale.ROOT)) },
+                    onPlace = { place, ret -> pickDest(place.name, place.placeId, place.point); isReturn = ret; screen = Screen.Options },
+                    onFriend = { bookingNotice = true }, onEditPickup = { nav(Screen.ChangePickup) }, pickup = pickup, friend = friend, near = me.position,
+                    onSaved = { returnTrip -> isReturn = returnTrip; nav(Screen.Saved) },
+                    onMap = { returnTrip -> isReturn = returnTrip; mapFor = "drop"; nav(Screen.MapPick) },
+                    onAdd = { kind, returnTrip -> isReturn = returnTrip; quickAddress(kind.uppercase(java.util.Locale.ROOT)) },
                     savedHome = home?.address, savedWork = work?.address,
                 )
             }
@@ -519,11 +554,12 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     onBook = {
                         val selected = quote
                         if (!booking && selected != null) {
-                            if (selected.expiresAt <= Instant.now()) {
+                            if (!quoteSubmitted && selected.expiresAt <= Instant.now()) {
                                 quote = null
                                 quoteError = R.string.live_quote_expired
                             } else {
                                 booking = true
+                                quoteSubmitted = true
                                 quoteError = null
                                 scope.launch {
                                     try {
@@ -554,7 +590,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             Screen.Finding, Screen.Trip -> {
                 val id = viewRideId
                 if (id == null) LaunchedEffect(Unit) { screen = Screen.Home }
-                else LiveRideScreen(id, onClose = { screen = Screen.Home }, onReschedule = { existing ->
+                else LiveRideScreen(id, onClose = { screen = rideReturnScreen }, onReschedule = { existing ->
                     rescheduling = existing
                     scheduleFrom = Screen.Trip
                     vehicle = rideCategories.indexOf(existing.category).coerceAtLeast(0)
@@ -684,7 +720,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             Screen.MapPick -> {
                 BackHandler { back() }
                 if (mapFor == "pickup") MapPickerScreen(textSetPickup, textPickupConfirm, onBack = { back() }, onConfirm = { addr, point -> pickup = addr; pickupPoint = point; back() }, onLocationOff = { locationRequested = true })
-                else MapPickerScreen(textMapSetDrop, textMapSetDrop, onBack = { back() }, onConfirm = { addr, ll -> pickDest(addr, null, ll); isReturn = false; screen = Screen.Options }, onLocationOff = { locationRequested = true })
+                else MapPickerScreen(textMapSetDrop, textMapSetDrop, onBack = { back() }, onConfirm = { addr, ll -> pickDest(addr, null, ll); backStack.removeLastOrNull(); screen = Screen.Options }, onLocationOff = { locationRequested = true })
             }
             Screen.ShareTrip -> {
                 BackHandler { back() }
@@ -708,7 +744,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                         if (pickup == address) pickupPoint = found
                     }
                     back()
-                }, onMap = { mapFor = "pickup"; screen = Screen.MapPick }, allowCurrentLocation = allowCurrentLocation)
+                }, onMap = { mapFor = "pickup"; nav(Screen.MapPick) }, allowCurrentLocation = allowCurrentLocation)
             }
             Screen.Friend -> {
                 BackHandler { back() }
@@ -741,9 +777,9 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
         }
     }
-    if (!online && screen != Screen.Splash && screen != Screen.Intro) {
+    if (!online && screen !in setOf(Screen.Splash, Screen.Intro, Screen.MyRides, Screen.Trip)) {
         BackHandler { }
-        NoInternetScreen(onRetry = { netKey++ }, onOpenRides = { })
+        NoInternetScreen(onRetry = { netKey++ }, onOpenRides = { if (profileComplete) screen = Screen.MyRides })
     } else if (showLocationOff) {
         BackHandler(onBack = dismissLocationOff)
         RiderLocationOffScreen(onManual = dismissLocationOff)

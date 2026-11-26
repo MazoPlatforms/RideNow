@@ -102,7 +102,7 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String, String) -> Unit, mod
     var minute by rememberSaveable { mutableIntStateOf(startTime.minute / 15) }       // 0..3
     var pm by rememberSaveable { mutableIntStateOf(if (startTime.hour >= 12) 1 else 0) }
     var repeat by rememberSaveable { mutableIntStateOf(0) }
-    var reminder by rememberSaveable { mutableIntStateOf(2) }
+    var reminder by rememberSaveable { mutableIntStateOf(0) }
     var passenger by rememberSaveable { mutableIntStateOf(0) }
     var sheet by remember { mutableStateOf("") }
 
@@ -111,6 +111,7 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String, String) -> Unit, mod
     val chips = if (date in base) base else base.take(4) + date
     val picked = date.atTime((hour + 1) % 12 + if (pm == 1) 12 else 0, minute * 15)
     val valid = picked.isAfter(LocalDateTime.now().plusMinutes(30)) && picked.isBefore(LocalDateTime.now().plusDays(30))
+    val optionsSupported = repeat == 0 && reminder == 0 && passenger == 0
     val label = picked.format(DateTimeFormatter.ofPattern("EEE, d MMM, h:mm a", Locale.getDefault()))
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
@@ -182,7 +183,8 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String, String) -> Unit, mod
         AnimatedContent(targetState = label, transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) }, label = "pickupLabel", modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)) { l ->
             Text(stringResource(R.string.home_pickup, l), color = c.muted, fontSize = 13.sp)
         }
-        RideButton(stringResource(R.string.ride_continue), { onContinue(label, picked.atZone(java.time.ZoneId.systemDefault()).toInstant().toString()) }, enabled = valid, modifier = Modifier.padding(top = 10.dp, bottom = 12.dp))
+        if (!optionsSupported) Text(stringResource(R.string.live_own_bookings), color = c.muted)
+        RideButton(stringResource(R.string.ride_continue), { onContinue(label, picked.atZone(java.time.ZoneId.systemDefault()).toInstant().toString()) }, enabled = valid && optionsSupported, modifier = Modifier.padding(top = 10.dp, bottom = 12.dp))
     }
 }
 
