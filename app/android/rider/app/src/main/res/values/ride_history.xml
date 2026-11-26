@@ -11,4 +11,7 @@
     <string name="ride_history_distance">Route distance · %1$.1f km</string>
     <string name="ride_history_cancel">Cancel scheduled ride</string>
     <string name="ride_history_cancel_failed">Could not cancel this ride. Refresh Your Rides to check its current status.</string>
+    <string name="ride_history_receipt">Save PDF receipt</string>
+    <string name="ride_history_receipt_saved">Receipt saved.</string>
+    <string name="ride_history_receipt_failed">Could not save the receipt. Check the payment status and try again.</string>
 </resources>

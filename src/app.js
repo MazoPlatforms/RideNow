@@ -762,6 +762,19 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       ]),
     };
   });
+  route('get', '/v1/rides/:id/receipt', {}, async ({ db, user, req }) => {
+    const id = req.params.id;
+    const receipt = ensure(await one(db,
+      `SELECT r.id AS "rideId",r.state,q.trip_type AS "tripType",q.category,
+              p.amount_minor AS "amountMinor",p.status,p.collected_at AS "paidAt"
+         FROM rides r JOIN fare_quotes q ON q.id=r.quote_id
+         LEFT JOIN payments p ON p.ride_id=r.id WHERE r.id=$1 AND r.rider_id=$2`,
+      [id, user.id],
+    ), 404, 'RIDE_NOT_FOUND');
+    ensure(receipt.state === 'COMPLETED' && receipt.status === 'COLLECTED' && receipt.paidAt, 409, 'RECEIPT_UNAVAILABLE');
+    const { state, status, ...paid } = receipt;
+    return { ...paid, currency: 'LKR', paymentMethod: 'CASH' };
+  });
   route(
     'post',
     '/v1/rides/:id/cancel',
@@ -832,6 +845,9 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     '/v1/driver-offers/:id/respond',
     { access: 'driver', idem: true, body: z.object({ accept: z.boolean() }).strict() },
     ({ db, user, req, body }) => acceptOffer(db, user, req.params.id, body.accept),
+  );
+  route('get', '/v1/earnings/summary', { access: 'driver' }, ({ db, user }) =>
+    ledger.earningsSummary(db, user.id),
   );
   route('get', '/v1/earnings/balance', { access: 'driver' }, ({ db, user }) =>
     ledger.balance(db, user.id),

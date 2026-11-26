@@ -58,7 +58,7 @@ fun RideHistoryScreen(
     val chosen = rides.firstOrNull { it.id == selected }
     if (chosen != null) {
         BackHandler { selected = null }
-        HistoryDetails(chosen) { selected = null }
+        DriverHistoryDetails(chosen) { selected = null }
         return
     }
 
@@ -157,7 +157,7 @@ private fun historyStatus(ride: DriverHistoryRide): String = str(when {
 })
 
 @Composable
-private fun HistoryDetails(ride: DriverHistoryRide, onBack: () -> Unit) {
+internal fun DriverHistoryDetails(ride: DriverHistoryRide, onBack: () -> Unit) {
     val c = RideTheme.colors
     Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         ScreenTop(str(R.string.ride_details), onBack)

@@ -11,4 +11,7 @@
     <string name="ride_history_distance">வழித்தடத் தூரம் · %1$.1f கி.மீ.</string>
     <string name="ride_history_cancel">திட்டமிட்ட பயணத்தை ரத்துசெய்</string>
     <string name="ride_history_cancel_failed">இந்தப் பயணத்தை ரத்துசெய்ய முடியவில்லை. தற்போதைய நிலையைப் பார்க்க பயணப் பட்டியலை மீண்டும் திறக்கவும்.</string>
+    <string name="ride_history_receipt">ரசீதை PDF ஆகச் சேமி</string>
+    <string name="ride_history_receipt_saved">ரசீது சேமிக்கப்பட்டது.</string>
+    <string name="ride_history_receipt_failed">ரசீதைச் சேமிக்க முடியவில்லை. கட்டண நிலையைச் சரிபார்த்து மீண்டும் முயலவும்.</string>
 </resources>

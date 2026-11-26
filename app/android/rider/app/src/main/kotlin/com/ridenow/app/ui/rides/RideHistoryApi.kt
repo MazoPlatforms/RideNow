@@ -40,7 +40,11 @@ internal object RideHistoryApi {
         val date = Instant.parse(item.optValue("scheduled_at") ?: item.getString("created_at"))
         val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
         val amountMinor = item.optValue("final_minor") ?: item.optValue("estimated_minor")
-        val fare = NumberFormat.getCurrencyInstance().apply { currency = Currency.getInstance("LKR") }
+        val fare = NumberFormat.getCurrencyInstance().apply {
+            currency = Currency.getInstance("LKR")
+            minimumFractionDigits = 2
+            maximumFractionDigits = 2
+        }
         return RideItem(
             id = item.getString("id"),
             date = formatter.format(date.atZone(ZoneId.systemDefault())),

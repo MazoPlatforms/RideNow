@@ -598,8 +598,8 @@ fun AppRoot(appearance: AppearanceState) {
                     Screen.Earnings -> {
                         BackHandler { tab(MainTab.Home) }
                         EarningsScreen(
-                            store, app.onlineMinutes(), store.unreadCount, initials, { tab(it) }, { go(Screen.NotificationCenter) }, { go(Screen.DriverProfile) },
-                            onSeeAll = { tab(MainTab.Rides) }, onOpenRide = { selRide = it.id; go(Screen.EarningsDetails) },
+                            app.onlineMinutes(), store.unreadCount, initials, { tab(it) }, { go(Screen.NotificationCenter) }, { go(Screen.DriverProfile) },
+                            onSeeAll = { tab(MainTab.Rides) },
                         )
                     }
                     Screen.Rides -> {

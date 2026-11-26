@@ -184,6 +184,7 @@ private fun HistoryDetails(ride: RideItem, back: () -> Unit, onCancelled: () -> 
     var busy by remember(ride.id) { mutableStateOf(false) }
     var error by remember(ride.id) { mutableStateOf(false) }
     val cancellationKey = rememberSaveable(ride.id) { UUID.randomUUID().toString() }
+    val receipt = rememberRideReceiptDownload(ride.id)
 
     Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         ScreenTop(stringResource(R.string.text_ride_details), back)
@@ -203,7 +204,11 @@ private fun HistoryDetails(ride: RideItem, back: () -> Unit, onCancelled: () -> 
                 "DISPUTED" -> Text(stringResource(R.string.ride_history_cash_disputed), color = c.muted)
                 else -> Unit
             }
+            receipt.feedback?.let { Text(stringResource(it), color = c.fg) }
             if (error) Text(stringResource(R.string.ride_history_cancel_failed), color = c.fg)
+        }
+        if (ride.payment == "COLLECTED") {
+            RideButton(stringResource(R.string.ride_history_receipt), receipt.start, enabled = !receipt.busy, loading = receipt.busy)
         }
         if (ride.status == RideStatus.Scheduled) {
             RideButton(stringResource(R.string.ride_history_cancel), { confirm = true }, enabled = !busy, loading = busy)

@@ -13,8 +13,8 @@ import java.util.Currency
 import java.util.Locale
 
 internal object RideHistoryApi {
-    suspend fun list(context: Context, cursor: String?): DriverRidePage {
-        val path = "/v1/rides?app=DRIVER&limit=30" + (cursor?.let { "&cursor=$it" } ?: "")
+    suspend fun list(context: Context, cursor: String?, limit: Int = 30): DriverRidePage {
+        val path = "/v1/rides?app=DRIVER&limit=$limit" + (cursor?.let { "&cursor=$it" } ?: "")
         val result = PhoneAuthApi.authorized(context, "GET", path)
         val items = result.getJSONArray("items")
         return DriverRidePage(List(items.length()) { parse(items.getJSONObject(it)) }, result.optValue("nextCursor"))
@@ -55,8 +55,13 @@ internal data class DriverHistoryRide(
 ) {
     val completed: Boolean get() = state == "COMPLETED"
     val cancelled: Boolean get() = state in setOf("CANCELLED", "NO_DRIVER", "NO_SHOW")
-    val fare: String get() = amountMinor?.let {
-        NumberFormat.getCurrencyInstance().apply { currency = Currency.getInstance("LKR") }
-            .format(it.toBigDecimal().movePointLeft(2))
-    } ?: "—"
+    val fare: String get() = amountMinor?.let(::formatMinor) ?: "—"
 }
+
+internal fun formatMinor(minor: Long): String = NumberFormat.getCurrencyInstance()
+    .apply {
+        currency = Currency.getInstance("LKR")
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+    }
+    .format(minor.toBigDecimal().movePointLeft(2))
