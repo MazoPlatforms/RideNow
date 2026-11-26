@@ -423,13 +423,41 @@ test('instant ride completes, cash is idempotent and driver owes commission', as
     key,
   ).expect(200);
   assert.deepEqual(repeated.body, finished.body);
+  const receiptPath = `/v1/rides/${r.rideId}/receipt`;
+  await request('get', receiptPath, s).expect(409);
+  await request('get', receiptPath, d).expect(404);
   await request('post', `/v1/rides/${r.rideId}/cash`, d).expect(200);
   await request('post', `/v1/rides/${r.rideId}/cash`, d).expect(200);
+  const receipt = await request('get', receiptPath, s).expect(200).expect('Cache-Control', 'no-store');
+  assert.equal(receipt.body.rideId, r.rideId);
+  assert.equal(receipt.body.amountMinor, finished.body.finalMinor);
+  assert.equal(receipt.body.currency, 'LKR');
+  assert.equal(receipt.body.paymentMethod, 'CASH');
+  assert.ok(Number.isFinite(Date.parse(receipt.body.paidAt)));
+  await request('get', receiptPath, d).expect(404);
+  const summaryPath = '/v1/earnings/summary';
+  await request('get', summaryPath, s).expect(403);
+  const summary = (await request('get', summaryPath, d).expect(200)).body;
+  assert.equal(summary.currency, 'LKR');
+  assert.equal(summary.timezone, 'Asia/Colombo');
+  const earned = finished.body.finalMinor - Math.round(finished.body.finalMinor * 0.2);
+  for (const [name, length] of Object.entries({ today: 24, week: 7, month: 30, all: 6 })) {
+    const period = summary.periods[name];
+    assert.equal(period.rides, 1);
+    assert.equal(Number(period.totalMinor), earned);
+    assert.equal(Number(period.previousMinor), 0);
+    assert.equal(period.series.length, length);
+    assert.equal(period.series.reduce((total, item) => total + Number(item.minor), 0), earned);
+  }
   const b = (await request('get', '/v1/earnings/balance', d).expect(200)).body;
   assert(Number(b.net_minor) < 0);
   assert.equal(-Number(b.net_minor), Math.round(finished.body.finalMinor * 0.2));
   assert.equal((await one(pool, 'SELECT count(*)::int AS n FROM ledger_transactions')).n, 2);
   assert.equal(Number((await one(pool, 'SELECT sum(debit-credit) AS n FROM ledger_entries')).n), 0);
+  const other = await driver();
+  const empty = (await request('get', summaryPath, other).expect(200)).body.periods;
+  assert.equal(empty.all.totalMinor, '0');
+  assert.equal(empty.all.rides, 0);
 });
 test('return trip bills both legs, excludes stop waiting from driving, and returns to pickup', async () => {
   const s = await login(),
@@ -478,7 +506,7 @@ test('mobile ride history separates rider and driver records and paginates by re
   const driven = await assigned(rider, dualRole);
   const scheduledAt = new Date(Date.now() + 3600000).toISOString();
   const first = await booking(dualRole, { scheduledAt });
-  const second = await booking(dualRole, { scheduledAt });
+  const second = await booking(dualRole, { scheduledAt: new Date(Date.now() + 3 * 3600000).toISOString() });
   await pool.query("UPDATE rides SET created_at=now()-interval '2 minutes' WHERE id=$1", [first.rideId]);
 
   const riderPath = '/v1/rides?app=RIDER&limit=1';

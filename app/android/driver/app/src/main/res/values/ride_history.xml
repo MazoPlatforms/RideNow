@@ -9,4 +9,7 @@
     <string name="ride_history_cash_collected">Cash payment collected</string>
     <string name="ride_history_cash_disputed">Cash payment under review</string>
     <string name="ride_history_pickup">Pickup</string>
+    <string name="earn_live_error">Could not load earnings.</string>
+    <string name="earn_live_calendar">Periods use Sri Lanka time</string>
+    <string name="earn_live_session">Online this session</string>
 </resources>

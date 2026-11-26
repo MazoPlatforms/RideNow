@@ -3780,6 +3780,47 @@
         }
       }
     },
+    "/v1/rides/{id}/receipt": {
+      "get": {
+        "operationId": "get__v1_rides__id_receipt",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
     "/v1/rides/{id}/cancel": {
       "post": {
         "operationId": "post__v1_rides__id_cancel",
@@ -4146,6 +4187,37 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/v1/earnings/summary": {
+      "get": {
+        "operationId": "get__v1_earnings_summary",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "Success"

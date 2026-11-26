@@ -9,4 +9,7 @@
     <string name="ride_history_cash_collected">ரொக்கக் கட்டணம் பெறப்பட்டது</string>
     <string name="ride_history_cash_disputed">ரொக்கக் கட்டணம் பரிசீலனையில் உள்ளது</string>
     <string name="ride_history_pickup">புறப்படும் இடம்</string>
+    <string name="earn_live_error">வருமானத்தை ஏற்ற முடியவில்லை.</string>
+    <string name="earn_live_calendar">கால அளவுகள் இலங்கை நேரப்படி காட்டப்படுகின்றன</string>
+    <string name="earn_live_session">இந்த அமர்வில் ஆன்லைன்</string>
 </resources>

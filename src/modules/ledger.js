@@ -84,6 +84,54 @@ export async function balance(db, driverId) {
     [driverId],
   );
 }
+export async function earningsSummary(db, driverId) {
+  return one(db,
+    `WITH calendar AS (
+       SELECT date_trunc('day', now() AT TIME ZONE 'Asia/Colombo') AS today,
+              date_trunc('month', now() AT TIME ZONE 'Asia/Colombo') AS month
+     ), payable AS (
+       SELECT t.ride_id, sum(e.credit-e.debit) AS amount
+       FROM ledger_accounts a
+       JOIN ledger_entries e ON e.account_id=a.id
+       JOIN ledger_transactions t ON t.id=e.transaction_id
+       LEFT JOIN ledger_transactions original ON original.id=t.reversal_of
+       WHERE a.user_id=$1 AND a.code='DRIVER_PAYABLE'
+         AND COALESCE(original.kind,t.kind) IN ('FARE','FARE_ADJUSTMENT')
+       GROUP BY t.ride_id
+     ), completed AS (
+       SELECT r.completed_at AT TIME ZONE 'Asia/Colombo' AS completed,
+              COALESCE(p.amount,0) AS amount
+       FROM rides r LEFT JOIN payable p ON p.ride_id=r.id
+       WHERE r.driver_id=$1 AND r.state='COMPLETED' AND r.completed_at IS NOT NULL
+     ), periods(name, since, until, previous_since) AS (
+       SELECT 'today',today,today+interval '1 day',today-interval '1 day' FROM calendar
+       UNION ALL SELECT 'week',today-interval '6 days',today+interval '1 day',today-interval '13 days' FROM calendar
+       UNION ALL SELECT 'month',today-interval '29 days',today+interval '1 day',today-interval '59 days' FROM calendar
+       UNION ALL SELECT 'all','-infinity'::timestamp,'infinity'::timestamp,NULL::timestamp
+     ), summaries AS (
+       SELECT periods.name, count(completed) FILTER (WHERE completed>=since AND completed<until)::int AS rides,
+              COALESCE(sum(amount) FILTER (WHERE completed>=since AND completed<until),0)::text AS total_minor,
+              COALESCE(sum(amount) FILTER (WHERE completed>=previous_since AND completed<since),0)::text AS previous_minor
+       FROM periods LEFT JOIN completed ON completed>=COALESCE(previous_since,since) AND completed<until
+       GROUP BY periods.name
+     ), buckets AS (
+       SELECT 'today' AS name,'hour' AS unit,generate_series(today,today+interval '23 hours',interval '1 hour') AS bucket FROM calendar
+       UNION ALL SELECT 'week','day',generate_series(today-interval '6 days',today,interval '1 day') FROM calendar
+       UNION ALL SELECT 'month','day',generate_series(today-interval '29 days',today,interval '1 day') FROM calendar
+       UNION ALL SELECT 'all','month',generate_series(month-interval '5 months',month,interval '1 month') FROM calendar
+     ), bucket_amounts AS (
+       SELECT name,bucket,COALESCE(sum(amount),0)::text AS amount
+       FROM buckets LEFT JOIN completed ON date_trunc(unit, completed)=bucket
+       GROUP BY name,bucket
+     )
+     SELECT 'LKR' AS currency, 'Asia/Colombo' AS timezone,
+            jsonb_object_agg(name,jsonb_build_object('rides',rides,'totalMinor',total_minor,'previousMinor',previous_minor,
+              'series',(SELECT jsonb_agg(jsonb_build_object('start',to_char(bucket,'YYYY-MM-DD"T"HH24:MI:SS'),'minor',amount) ORDER BY bucket)
+                        FROM bucket_amounts b WHERE b.name=s.name))) AS periods
+     FROM summaries s`,
+    [driverId],
+  );
+}
 export async function adjustment(db, user, body) {
   ensure(
     await one(db, 'SELECT user_id FROM driver_profiles WHERE user_id=$1 FOR UPDATE', [
