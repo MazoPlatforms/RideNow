@@ -51,7 +51,6 @@ internal fun driverRideError(error: Exception): Int = when ((error as? PhoneAuth
 @Composable
 internal fun LiveOfferSheet(offer: DispatchOffer, busy: Boolean, respond: (Boolean) -> Unit) {
     val c = RideTheme.colors
-    val context = LocalContext.current
     var remaining by remember(offer.id) { mutableLongStateOf(1) }
     LaunchedEffect(offer.id) {
         while (true) {
@@ -78,6 +77,7 @@ internal fun LiveDriverTrip(
     ride: DriverRide, busy: Boolean, stale: Boolean, error: Int?, onBack: () -> Unit, onAction: (String, String?) -> Unit,
 ) {
     val c = RideTheme.colors
+    val context = LocalContext.current
     val location = rememberDriverMapLocation()
     val camera = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(ride.pickup, 14f) }
     var pin by remember(ride.id, ride.state) { mutableStateOf("") }
