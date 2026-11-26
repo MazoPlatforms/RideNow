@@ -58,7 +58,7 @@ fun ConfirmScreen(
     destination: String, vehicleIndex: Int, returnTrip: Boolean, whenLabel: String?, onBack: () -> Unit, onBook: () -> Unit,
     route: RouteInfo?, from: LatLng, to: LatLng?, modifier: Modifier = Modifier,
     quotedMinor: Long? = null, busy: Boolean = false, error: Int? = null, onRefreshQuote: () -> Unit = {},
-    pickupLabel: String? = null,
+    pickupLabel: String? = null, repeatedRideCount: Int = 1, reminderMinutes: Int = 0,
 ) {
     val chipText = route?.let { stringResource(R.string.text_value_km_value_min).format(it.km, it.minutes) }
     val textValueValueSeats = stringResource(R.string.text_value_value_seats)
@@ -101,6 +101,8 @@ fun ConfirmScreen(
                     }
                 }
             }
+            if (repeatedRideCount > 1) Text(stringResource(R.string.schedule_repeat_summary, repeatedRideCount), color = c.muted, fontSize = 13.sp)
+            if (reminderMinutes > 0 && whenLabel != null) Text(stringResource(R.string.schedule_reminder_summary, reminderMinutes), color = c.muted, fontSize = 13.sp)
             if (returnTrip) Text(stringResource(R.string.ride_return_note), color = c.muted)
             error?.let { Text(stringResource(it), color = c.fg) }
         }

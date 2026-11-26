@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -28,6 +29,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import android.content.Intent
+import android.net.Uri
 
 internal fun driverRideError(error: Exception): Int = when ((error as? PhoneAuthException)?.code) {
     "FRESH_LOCATION_NEAR_STOP_REQUIRED" -> R.string.live_near_stop
@@ -48,6 +51,7 @@ internal fun driverRideError(error: Exception): Int = when ((error as? PhoneAuth
 @Composable
 internal fun LiveOfferSheet(offer: DispatchOffer, busy: Boolean, respond: (Boolean) -> Unit) {
     val c = RideTheme.colors
+    val context = LocalContext.current
     var remaining by remember(offer.id) { mutableLongStateOf(1) }
     LaunchedEffect(offer.id) {
         while (true) {
@@ -116,6 +120,11 @@ internal fun LiveDriverTrip(
             Text(ride.pickupLabel + " → " + ride.destinationLabel, color = c.fg)
             if (ride.returnTrip) Text(stringResource(R.string.live_return_trip), color = c.muted)
             ride.riderName?.let { Text(it, color = c.fg) }
+            ride.passengerPhone?.let { passengerPhone ->
+                RideButton(stringResource(R.string.live_call_passenger), {
+                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(passengerPhone)}")))
+                }, enabled = !stale, style = RideButtonStyle.Outline)
+            }
             if (scheduled != null) {
                 val time = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
                     .withZone(ZoneId.systemDefault()).format(scheduled)

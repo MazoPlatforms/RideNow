@@ -18,7 +18,7 @@ internal data class DriverRide(
     val id: String, val state: String, val version: Int, val pickup: LatLng, val destination: LatLng,
     val pickupLabel: String, val destinationLabel: String, val returnTrip: Boolean, val path: List<LatLng>,
     val riderName: String?, val scheduled: Instant?, val arrived: Instant?, val estimate: Long,
-    val total: Long?, val payment: String?,
+    val total: Long?, val payment: String?, val passengerPhone: String?,
 ) {
     val canCancel get() = state in setOf("DRIVER_ASSIGNED", "DRIVER_ARRIVING", "DRIVER_ARRIVED")
     val needsLocation get() = state !in setOf("COMPLETED", "CANCELLED", "NO_DRIVER", "NO_SHOW")
@@ -86,7 +86,7 @@ internal object DriverRideApi {
             label(data, 0, pickup), label(data, 1, destination), data.getString("trip_type") == "RETURN", tripPath,
             data.value("counterpart")?.takeIf(String::isNotBlank), data.value("scheduled_at")?.let(Instant::parse),
             data.value("arrived_at")?.let(Instant::parse), data.getLong("estimated_minor"),
-            data.value("final_minor")?.toLong(), data.value("payment_status"))
+            data.value("final_minor")?.toLong(), data.value("payment_status"), data.value("passengerPhone"))
     }
 
     private fun label(row: JSONObject, index: Int, point: LatLng): String =

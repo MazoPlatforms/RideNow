@@ -4,6 +4,7 @@ import android.content.Context
 import com.ridenow.app.ui.auth.PhoneAuthApi
 import com.ridenow.app.ui.map.LatLng
 import com.ridenow.app.ui.map.RouteInfo
+import com.ridenow.app.ui.search.RidePassenger
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
@@ -11,7 +12,7 @@ import java.util.UUID
 
 internal val rideCategories = listOf("TUK", "CAR", "VAN")
 
-internal data class FareQuote(val id: String, val minor: Long, val expiresAt: Instant, val route: RouteInfo?)
+internal data class FareQuote(val id: String, val minor: Long, val expiresAt: Instant, val route: RouteInfo?, val reminderMinutes: Int)
 
 internal data class LiveRide(
     val id: String, val state: String, val category: String, val pickup: LatLng, val destination: LatLng,
@@ -26,7 +27,7 @@ internal data class LiveRide(
 internal object LiveRideApi {
     suspend fun quote(
         context: Context, pickup: LatLng, destination: LatLng, pickupLabel: String, destinationLabel: String,
-        category: String, returnTrip: Boolean, scheduledAt: String?,
+        category: String, returnTrip: Boolean, scheduledAt: String?, repeatAt: List<String> = emptyList(), repeatRule: String = "NONE", reminderMinutes: Int = 0,
     ): FareQuote {
         val data = JSONObject()
             .put("waypoints", JSONArray().put(pickup.coordinate()).put(destination.coordinate()))
@@ -35,14 +36,17 @@ internal object LiveRideApi {
             .put("category", category)
             .put("tripType", if (returnTrip) "RETURN" else "ONE_WAY")
         if (scheduledAt != null) data.put("scheduledAt", scheduledAt)
+        data.put("repeatAt", JSONArray(repeatAt)).put("repeatRule", repeatRule).put("reminderMinutes", reminderMinutes)
         return PhoneAuthApi.authorized(context, "POST", "/v1/fare-quotes", data) {
-            FareQuote(it.getString("id"), it.getLong("estimated_minor"), Instant.parse(it.getString("expires_at")), route(it.optJSONObject("route")))
+            FareQuote(it.getString("id"), it.getLong("estimated_minor"), Instant.parse(it.getString("expires_at")), route(it.optJSONObject("route")), it.optInt("reminder_minutes", 0))
         }
     }
 
-    suspend fun book(context: Context, quote: FareQuote, key: String, rescheduleId: String?): String {
+    suspend fun book(context: Context, quote: FareQuote, key: String, rescheduleId: String?, passenger: RidePassenger? = null): String {
         val path = if (rescheduleId == null) "/v1/rides" else "/v1/rides/$rescheduleId/reschedule"
-        return PhoneAuthApi.authorized(context, "POST", path, JSONObject().put("quoteId", quote.id), key) {
+        val body = JSONObject().put("quoteId", quote.id)
+        if (rescheduleId == null && passenger != null) body.put("passenger", JSONObject().put("name", passenger.name).put("phone", passenger.phone))
+        return PhoneAuthApi.authorized(context, "POST", path, body, key) {
             it.getString("rideId")
         }
     }
