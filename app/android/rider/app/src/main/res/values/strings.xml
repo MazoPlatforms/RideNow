@@ -1,4 +1,8 @@
 <resources>
+    <string name="schedule_repeat_summary">%1$d scheduled rides, repeating for up to one month</string>
+    <string name="schedule_reminder_summary">A reminder will arrive %1$d minutes before each ride</string>
+    <string name="friend_ride_sms_body">RideNow ride booked for %1$s. Pickup: %2$s. Destination: %3$s. Pickup time: %4$s. Reference: %5$s. Your assigned driver will contact you.</string>
+    <string name="friend_ride_asap">as soon as possible</string>
     <string name="app_name">RideNow</string>
     <string name="splash_description">RideNow. Your ride, before you ask.</string>
     <string name="splash_tagline">Your ride, before you ask.</string>

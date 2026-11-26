@@ -10,10 +10,11 @@ export async function mobileRide(db, user, { app, id }, key) {
   ))?.availability ?? 'OFFLINE' : undefined;
   const record = await one(db,
     `SELECT r.id,r.state,r.version,r.scheduled_at,r.arrived_at,r.pin_encrypted,r.driver_id,r.final_minor,
+            r.passenger_name,r.passenger_phone_encrypted,r.reminder_minutes,r.repeat_group,r.repeat_index,
             q.waypoints,q.waypoint_labels,q.route,q.trip_type,q.category,q.estimated_minor,
             CASE WHEN r.driver_id IS NULL THEN 0 ELSE (q.fare_snapshot->>'cancellation_minor')::int END AS cancellation_minor,
             c.amount_minor AS charged_minor,p.status AS payment_status,
-            CASE WHEN $3 THEN rider.name ELSE operator.name END AS counterpart,
+            CASE WHEN $3 THEN COALESCE(r.passenger_name,rider.name) ELSE operator.name END AS counterpart,
             v.registration,v.make,v.model,v.color,
             CASE WHEN l.received_at > now()-interval '30 seconds' THEN ST_Y(l.point::geometry) END AS driver_latitude,
             CASE WHEN l.received_at > now()-interval '30 seconds' THEN ST_X(l.point::geometry) END AS driver_longitude
@@ -34,10 +35,12 @@ export async function mobileRide(db, user, { app, id }, key) {
   );
   if (id) ensure(record, 404, 'RIDE_NOT_FOUND');
   if (!record) return { ride: null, availability };
-  const { pin_encrypted, driver_id, driver_latitude, driver_longitude, ...ride } = record;
+  const { pin_encrypted, passenger_phone_encrypted, driver_id, driver_latitude, driver_longitude, ...ride } = record;
   const terminal = TERMINAL.includes(ride.state);
   if (!driver && !terminal && driver_id && ['DRIVER_ASSIGNED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED'].includes(ride.state))
     ride.ridePin = decrypt(pin_encrypted, key);
+  if (driver && !terminal && driver_id && passenger_phone_encrypted)
+    ride.passengerPhone = decrypt(passenger_phone_encrypted, key);
   if (!driver && !terminal && driver_latitude !== null)
     ride.driverLocation = [driver_longitude, driver_latitude];
   return { ride, availability };

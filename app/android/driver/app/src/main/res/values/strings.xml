@@ -1,4 +1,5 @@
 <resources>
+    <string name="live_call_passenger">Call passenger</string>
     <string name="app_name">RideNow Driver</string>
     <string name="splash_description">RideNow Driver. Drive when you want.</string>
     <string name="splash_tagline">Drive when you want.</string>

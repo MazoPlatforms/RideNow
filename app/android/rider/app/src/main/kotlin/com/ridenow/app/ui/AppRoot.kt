@@ -63,6 +63,9 @@ import com.ridenow.app.ui.saved.SavedAddress
 import com.ridenow.app.ui.saved.RiderSettingsApi
 import com.ridenow.app.ui.search.ChangePickupScreen
 import com.ridenow.app.ui.search.FriendScreen
+import com.ridenow.app.ui.search.RidePassenger
+import android.content.Intent
+import android.net.Uri
 import com.ridenow.app.ui.share.ShareTripScreen
 import com.ridenow.app.ui.support.ContactSupportScreen
 import com.ridenow.app.ui.post.ReportProblemScreen
@@ -105,6 +108,7 @@ private object SessionFlags { var splashDone = false }
 
 @Composable
 fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
+    val friendRideSmsBody = stringResource(R.string.friend_ride_sms_body)
     val textAlexMorgan = stringResource(R.string.text_alex_morgan)
     val textAna = stringResource(R.string.text_ana)
     val textBen = stringResource(R.string.text_ben)
@@ -140,6 +144,10 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var rating by rememberSaveable { mutableStateOf(0) }
     var scheduled by rememberSaveable { mutableStateOf<String?>(null) }
     var scheduleInstant by rememberSaveable { mutableStateOf<String?>(null) }
+    var repeatAt by rememberSaveable { mutableStateOf(listOf<String>()) }
+    var repeatRule by rememberSaveable { mutableStateOf("NONE") }
+    var reminderMinutes by rememberSaveable { mutableIntStateOf(0) }
+    var friend by remember { mutableStateOf<RidePassenger?>(null) }
     var rescheduling by remember { mutableStateOf<LiveRide?>(null) }
     var viewRideId by remember { mutableStateOf<String?>(null) }
     var currentRideId by remember(phone) { mutableStateOf<String?>(null) }
@@ -257,7 +265,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         }
     }
 
-    LaunchedEffect(screen, chosenPickup, chosenDrop, vehicle, isReturn, scheduleInstant, quoteAttempt) {
+    LaunchedEffect(screen, chosenPickup, chosenDrop, vehicle, isReturn, scheduleInstant, repeatAt, repeatRule, reminderMinutes, quoteAttempt) {
         if (screen != Screen.Confirm || booking) return@LaunchedEffect
         quote = null
         quoteSubmitted = false
@@ -271,7 +279,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             val original = rescheduling
             quote = LiveRideApi.quote(context, chosenPickup, chosenDrop, original?.pickupLabel ?: pickup,
                 original?.destinationLabel ?: dest, original?.category ?: rideCategories[vehicle],
-                original?.returnTrip ?: isReturn, scheduleInstant)
+                original?.returnTrip ?: isReturn, scheduleInstant, repeatAt, repeatRule, reminderMinutes)
             bookingKey = UUID.randomUUID().toString()
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -288,6 +296,9 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         rescheduling = null
         scheduled = null
         scheduleInstant = null
+        repeatAt = emptyList()
+        repeatRule = "NONE"
+        reminderMinutes = 0
         screen = Screen.Trip
     }
 
@@ -296,12 +307,15 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         rescheduling = null
         scheduled = null
         scheduleInstant = null
+        repeatAt = emptyList()
+        repeatRule = "NONE"
+        reminderMinutes = 0
+        friend = null
         screen = Screen.Search
     }
     val savedAddresses = remember { mutableStateListOf<SavedAddress>() }
     val home = savedAddresses.firstOrNull { it.kind == "HOME" }
     val work = savedAddresses.firstOrNull { it.kind == "WORK" }
-    var friend by rememberSaveable { mutableStateOf<String?>(null) }
     var mapFor by rememberSaveable { mutableStateOf("drop") }
     var addLabel by rememberSaveable { mutableStateOf("Home") }
     var editAddress by remember { mutableStateOf<SavedAddress?>(null) }
@@ -521,7 +535,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 SearchScreen(
                     onBack = { scheduled = null; scheduleInstant = null; screen = Screen.Home }, scheduled = scheduled,
                     onPlace = { place, ret -> pickDest(place.name, place.placeId, place.point); isReturn = ret; screen = Screen.Options },
-                    onFriend = { bookingNotice = true }, onEditPickup = { nav(Screen.ChangePickup) }, pickup = pickup, friend = friend, near = me.position,
+                    onFriend = { nav(Screen.Friend) }, onEditPickup = { nav(Screen.ChangePickup) }, pickup = pickup, friend = friend?.name, near = me.position,
                     onSaved = { returnTrip -> isReturn = returnTrip; nav(Screen.Saved) },
                     onMap = { returnTrip -> isReturn = returnTrip; mapFor = "drop"; nav(Screen.MapPick) },
                     onAdd = { kind, returnTrip -> isReturn = returnTrip; quickAddress(kind.uppercase(java.util.Locale.ROOT)) },
@@ -539,9 +553,12 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.Schedule -> {
                 BackHandler { screen = scheduleFrom }
-                ScheduleScreen(onBack = { screen = scheduleFrom }, onContinue = { label, instant ->
+                ScheduleScreen(onBack = { screen = scheduleFrom }, onPassenger = { someoneElse -> if (someoneElse) nav(Screen.Friend) else friend = null }, initialPassenger = if (friend != null) 1 else 0, allowRepeat = rescheduling == null, onContinue = { label, instant, repeated, rule, reminder ->
                     scheduled = label
                     scheduleInstant = instant
+                    repeatAt = repeated
+                    repeatRule = rule
+                    reminderMinutes = reminder
                     screen = if (rescheduling != null || scheduleFrom == Screen.Options) Screen.Confirm else Screen.Search
                 })
             }
@@ -563,7 +580,15 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                                 quoteError = null
                                 scope.launch {
                                     try {
-                                        val id = LiveRideApi.book(context, selected, bookingKey, rescheduling?.id)
+                                        val id = LiveRideApi.book(context, selected, bookingKey, rescheduling?.id, friend)
+                                        friend?.takeIf { it.shareBySms && rescheduling == null }?.let { passenger ->
+                                            val message = String.format(java.util.Locale.getDefault(), friendRideSmsBody,
+                                                passenger.name, pickup, dest, scheduled ?: context.getString(R.string.friend_ride_asap), id)
+                                            runCatching {
+                                                context.startActivity(Intent(Intent.ACTION_SENDTO,
+                                                    Uri.parse("smsto:${Uri.encode(passenger.phone)}")).putExtra("sms_body", message))
+                                            }
+                                        }
                                         showRide(id)
                                     } catch (cancelled: CancellationException) {
                                         throw cancelled
@@ -585,6 +610,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     route = quote?.route, from = chosenPickup ?: routePickup, to = chosenDrop,
                     quotedMinor = quote?.minor, busy = quoting || booking, error = quoteError,
                     onRefreshQuote = { quoteAttempt++ }, pickupLabel = rescheduling?.pickupLabel ?: pickup,
+                    repeatedRideCount = if (rescheduling == null) repeatAt.size.coerceAtLeast(1) else 1,
+                    reminderMinutes = reminderMinutes,
                 )
             }
             Screen.Finding, Screen.Trip -> {
@@ -748,7 +775,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.Friend -> {
                 BackHandler { back() }
-                FriendScreen(onBack = { back() }, onDone = { friend = it; back() })
+                FriendScreen(onBack = { back() }, initial = friend, onDone = { friend = it; back() })
             }
             Screen.AddAddr -> {
                 BackHandler { back() }

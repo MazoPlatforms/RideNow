@@ -2019,6 +2019,8 @@ test('account deletion OTP is scoped to its owner and session family, then erase
   const ticket = (await request('post', support + '/tickets', owner, {
     app: 'RIDER', kind: 'TICKET', subject: 'Private support ticket', body: 'Goodbye', attachments: [file.id],
   }).expect(201)).body;
+  const tripWithAddress = await booking(owner, { waypointLabels: ['Private pickup label', 'Private drop-off label'] });
+  await request('post', `/v1/rides/${tripWithAddress.rideId}/cancel`, owner, { reason: 'Changed plans' }).expect(200);
   const { challenge, code } = await startAccountDeletion(owner);
   const payload = { challengeId: challenge.challengeId, code };
   assert.equal(challenge.twoStepRequired, false);
@@ -2044,6 +2046,8 @@ test('account deletion OTP is scoped to its owner and session family, then erase
   assert.equal(erased.name, '');
   assert.equal(erased.email, '');
   assert.equal(erased.rider_city, null);
+  const formerQuote = await one(pool, 'SELECT q.waypoint_labels FROM fare_quotes q JOIN rides r ON r.quote_id=q.id WHERE r.id=$1', [tripWithAddress.rideId]);
+  assert.equal(formerQuote.waypoint_labels, null);
   assert.equal(await one(pool, 'SELECT id FROM profile_photo_uploads WHERE user_id=$1', [id]), undefined);
   assert.equal(await one(pool, 'SELECT id FROM support_attachments WHERE id=$1', [file.id]), undefined);
   assert.equal(await one(pool, 'SELECT id FROM support_messages WHERE ticket_id=$1', [ticket.id]), undefined);
@@ -2322,7 +2326,7 @@ test('account data export honors app and section scope and excludes private cred
     kind: 'HOME', label: 'Home', address: 'Export owner address', coordinates: [81.7, 7.7],
   }).expect(200);
   await request('post', '/v1/me/saved-addresses', other, { kind: 'HOME', address: 'Someone else address' }).expect(200);
-  const mine = await booking(rider);
+  const mine = await booking(rider, { waypointLabels: ['Exported pickup', 'Exported destination'] });
   const others = await booking(other);
 
   const support = '/v1/me/support';
@@ -2342,6 +2346,7 @@ test('account data export honors app and section scope and excludes private cred
   assert.deepEqual(result.data.profile.devices.map(device => device.name), ['Rider phone']);
   assert.deepEqual(result.data.savedPlaces.addresses.map(address => address.address), ['Export owner address']);
   assert.deepEqual(result.data.rides.map(ride => ride.id), [mine.rideId]);
+  assert.deepEqual(result.data.rides[0].waypoint_labels, ['Exported pickup', 'Exported destination']);
   assert.equal(result.data.support[0].messages[0].body, 'Exported message');
   assert.deepEqual(result.files.map(file => file.type), ['avatar','support']);
   const serialized = JSON.stringify(result);

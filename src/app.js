@@ -14,7 +14,7 @@ import { rateLimiter } from './shared/rate-limit.js';
 import { createRecaptchaVerifier } from './shared/recaptcha.js';
 import { mountSupport } from './modules/support.js';
 import { mountDataExport } from './modules/data-export.js';
-import { createAuth, permission } from './modules/auth.js';
+import { createAuth, permission, normalizePhone } from './modules/auth.js';
 import { createMobilePreferences, cityInput, savedAddressInput, trustedContactInput, notificationApp, notificationChange } from './modules/mobile-preferences.js';
 import { quote } from './modules/pricing.js';
 import * as rides from './modules/rides.js';
@@ -69,6 +69,9 @@ const quoteSchema = z
     tripType: z.enum(['ONE_WAY', 'RETURN']).default('ONE_WAY'),
     scheduledAt: z.iso.datetime().optional(),
     waypointLabels: z.tuple([z.string().trim().min(1).max(150), z.string().trim().min(1).max(150)]).optional(),
+    repeatRule: z.enum(['NONE','DAILY','WEEKDAYS','WEEKLY','MONTHLY']).default('NONE'),
+    repeatAt: z.array(z.iso.datetime()).max(31).default([]),
+    reminderMinutes: z.union([z.literal(0),z.literal(5),z.literal(15),z.literal(30),z.literal(60)]).default(0),
   })
   .strict();
 export function createApp({ pool, redis, config, maps, storage, logger, captchaVerifier = createRecaptchaVerifier(config) }) {
@@ -705,8 +708,9 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
   route(
     'post',
     '/v1/rides',
-    { idem: true, status: 201, body: z.object({ quoteId: uuid }).strict() },
-    ({ db, user, body }) => rides.book(db, user, body.quoteId, config),
+    { idem: true, status: 201, body: z.object({ quoteId: uuid, passenger: z.strictObject({ name: z.string().trim().min(2).max(80).regex(/^[^\p{C}]+$/u), phone }).optional() }).strict() },
+    ({ db, user, body }) => rides.book(db, user, body.quoteId, config,
+      body.passenger ? { name: body.passenger.name, phone: normalizePhone(body.passenger.phone) } : null),
   );
   const rideHistoryQuery = page.extend({ app: notificationApp.optional() });
   route('get', '/v1/rides', { query: rideHistoryQuery }, async ({ db, user, req }) => {
@@ -750,7 +754,7 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       403,
       'FORBIDDEN',
     );
-    const { pin_hash, pin_encrypted, pin_attempts, ...safe } = r;
+    const { pin_hash, pin_encrypted, pin_attempts, passenger_phone_encrypted, ...safe } = r;
     const position =
       r.driver_id && !rides.TERMINAL.includes(r.state)
         ? await one(
@@ -763,6 +767,9 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       ...safe,
       ...(r.rider_id === user.id && !rides.TERMINAL.includes(r.state)
         ? { ridePin: decrypt(pin_encrypted, config.ENCRYPTION_KEY) }
+        : {}),
+      ...(r.driver_id === user.id && !rides.TERMINAL.includes(r.state) && passenger_phone_encrypted
+        ? { passengerPhone: decrypt(passenger_phone_encrypted, config.ENCRYPTION_KEY) }
         : {}),
       driverLocation: position,
       payment: await one(db, 'SELECT * FROM payments WHERE ride_id=$1', [r.id]),
