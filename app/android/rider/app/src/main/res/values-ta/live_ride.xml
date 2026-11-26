@@ -1,0 +1,35 @@
+<resources>
+    <string name="live_open">தற்போதைய பயணத்தைப் பார்</string>
+    <string name="live_error">இந்தக் கோரிக்கையை நிறைவேற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.</string>
+    <string name="live_connection">நேரடிப் பயணப் புதுப்பிப்புகள் தற்காலிகமாகக் கிடைக்கவில்லை.</string>
+    <string name="live_state_changed">பயண நிலை மாறியுள்ளது. தற்போதைய நிலையைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.</string>
+    <string name="live_cancel">பயணத்தை ரத்துசெய்</string>
+    <string name="live_outside">புறப்படும் இடமும் சேரும் இடமும் சேவைப் பகுதிக்குள் இருக்க வேண்டும்.</string>
+    <string name="live_vehicle_unavailable">இந்த வாகன வகை இங்கு கிடைக்கவில்லை.</string>
+    <string name="live_no_route">வாகனம் செல்லக்கூடிய வழித்தடம் கிடைக்கவில்லை.</string>
+    <string name="live_schedule_invalid">30 நிமிடங்கள் முதல் 30 நாட்கள் வரையிலான நேரத்தைத் தேர்வு செய்யுங்கள். இரு முன்பதிவுகளுக்கும் இடையே குறைந்தது ஒரு மணி நேரம் இருக்க வேண்டும்.</string>
+    <string name="live_quote_expired">முன்பதிவு செய்வதற்கு முன் கட்டண மதிப்பீட்டைப் புதுப்பிக்கவும்.</string>
+    <string name="live_active_exists">உங்களுக்கு ஏற்கெனவே ஒரு பயணம் செயலில் உள்ளது.</string>
+    <string name="live_need_points">சரியான புறப்படும் இடத்தையும் சேரும் இடத்தையும் தேர்வு செய்யுங்கள்.</string>
+    <string name="live_now">இப்போது</string>
+    <string name="live_book">பயணத்தை முன்பதிவு செய்</string>
+    <string name="live_book_scheduled">பயணத்தைத் திட்டமிடு</string>
+    <string name="live_seats">%1$d இருக்கைகள்</string>
+    <string name="live_see_fare">கட்டணத்தைப் பார்</string>
+    <string name="live_pin">புறப்படும் இடத்தில் இந்த PIN எண்ணை ஓட்டுநரிடம் தெரிவியுங்கள்</string>
+    <string name="live_fee_charged">ரத்துக் கட்டணம் விதிக்கப்பட்டது · %1$s</string>
+    <string name="live_fee_confirm">இப்போது ரத்துசெய்தால் %1$s கட்டணம் விதிக்கப்படும்.</string>
+    <string name="live_cancel_confirm">இந்த முன்பதிவை ரத்துசெய்யவா?</string>
+    <string name="live_reschedule">பயண நேரத்தை மாற்று</string>
+    <string name="live_scheduled">பயணம் திட்டமிடப்பட்டது</string>
+    <string name="live_searching">ஓட்டுநரைத் தேடுகிறோம்</string>
+    <string name="live_arriving">ஓட்டுநர் வந்துகொண்டிருக்கிறார்</string>
+    <string name="live_arrived">ஓட்டுநர் வந்துவிட்டார்</string>
+    <string name="live_started">பயணம் நடைபெறுகிறது</string>
+    <string name="live_stop">ஓட்டுநர் நிறுத்தத்தில் இருக்கிறார்</string>
+    <string name="live_returning">திரும்பும் பயணம் நடைபெறுகிறது</string>
+    <string name="live_completed">பயணம் முடிந்தது</string>
+    <string name="live_cancelled">பயணம் ரத்துசெய்யப்பட்டது</string>
+    <string name="live_no_show">புறப்படும் நேரம் தவறியது</string>
+    <string name="live_no_driver">ஓட்டுநர் கிடைக்கவில்லை</string>
+</resources>

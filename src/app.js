@@ -1,3 +1,4 @@
+import { mobileRide, mobileOffers } from './modules/mobile-rides.js';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -67,6 +68,7 @@ const quoteSchema = z
     category,
     tripType: z.enum(['ONE_WAY', 'RETURN']).default('ONE_WAY'),
     scheduledAt: z.iso.datetime().optional(),
+    waypointLabels: z.tuple([z.string().trim().min(1).max(150), z.string().trim().min(1).max(150)]).optional(),
   })
   .strict();
 export function createApp({ pool, redis, config, maps, storage, logger, captchaVerifier = createRecaptchaVerifier(config) }) {
@@ -726,6 +728,13 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     )).rows;
     return { items: items.slice(0, limit), nextCursor: items.length > limit ? items[limit - 1].id : null };
   });
+  const mobileRideQuery = z.object({ app: notificationApp, id: uuid.optional() });
+  route('get', '/v1/mobile/ride', { query: mobileRideQuery }, ({ db, user, req }) => {
+    const query = mobileRideQuery.parse(req.query);
+    if (query.app === 'DRIVER') ensure(user.roles.includes('DRIVER'), 403, 'DRIVER_REQUIRED');
+    return mobileRide(db, user, query, config.ENCRYPTION_KEY);
+  });
+  route('get', '/v1/mobile/ride-offers', { access: 'driver' }, ({ db, user }) => mobileOffers(db, user));
   route('get', '/v1/rides/:id', {}, async ({ db, user, req }) => {
     const r = ensure(
       await one(
@@ -778,7 +787,7 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
   route(
     'post',
     '/v1/rides/:id/cancel',
-    { idem: true, body: z.object({ reason: text, expectedState: z.literal('SCHEDULED').optional() }).strict() },
+    { idem: true, body: z.object({ reason: text, expectedState: z.enum(['SCHEDULED', 'SEARCHING', 'DRIVER_ASSIGNED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED']).optional() }).strict() },
     ({ db, user, req, body }) => rides.cancel(db, user, req.params.id, body.reason, body.expectedState),
   );
   route(

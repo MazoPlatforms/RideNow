@@ -86,9 +86,9 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.abs
 
-/** Pick a pickup date and time. [onContinue] receives a label such as "Wed, 4 Nov, 8:30 AM". */
+/** Pick a pickup date and time. [onContinue] receives the display label and the selected instant. */
 @Composable
-fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: Modifier = Modifier) {
+fun ScheduleScreen(onBack: () -> Unit, onContinue: (String, String) -> Unit, modifier: Modifier = Modifier) {
     val textAm = stringResource(R.string.text_am)
     val textPm = stringResource(R.string.text_pm)
 
@@ -96,7 +96,7 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
     val backLabel = stringResource(R.string.search_back)
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
-    val startTime = remember { LocalDateTime.now().plusMinutes(30).let { it.plusMinutes(((15 - it.minute % 15) % 15).toLong()) } }
+    val startTime = remember { LocalDateTime.now().plusMinutes(31).let { it.plusMinutes(((15 - it.minute % 15) % 15).toLong()) } }
     var dateDay by rememberSaveable { mutableLongStateOf(startTime.toLocalDate().toEpochDay()) }
     var hour by rememberSaveable { mutableIntStateOf((startTime.hour + 11) % 12) }   // 0..11 = 1..12
     var minute by rememberSaveable { mutableIntStateOf(startTime.minute / 15) }       // 0..3
@@ -110,7 +110,7 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
     val base = (0..4).map { today.plusDays(it.toLong()) }
     val chips = if (date in base) base else base.take(4) + date
     val picked = date.atTime((hour + 1) % 12 + if (pm == 1) 12 else 0, minute * 15)
-    val valid = picked.isAfter(LocalDateTime.now().plusMinutes(14))
+    val valid = picked.isAfter(LocalDateTime.now().plusMinutes(30)) && picked.isBefore(LocalDateTime.now().plusDays(30))
     val label = picked.format(DateTimeFormatter.ofPattern("EEE, d MMM, h:mm a", Locale.getDefault()))
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
@@ -182,7 +182,7 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
         AnimatedContent(targetState = label, transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) }, label = "pickupLabel", modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)) { l ->
             Text(stringResource(R.string.home_pickup, l), color = c.muted, fontSize = 13.sp)
         }
-        RideButton(stringResource(R.string.ride_continue), { onContinue(label) }, enabled = valid, modifier = Modifier.padding(top = 10.dp, bottom = 12.dp))
+        RideButton(stringResource(R.string.ride_continue), { onContinue(label, picked.atZone(java.time.ZoneId.systemDefault()).toInstant().toString()) }, enabled = valid, modifier = Modifier.padding(top = 10.dp, bottom = 12.dp))
     }
 }
 
@@ -253,4 +253,4 @@ private fun Wheel(items: List<String>, initial: Int, modifier: Modifier, onSelec
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun SchedulePreview() = RideNowTheme(darkTheme = true) { ScheduleScreen({}, {}) }
+private fun SchedulePreview() = RideNowTheme(darkTheme = true) { ScheduleScreen({}, { _, _ -> }) }

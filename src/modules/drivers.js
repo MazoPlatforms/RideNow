@@ -50,6 +50,8 @@ export async function availability(db, user, value) {
   ensure(!['RESERVED', 'ON_TRIP'].includes(p.availability), 409, 'DRIVER_BUSY');
   if (value === 'AVAILABLE') {
     ensure(await eligible(db, user.id), 409, 'DRIVER_NOT_ELIGIBLE');
+    ensure(!(await one(db, `SELECT 1 FROM rides r JOIN payments p ON p.ride_id=r.id
+      WHERE r.driver_id=$1 AND p.status='DUE' LIMIT 1`, [user.id])), 409, 'RIDE_CASH_PENDING');
     ensure(
       await one(
         db,

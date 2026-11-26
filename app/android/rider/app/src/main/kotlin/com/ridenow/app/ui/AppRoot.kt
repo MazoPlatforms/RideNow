@@ -79,7 +79,14 @@ import com.ridenow.app.ui.post.RateDriverScreen
 import com.ridenow.app.ui.post.RideCompleteScreen
 import com.ridenow.app.ui.profile.EditProfileScreen
 import com.ridenow.app.ui.profile.ProfileScreen
-import com.ridenow.app.ui.rides.MyRidesScreen
+import com.ridenow.app.ui.rides.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import java.time.Instant
+import java.util.UUID
 import com.ridenow.app.ui.search.SearchScreen
 import com.ridenow.app.ui.settings.SettingsScreen
 import com.ridenow.app.ui.splash.SplashScreen
@@ -132,6 +139,17 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var vehicle by rememberSaveable { mutableStateOf(1) }
     var rating by rememberSaveable { mutableStateOf(0) }
     var scheduled by rememberSaveable { mutableStateOf<String?>(null) }
+    var scheduleInstant by rememberSaveable { mutableStateOf<String?>(null) }
+    var rescheduling by remember { mutableStateOf<LiveRide?>(null) }
+    var viewRideId by remember { mutableStateOf<String?>(null) }
+    var currentRideId by remember(phone) { mutableStateOf<String?>(null) }
+    var quote by remember { mutableStateOf<FareQuote?>(null) }
+    var quoteError by remember { mutableStateOf<Int?>(null) }
+    var quoteAttempt by remember { mutableIntStateOf(0) }
+    var quoting by remember { mutableStateOf(false) }
+    var booking by remember { mutableStateOf(false) }
+    var bookingKey by remember { mutableStateOf("") }
+    var destinationJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var scheduleFrom by rememberSaveable { mutableStateOf(Screen.Home) }
     var drawer by rememberSaveable { mutableStateOf(false) }
     val backStack = remember { mutableStateListOf<Screen>() }
@@ -143,8 +161,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var locationDismissed by rememberSaveable(locationOn) { mutableStateOf(false) }
     var locationRequested by remember(screen, locationOn) { mutableStateOf(false) }
     val showLocationOff = !locationOn && (locationRequested || (!locationDismissed && screen in setOf(
-        Screen.Location, Screen.Home, Screen.Search, Screen.Options, Screen.Confirm, Screen.Finding,
-        Screen.Trip, Screen.MapPick, Screen.ChangePickup, Screen.ShareTrip,
+        Screen.Location, Screen.Home, Screen.Search, Screen.Options, Screen.Finding,
+        Screen.MapPick, Screen.ChangePickup, Screen.ShareTrip,
     )))
     val dismissLocationOff = {
         locationDismissed = true
@@ -166,7 +184,8 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     }
     val pickDest = { name: String, placeId: String?, ll: LatLng? ->
         dest = name; destLat = 0.0; destLng = 0.0
-        scope.launch {
+        destinationJob?.cancel()
+        destinationJob = scope.launch {
             val p = ll ?: (placeId?.let { SifricApi.placeLatLng(context, it) } ?: SifricApi.geocode(context, name))
             if (p != null) { destLat = p.latitude; destLng = p.longitude }
         }
@@ -206,7 +225,63 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     }
     var netKey by remember { mutableIntStateOf(0) }
     val online = rememberOnline(netKey)
-    var pickup by rememberSaveable { mutableStateOf(text128MeridianWalk) }
+    val currentLocationLabel = stringResource(R.string.search_current)
+    var pickup by rememberSaveable { mutableStateOf(currentLocationLabel) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val chosenPickup = rescheduling?.pickup ?: pickupPoint ?: me.position.takeIf { me.real }
+    val chosenDrop = rescheduling?.destination ?: destLL
+
+    LaunchedEffect(phone, profileComplete, screen, online, lifecycle) {
+        if (!profileComplete || phone.isBlank() || !online || screen != Screen.Home) return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                try { currentRideId = LiveRideApi.get(context)?.id }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { /* Preserve the last known active ride while the connection recovers. */ }
+                delay(5_000)
+            }
+        }
+    }
+
+    LaunchedEffect(screen, chosenPickup, chosenDrop, vehicle, isReturn, scheduleInstant, quoteAttempt) {
+        if (screen != Screen.Confirm || booking) return@LaunchedEffect
+        quote = null
+        quoteError = null
+        if (chosenPickup == null || chosenDrop == null) {
+            quoteError = R.string.live_need_points
+            return@LaunchedEffect
+        }
+        quoting = true
+        try {
+            val original = rescheduling
+            quote = LiveRideApi.quote(context, chosenPickup, chosenDrop, original?.pickupLabel ?: pickup,
+                original?.destinationLabel ?: dest, original?.category ?: rideCategories[vehicle],
+                original?.returnTrip ?: isReturn, scheduleInstant)
+            bookingKey = UUID.randomUUID().toString()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            quoteError = rideError(failure)
+        } finally {
+            quoting = false
+        }
+    }
+
+    fun showRide(id: String) {
+        viewRideId = id
+        rescheduling = null
+        scheduled = null
+        scheduleInstant = null
+        screen = Screen.Trip
+    }
+
+    fun startRideSearch() {
+        currentRideId?.let { showRide(it); return }
+        rescheduling = null
+        scheduled = null
+        scheduleInstant = null
+        screen = Screen.Search
+    }
     val savedAddresses = remember { mutableStateListOf<SavedAddress>() }
     val home = savedAddresses.firstOrNull { it.kind == "HOME" }
     val work = savedAddresses.firstOrNull { it.kind == "WORK" }
@@ -293,11 +368,11 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         schedule = { scheduleFrom = Screen.Options; screen = Screen.Schedule }, finding = { screen = Screen.Finding }, trip = { screen = Screen.Trip },
         complete = { rating = 0; screen = Screen.Complete }, report = { nav(Screen.Report) }, support = { nav(Screen.Support) }, safety = { nav(Screen.Safety) },
         setPhone = { phone = it }, setVehicle = { vehicle = it }, setScheduled = { scheduled = it }, confirm = { screen = Screen.Confirm },
-        changeDrop = { pickDest(it, null, null) }, cancelScheduled = { scheduled = null; screen = Screen.Home }, signedOut = {
+        changeDrop = { pickDest(it, null, null) }, cancelScheduled = { scheduled = null; scheduleInstant = null; screen = Screen.Home }, signedOut = {
             phone = ""; name = textAlexMorgan; email = ""; profilePhoto = null
             profileDetails = PhoneAuthApi.ProfileDetails(); profileComplete = false
             challengeId = ""; dest = ""; destLat = 0.0; destLng = 0.0
-            friend = null; pickup = text128MeridianWalk; pickupPoint = null; scheduled = null
+            friend = null; pickup = currentLocationLabel; pickupPoint = null; scheduled = null; scheduleInstant = null; viewRideId = null; currentRideId = null
             contacts.clear(); savedAddresses.clear(); backStack.clear(); drawer = false
             com.ridenow.app.ui.support.TicketStore.tickets.clear()
             com.ridenow.app.ui.support.TicketStore.selectedId = null
@@ -390,20 +465,28 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             Screen.Home -> Box(Modifier.fillMaxSize()) {
                 HomeScreen(
                     onMenu = { drawer = true }, onNotifications = { nav(Screen.Notifs) },
-                    onSearch = { screen = Screen.Search }, onLater = { scheduleFrom = Screen.Home; screen = Screen.Schedule },
+                    onSearch = ::startRideSearch, onLater = {
+                        val current = currentRideId
+                        if (current != null) showRide(current) else {
+                            rescheduling = null
+                            scheduleFrom = Screen.Home
+                            screen = Screen.Schedule
+                        }
+                    },
                     onEditPickup = { nav(Screen.ChangePickup) }, onSaved = { quickAddress(it.uppercase(java.util.Locale.ROOT)) }, pickup = pickup,
-                    onRecent = { pickDest(it, null, null); isReturn = false; screen = Screen.Options },
+                    onRecent = { currentRideId?.let(::showRide) ?: run { pickDest(it, null, null); isReturn = false; screen = Screen.Options } },
+                    onActiveRide = currentRideId?.let { id -> { showRide(id) } },
                 )
                 MenuDrawer(
                     open = drawer, name = name, phone = shownPhone, onClose = { drawer = false },
                     onProfile = { go("Profile") }, onItem = { go(it) },
-                    onSignOut = { drawer = false; phone = ""; profilePhoto = null; scope.launch { runCatching { PhoneAuthApi.signOut(context) } }; screen = Screen.Welcome },
+                    onSignOut = { drawer = false; phone = ""; profilePhoto = null; scope.launch { runCatching { PhoneAuthApi.signOut(context) } }; screen = Screen.Welcome; viewRideId = null; currentRideId = null },
                 )
             }
             Screen.Search -> {
-                BackHandler { scheduled = null; screen = Screen.Home }
+                BackHandler { scheduled = null; scheduleInstant = null; screen = Screen.Home }
                 SearchScreen(
-                    onBack = { scheduled = null; screen = Screen.Home }, scheduled = scheduled,
+                    onBack = { scheduled = null; scheduleInstant = null; screen = Screen.Home }, scheduled = scheduled,
                     onPlace = { place, ret -> pickDest(place.name, place.placeId, null); isReturn = ret; screen = Screen.Options },
                     onFriend = { nav(Screen.Friend) }, onEditPickup = { nav(Screen.ChangePickup) }, pickup = pickup, friend = friend, near = me.position,
                     onSaved = { nav(Screen.Saved) }, onMap = { mapFor = "drop"; nav(Screen.MapPick) }, onAdd = { quickAddress(it.uppercase(java.util.Locale.ROOT)) },
@@ -421,28 +504,62 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.Schedule -> {
                 BackHandler { screen = scheduleFrom }
-                ScheduleScreen(onBack = { screen = scheduleFrom }, onContinue = { label ->
+                ScheduleScreen(onBack = { screen = scheduleFrom }, onContinue = { label, instant ->
                     scheduled = label
-                    screen = if (scheduleFrom == Screen.Options) Screen.Confirm else Screen.Search
+                    scheduleInstant = instant
+                    screen = if (rescheduling != null || scheduleFrom == Screen.Options) Screen.Confirm else Screen.Search
                 })
             }
             Screen.Confirm -> {
-                BackHandler { screen = Screen.Options }
+                val backToOptions = { if (!booking) screen = if (rescheduling != null) Screen.Schedule else Screen.Options }
+                BackHandler(onBack = backToOptions)
                 ConfirmScreen(
-                    dest, vehicle, isReturn, whenLabel = scheduled, onBack = { screen = Screen.Options },
-                    onBook = { if (scheduled != null) open("Scheduled ride details") else screen = Screen.Finding },
-                    route = routeInfo, from = routePickup, to = destLL,
+                    rescheduling?.destinationLabel ?: dest, vehicle, rescheduling?.returnTrip ?: isReturn,
+                    whenLabel = scheduled, onBack = backToOptions,
+                    onBook = {
+                        val selected = quote
+                        if (!booking && selected != null) {
+                            if (selected.expiresAt <= Instant.now()) {
+                                quote = null
+                                quoteError = R.string.live_quote_expired
+                            } else {
+                                booking = true
+                                quoteError = null
+                                scope.launch {
+                                    try {
+                                        val id = LiveRideApi.book(context, selected, bookingKey, rescheduling?.id)
+                                        showRide(id)
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (failure: Exception) {
+                                        quoteError = rideError(failure)
+                                        if (quoteError == R.string.live_quote_expired) quote = null
+                                        if (quoteError == R.string.live_active_exists) {
+                                            try { LiveRideApi.get(context)?.id?.let(::showRide) }
+                                            catch (cancelled: CancellationException) { throw cancelled }
+                                            catch (_: Exception) { }
+                                        }
+                                    } finally {
+                                        booking = false
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    route = quote?.route, from = chosenPickup ?: routePickup, to = chosenDrop,
+                    quotedMinor = quote?.minor, busy = quoting || booking, error = quoteError,
+                    onRefreshQuote = { quoteAttempt++ }, pickupLabel = rescheduling?.pickupLabel ?: pickup,
                 )
             }
-            Screen.Finding -> FindingDriverScreen(dest, vehicle, isReturn, onFound = { screen = Screen.Trip }, onCancel = { scheduled = null; screen = Screen.Home }, me = me.position)
-            Screen.Trip -> {
-                BackHandler { }
-                TripScreen(
-                    dest, vehicle, onCancelled = { scheduled = null; screen = Screen.Home }, onComplete = { rating = 0; open("Pay in cash") },
-                    onCall = { open("In-app call") }, onMessage = { open("Chat with driver") },
-                    onShare = { nav(Screen.ShareTrip) }, onSafety = { nav(Screen.Safety) },
-                    pickup = me.position, drop = destLL ?: LatLng(me.position.latitude + 0.012, me.position.longitude + 0.01), route = routeInfo,
-                )
+            Screen.Finding, Screen.Trip -> {
+                val id = viewRideId
+                if (id == null) LaunchedEffect(Unit) { screen = Screen.Home }
+                else LiveRideScreen(id, onClose = { screen = Screen.Home }, onReschedule = { existing ->
+                    rescheduling = existing
+                    scheduleFrom = Screen.Trip
+                    vehicle = rideCategories.indexOf(existing.category).coerceAtLeast(0)
+                    screen = Screen.Schedule
+                })
             }
             Screen.Complete -> {
                 BackHandler { }
@@ -494,7 +611,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.MyRides -> {
                 BackHandler { screen = Screen.Home }
-                MyRidesScreen(onBack = { screen = Screen.Home }, onBook = { screen = Screen.Search })
+                MyRidesScreen(onBack = { screen = Screen.Home }, onBook = ::startRideSearch, onLiveRide = ::showRide)
             }
             Screen.Payments -> {
                 BackHandler { screen = Screen.Home }

@@ -42,7 +42,7 @@ data class RideItem(
 )
 
 @Composable
-fun MyRidesScreen(onBack: () -> Unit, onBook: () -> Unit, modifier: Modifier = Modifier) {
+fun MyRidesScreen(onBack: () -> Unit, onBook: () -> Unit, modifier: Modifier = Modifier, onLiveRide: ((String) -> Unit)? = null) {
     val context = LocalContext.current
     val preview = LocalInspectionMode.current
     val scope = rememberCoroutineScope()
@@ -105,7 +105,7 @@ fun MyRidesScreen(onBack: () -> Unit, onBook: () -> Unit, modifier: Modifier = M
         } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             val upcoming = shown.filter { it.status == RideStatus.Scheduled || it.status == RideStatus.Active }
             val past = shown - upcoming.toSet()
-            if (upcoming.isNotEmpty()) { SectionLabel(textUpcoming); upcoming.forEach { RideCard(it) { selected = it.id }; Spacer(Modifier.height(8.dp)) } }
+            if (upcoming.isNotEmpty()) { SectionLabel(textUpcoming); upcoming.forEach { RideCard(it) { if (onLiveRide == null) selected = it.id else onLiveRide(it.id) }; Spacer(Modifier.height(8.dp)) } }
             if (past.isNotEmpty()) { SectionLabel(textPast); past.forEach { RideCard(it) { selected = it.id }; Spacer(Modifier.height(8.dp)) } }
             if (loadError) HistoryLoadState(false) { scope.launch { fetch(cursor) } }
             else if (cursor != null) RideButton(stringResource(R.string.ride_history_more), { scope.launch { fetch(cursor) } }, enabled = !loading, loading = loading)

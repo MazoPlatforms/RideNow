@@ -59,9 +59,9 @@ fun RideOptionsScreen(
     val textValueKmValueMin = stringResource(R.string.text_value_km_value_min)
     val textValueKm = stringResource(R.string.text_value_km)
     val miles = com.ridenow.app.ui.util.rememberUseMiles()
-    val kmText = route?.km ?: TripKm
-    val distText = if (miles) stringResource(R.string.text_value_mi).format(com.ridenow.app.ui.util.kmToMiles(kmText)) else textValueKm.format(kmText)
-    val chipText = if (miles) stringResource(R.string.text_value_mi_value_min).format(com.ridenow.app.ui.util.kmToMiles(kmText), route?.minutes ?: TripMinutes) else textValueKmValueMin.format(kmText, route?.minutes ?: TripMinutes)
+    val kmText = route?.km ?: "0.0"
+    val distText = if (route == null) "—" else if (miles) stringResource(R.string.text_value_mi).format(com.ridenow.app.ui.util.kmToMiles(kmText)) else textValueKm.format(kmText)
+    val chipText = if (route == null) null else if (miles) stringResource(R.string.text_value_mi_value_min).format(com.ridenow.app.ui.util.kmToMiles(kmText), route?.minutes ?: 0) else textValueKmValueMin.format(kmText, route?.minutes ?: 0)
     val textValueMin = stringResource(R.string.text_value_min)
     val textValueBags = stringResource(R.string.text_value_bags)
 
@@ -95,11 +95,11 @@ fun RideOptionsScreen(
             Text(stringResource(R.string.ride_choose), color = c.fg, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 14.dp))
             if (returnTrip) Text(stringResource(R.string.ride_return_note), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
             Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Vehicles.forEachIndexed { i, veh -> VehicleRow(veh, returnTrip, i == selected) { selected = i } }
+                Vehicles.forEachIndexed { i, veh -> VehicleRow(veh, i == selected) { selected = i } }
             }
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Stat(stringResource(R.string.ride_distance), distText, Modifier.weight(1f))
-                Stat(stringResource(R.string.ride_time), textValueMin.format(route?.minutes ?: TripMinutes), Modifier.weight(1f))
+                Stat(stringResource(R.string.ride_time), route?.minutes?.let { textValueMin.format(it) } ?: "—", Modifier.weight(1f))
                 Stat(stringResource(R.string.ride_seats), "${v.seats}", Modifier.weight(1f))
                 Stat(stringResource(R.string.ride_luggage), textValueBags.format(v.luggage), Modifier.weight(1f))
             }
@@ -112,15 +112,14 @@ fun RideOptionsScreen(
 }
 
 @Composable
-private fun VehicleRow(v: Vehicle, returnTrip: Boolean, on: Boolean, onClick: () -> Unit) {
-    val textValueValueSeatsValue = stringResource(R.string.text_value_value_seats_value)
-    val textValueSeatsValueMinAway = stringResource(R.string.text_value_seats_value_min_away)
+private fun VehicleRow(v: Vehicle, on: Boolean, onClick: () -> Unit) {
+    val seats = stringResource(R.string.live_seats, v.seats)
 
     val c = RideTheme.colors
     Row(
         Modifier.fillMaxWidth().height(76.dp).clip(RoundedCornerShape(16.dp)).background(if (on) c.accent.copy(alpha = 0.14f) else c.field)
             .border(if (on) 1.5.dp else 1.dp, if (on) c.accent else c.border, RoundedCornerShape(16.dp)).clickable(role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 12.dp).semantics { contentDescription = textValueValueSeatsValue.format(v.name, v.seats, money(v.fareFor(returnTrip))) },
+            .padding(horizontal = 12.dp).semantics { contentDescription = v.name + ", " + seats },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         VehicleArt(v.style, 76.dp)
@@ -129,12 +128,11 @@ private fun VehicleRow(v: Vehicle, returnTrip: Boolean, on: Boolean, onClick: ()
             Text(v.name, color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RideIcon(RideIcons.Person, c.muted, size = 14.dp); Spacer(Modifier.width(5.dp))
-                Text(textValueSeatsValueMinAway.format(v.seats, v.etaMin), color = c.muted, fontSize = 12.sp)
+                Text(seats, color = c.muted, fontSize = 12.sp)
             }
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text(money(v.fareFor(returnTrip)), color = c.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            Text(stringResource(R.string.ride_est_fare), color = c.muted, fontSize = 11.sp)
+            Text(stringResource(R.string.live_see_fare), color = c.muted, fontSize = 12.sp)
         }
     }
 }

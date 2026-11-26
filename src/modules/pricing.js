@@ -41,8 +41,8 @@ export async function quote(db, maps, user, body) {
   const amount = calculateFare(snapshot, route.distanceMeters, route.durationSeconds);
   return ensure(await one(
     db,
-    `INSERT INTO fare_quotes(rider_id,area_id,category,trip_type,waypoints,route,fare_snapshot,estimated_minor,scheduled_at,expires_at)
-    SELECT id,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '2 minutes' FROM users
+    `INSERT INTO fare_quotes(rider_id,area_id,category,trip_type,waypoints,route,fare_snapshot,estimated_minor,scheduled_at,expires_at,waypoint_labels)
+    SELECT id,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '2 minutes',$10 FROM users
     WHERE id=$1 AND deleted_at IS NULL AND NOT suspended FOR KEY SHARE RETURNING *`,
     [
       user.id,
@@ -54,6 +54,7 @@ export async function quote(db, maps, user, body) {
       snapshot,
       amount,
       body.scheduledAt ?? null,
+      body.waypointLabels ? JSON.stringify(body.waypointLabels) : null,
     ],
   ), 401, 'SESSION_REVOKED');
 }

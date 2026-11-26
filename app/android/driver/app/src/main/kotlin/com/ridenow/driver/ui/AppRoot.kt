@@ -67,9 +67,13 @@ import com.ridenow.driver.ui.status.ApprovedScreen
 import com.ridenow.driver.ui.status.RejectedScreen
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.theme.ThemeMode
-import com.ridenow.driver.ui.trip.TripCompleteScreen
-import com.ridenow.driver.ui.trip.TripPhase
-import com.ridenow.driver.ui.trip.TripScreen
+import com.ridenow.driver.ui.trip.*
+import com.ridenow.driver.ui.earnings.EarningsApi
+import com.ridenow.driver.ui.earnings.EarningsPeriod
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import java.util.UUID
 import kotlinx.coroutines.delay
 import com.ridenow.driver.ui.welcome.WelcomeScreen
 import com.ridenow.driver.ui.components.initialsOf
@@ -116,7 +120,6 @@ import com.ridenow.driver.ui.system.rememberNotificationsEnabled
 import com.ridenow.driver.ui.system.rememberOnline
 import com.ridenow.driver.ui.theme.AppearanceState
 import com.ridenow.driver.ui.theme.MapStyle
-import com.ridenow.driver.ui.trip.CompletedTrip
 import com.ridenow.driver.ui.vehicle.VehicleDetailsScreen
 import com.ridenow.driver.ui.vehicle.VehicleDocumentsScreen
 
@@ -325,9 +328,121 @@ fun AppRoot(appearance: AppearanceState) {
     fun back() { screen = stack.removeLastOrNull() ?: Screen.Home }
     /** Switches tab and forgets the pushed screens. */
     fun tab(t: MainTab) { stack.clear(); screen = tabScreen(t) }
-    fun nowMinute(): Int = java.util.Calendar.getInstance().let { it.get(java.util.Calendar.HOUR_OF_DAY) * 60 + it.get(java.util.Calendar.MINUTE) }
+    val rideLifecycle = LocalLifecycleOwner.current.lifecycle
+    var liveRide by remember(phone) { mutableStateOf<DriverRide?>(null) }
+    var liveOffer by remember(phone) { mutableStateOf<DispatchOffer?>(null) }
+    var liveError by remember(phone) { mutableStateOf<Int?>(null) }
+    var liveStale by remember(phone) { mutableStateOf(false) }
+    var liveBusy by remember(phone) { mutableStateOf(false) }
+    var dismissedRide by remember(phone) { mutableStateOf<String?>(null) }
+    var today by remember(phone) { mutableStateOf<EarningsPeriod?>(null) }
+    var retryOperation by remember(phone) { mutableStateOf<Pair<String, String>?>(null) }
+
+    suspend fun refreshRide() {
+        val status = DriverRideApi.current(context)
+        liveStale = false
+        liveRide = status.ride
+        val available = status.availability == "AVAILABLE"
+        if (available && !app.online) app.goOnline()
+        if (!available && app.online) app.goOffline()
+        if (available || status.ride?.needsLocation == true) {
+            if (DriverGps.permitted(context) && rideLifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                DriverTrackingService.start(context)
+            }
+        } else DriverTrackingService.stop(context)
+        liveOffer = if (available && status.ride == null) DriverRideApi.offer(context) else null
+        val ride = status.ride
+        if (ride != null && ride.id != dismissedRide && screen == Screen.Home) screen = Screen.Trip
+        if (ride == null && screen == Screen.Trip) screen = Screen.Home
+    }
+
+    fun runRideOperation(operation: String, action: suspend (String) -> Unit) {
+        if (liveBusy) return
+        liveBusy = true
+        liveError = null
+        val key = retryOperation?.takeIf { it.first == operation }?.second ?: UUID.randomUUID().toString()
+        retryOperation = operation to key
+        scope.launch {
+            try {
+                action(key)
+                retryOperation = null
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                if (failure is PhoneAuthException && failure.status < 500) retryOperation = null
+                liveError = driverRideError(failure)
+            } finally {
+                try { refreshRide() }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { liveStale = true }
+                finally { liveBusy = false }
+            }
+        }
+    }
+
+    fun changeOnline(available: Boolean) = runRideOperation("availability:$available") {
+        if (!available) {
+            DriverRideApi.availability(context, false)
+            DriverTrackingService.stop(context)
+        } else if (!DriverGps.publish(context)) {
+            liveError = R.string.live_gps
+        } else {
+            DriverRideApi.availability(context, true)
+            try { DriverTrackingService.start(context) }
+            catch (failure: Exception) {
+                DriverRideApi.availability(context, false)
+                throw failure
+            }
+        }
+    }
+
+    fun respondToOffer(offer: DispatchOffer, accept: Boolean) = runRideOperation("offer:${offer.id}:$accept") { key ->
+        DriverRideApi.respond(context, offer, accept, key)
+        liveOffer = null
+    }
+
+    fun advanceRide(ride: DriverRide, action: String, pin: String?) = runRideOperation("${ride.id}:${ride.version}:$action:$pin") { key ->
+        if (action in setOf("ARRIVE", "AT_STOP", "COMPLETE", "NO_SHOW") && !DriverGps.publish(context)) {
+            liveError = R.string.live_gps
+        } else if (action == "CANCEL") {
+            DriverRideApi.cancel(context, ride, key)
+            screen = Screen.Home
+        } else {
+            DriverRideApi.action(context, ride, action, key, pin)
+            if (action == "CASH") screen = Screen.Home
+        }
+    }
+
+    LaunchedEffect(phone, reviewStatus, rideLifecycle) {
+        if (phone.isBlank() || reviewStatus != "APPROVED") return@LaunchedEffect
+        rideLifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                if (!liveBusy) {
+                    try { refreshRide() }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { liveStale = true; liveOffer = null }
+                }
+                delay(if (app.online || liveRide != null) 2_500L else 7_000L)
+            }
+        }
+    }
+
+    LaunchedEffect(screen, phone, reviewStatus) {
+        if (screen == Screen.Home && phone.isNotBlank() && reviewStatus == "APPROVED") {
+            try { today = EarningsApi.summary(context).first() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { }
+        }
+    }
     fun signOut() = runOnboarding {
         try {
+            if (reviewStatus == "APPROVED") {
+                try { DriverRideApi.availability(context, false) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { }
+            }
+            DriverTrackingService.stop(context)
+            DriverGps.reset()
             PhoneAuthApi.signOut(context)
         } finally {
             app.reset()
@@ -578,23 +693,26 @@ fun AppRoot(appearance: AppearanceState) {
                     )
                     Screen.Rejected -> RejectedScreen(onReapply = { editing = false; screen = Screen.Terms }, onSupport = { go(Screen.Tickets) })
                     Screen.Approved -> ApprovedScreen(onOpenHome = { screen = Screen.Home }, onExplore = { screen = Screen.Home })
-                    Screen.Home -> HomeScreen(
+                    Screen.Home -> {
+                        HomeScreen(
                         online = app.online, bankSaved = app.bankSaved, driverName = driverName,
                         onlineSince = app.onlineSince, bankedMillis = app.bankedMillis,
                         onToggle = {
-                            if (app.online) app.goOffline()
+                            if (app.online) changeOnline(false)
                             else if (!locationOn) locDismissed = false
                             else if (!app.bankSaved) { bankReturn = Screen.Home.name; screen = Screen.Bank }
-                            else app.goOnline()
+                            else changeOnline(true)
                         },
                         onAddBank = { bankReturn = Screen.Home.name; screen = Screen.Bank },
                         onTab = { tab(it) },
-                        earnings = app.earnings, trips = app.history.size, request = app.request,
-                        onOfferRequest = { app.offerRequest() }, onDecline = { app.declineRequest() },
-                        onAccept = { app.acceptRequest(); screen = Screen.Trip },
+                        earnings = today?.total?.div(100.0), trips = today?.rideCount,
+                        onActiveTrip = liveRide?.let { { dismissedRide = null; liveError = null; screen = Screen.Trip } },
+                        problem = liveError ?: if (liveStale) R.string.live_connection else null,
                         unread = store.unreadCount, onBell = { go(Screen.NotificationCenter) }, onProfile = { go(Screen.DriverProfile) },
                         onCycleMap = { appearance.setMapStyle(MapStyle.entries[(appearance.mapStyle.ordinal + 1) % MapStyle.entries.size]) },
                     )
+                        liveOffer?.let { offer -> LiveOfferSheet(offer, liveBusy, { respondToOffer(offer, it) }) }
+                    }
                     Screen.Earnings -> {
                         BackHandler { tab(MainTab.Home) }
                         EarningsScreen(
@@ -614,26 +732,11 @@ fun AppRoot(appearance: AppearanceState) {
                             onReport = { reportCat = -1; go(Screen.ReportIssue) },
                         )
                     }
-                    Screen.Trip -> {
-                        val trip = app.trip
-                        if (trip == null) LaunchedEffect(Unit) { screen = Screen.Home } else {
-                            BackHandler { }
-                            TripScreen(
-                                trip = trip, phase = app.phase,
-                                onAdvance = { if (app.phase == TripPhase.InTrip) screen = Screen.TripComplete else app.advanceTrip() },
-                                onCancel = { app.cancelTrip(); screen = Screen.Home },
-                            )
-                        }
-                    }
-                    Screen.TripComplete -> {
-                        val trip = app.trip
-                        if (trip == null) LaunchedEffect(Unit) { screen = Screen.Home } else {
-                            BackHandler { }
-                            TripCompleteScreen(trip = trip, onDone = {
-                                store.addFinished(CompletedTrip(trip.rider, trip.pickup, trip.drop, trip.fare, System.currentTimeMillis()), nowMinute())
-                                app.finishTrip(); screen = Screen.Home
-                            })
-                        }
+                    Screen.Trip, Screen.TripComplete -> {
+                        val trip = liveRide
+                        if (trip != null) LiveDriverTrip(trip, liveBusy, liveStale, liveError,
+                            onBack = { dismissedRide = trip.id; liveError = null; screen = Screen.Home },
+                            onAction = { action, pin -> advanceRide(trip, action, pin) })
                     }
                     Screen.DriverProfile -> {
                         BackHandler { back() }
@@ -680,7 +783,7 @@ fun AppRoot(appearance: AppearanceState) {
                             onProfile = { go(Screen.DriverProfile) }, onVehicle = { go(Screen.VehicleDetails) }, onDocuments = { go(Screen.VehicleDocuments) },
                             onPayouts = { go(Screen.Payouts) }, onBank = { go(Screen.BankManage) }, onSettings = { go(Screen.Settings) },
                             onNotificationSettings = { go(Screen.NotificationSettings) }, onHelpSafety = { go(Screen.HelpSafety) }, onLegal = { go(Screen.Legal) },
-                            onGoOffline = { app.goOffline() }, onSignOut = { signOut() },
+                            onGoOffline = { changeOnline(false) }, onSignOut = { signOut() },
                         )
                     }
                     Screen.NotificationCenter -> { BackHandler { back() }; NotificationsScreen(store, { back() }, { openNotice(it) }) }
@@ -706,7 +809,7 @@ fun AppRoot(appearance: AppearanceState) {
                         BackHandler { back() }
                         BankAccountManageScreen(
                             store, { back() }, { selTopic = 2; go(Screen.Faq) }, onEdit = { editBankId = it.id; go(Screen.BankForm) },
-                            onAdd = { editBankId = -1; go(Screen.BankForm) }, onRemoved = { app.bankSaved = store.banks.isNotEmpty(); if (!app.bankSaved && app.online) app.goOffline() },
+                            onAdd = { editBankId = -1; go(Screen.BankForm) }, onRemoved = { app.bankSaved = store.banks.isNotEmpty(); if (!app.bankSaved && app.online) changeOnline(false) },
                         )
                     }
                     Screen.BankForm -> {
@@ -741,9 +844,10 @@ fun AppRoot(appearance: AppearanceState) {
                         BackHandler { back() }
                         val requested = stringResource(R.string.priv_download_done)
                         DeleteAccountScreen(
-                            { back() }, onDownload = { toast(context, requested) }, onGoOffline = { app.goOffline(); tab(MainTab.Home) },
+                            { back() }, onDownload = { toast(context, requested) }, onGoOffline = { changeOnline(false); tab(MainTab.Home) },
                             onDelete = {
                                 prefs.edit().clear().apply()
+                                DriverTrackingService.stop(context)
                                 app.reset()
                                 phone = ""; challengeId = ""; editing = false; bankReturn = null
                                 reviewStatus = ""; reviewReason = ""
@@ -811,6 +915,7 @@ fun AppRoot(appearance: AppearanceState) {
                         }
                         confirmReapplication = false
                         PhoneAuthApi.savePendingApplication(context, null)
+                        DriverTrackingService.stop(context)
                         app.goOffline()
                         app.draft = com.ridenow.driver.ui.registration.DriverDraft()
                         app.summaries.clear()
