@@ -604,7 +604,7 @@ fun AppRoot(appearance: AppearanceState) {
                     }
                     Screen.Rides -> {
                         BackHandler { tab(MainTab.Home) }
-                        RideHistoryScreen(store, store.unreadCount, initials, { tab(it) }, { go(Screen.NotificationCenter) }, { go(Screen.DriverProfile) }, { selRide = it.id; go(Screen.RideDetails) })
+                        RideHistoryScreen(store.unreadCount, initials, { tab(it) }, { go(Screen.NotificationCenter) }, { go(Screen.DriverProfile) })
                     }
                     Screen.Support -> {
                         BackHandler { tab(MainTab.Home) }

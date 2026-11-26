@@ -471,6 +471,57 @@ test('two dispatch workers issue one offer and only one acceptance wins', async 
   );
   assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
 });
+test('mobile ride history separates rider and driver records and paginates by recency', async () => {
+  const dualRole = await driver();
+  const rider = await login();
+  const outsider = await login();
+  const driven = await assigned(rider, dualRole);
+  const scheduledAt = new Date(Date.now() + 3600000).toISOString();
+  const first = await booking(dualRole, { scheduledAt });
+  const second = await booking(dualRole, { scheduledAt });
+  await pool.query("UPDATE rides SET created_at=now()-interval '2 minutes' WHERE id=$1", [first.rideId]);
+
+  const riderPath = '/v1/rides?app=RIDER&limit=1';
+  const recent = (await request('get', riderPath, dualRole).expect(200)).body;
+  assert.deepEqual(recent.items.map((item) => item.id), [second.rideId]);
+  assert.equal(recent.items[0].state, 'SCHEDULED');
+  assert.deepEqual(recent.items[0].waypoints, [pickup, dropoff]);
+  assert.equal(recent.items[0].category, 'TUK');
+  assert.ok(recent.items[0].estimated_minor > 0);
+  for (const key of ['pin_hash', 'pin_encrypted', 'ridePin', 'rider_id', 'driver_id'])
+    assert.equal(Object.hasOwn(recent.items[0], key), false);
+  assert.equal(recent.nextCursor, second.rideId);
+
+  const older = (await request('get', `${riderPath}&cursor=${recent.nextCursor}`, dualRole).expect(200)).body;
+  assert.deepEqual(older.items.map((item) => item.id), [first.rideId]);
+  assert.equal(older.nextCursor, null);
+  const driverList = (await request('get', '/v1/rides?app=DRIVER', dualRole).expect(200)).body;
+  assert.deepEqual(driverList.items.map((item) => item.id), [driven.rideId]);
+  const combined = (await request('get', '/v1/rides', dualRole).expect(200)).body;
+  assert.equal(combined.items.length, 3);
+  const wrongRoleCursor = (await request('get', `${riderPath}&cursor=${driven.rideId}`, dualRole).expect(200)).body;
+  assert.deepEqual(wrongRoleCursor.items, []);
+  assert.deepEqual((await request('get', riderPath, outsider).expect(200)).body.items, []);
+  await request('get', '/v1/rides?app=ADMIN', dualRole).expect(400);
+});
+
+test('scheduled cancellation rejects stale state and protects ownership', async () => {
+  const rider = await login();
+  const other = await login();
+  const scheduledAt = new Date(Date.now() + 3600000).toISOString();
+  const scheduled = await booking(rider, { scheduledAt });
+  const active = await booking(rider);
+  const payload = { reason: 'Changed plans', expectedState: 'SCHEDULED' };
+  await request('post', `/v1/rides/${scheduled.rideId}/cancel`, other, payload).expect(403);
+  await request('post', `/v1/rides/${active.rideId}/cancel`, rider, payload).expect(409);
+  const key = randomUUID();
+  for (let i = 0; i < 2; i++) {
+    const cancelled = (await request('post', `/v1/rides/${scheduled.rideId}/cancel`, rider, payload, key).expect(200)).body;
+    assert.equal(cancelled.state, 'CANCELLED');
+  }
+  assert.equal((await one(pool, 'SELECT state FROM rides WHERE id=$1', [active.rideId])).state, 'SEARCHING');
+});
+
 test('scheduled rides wait for dispatch window; busy rider cancels after grace period', async () => {
   const s = await login(),
     future = new Date(Date.now() + 3600000).toISOString(),

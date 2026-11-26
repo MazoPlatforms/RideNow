@@ -494,7 +494,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             }
             Screen.MyRides -> {
                 BackHandler { screen = Screen.Home }
-                MyRidesScreen(onBack = { screen = Screen.Home }, onBook = { screen = Screen.Search }, onOpen = { open("Ride details") })
+                MyRidesScreen(onBack = { screen = Screen.Home }, onBook = { screen = Screen.Search })
             }
             Screen.Payments -> {
                 BackHandler { screen = Screen.Home }

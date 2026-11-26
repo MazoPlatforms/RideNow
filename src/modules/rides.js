@@ -85,13 +85,14 @@ export async function releaseDriver(db, id) {
     [id],
   );
 }
-export async function cancel(db, user, id, reason) {
+export async function cancel(db, user, id, reason, expectedState) {
   const ride = ensure(
     await one(db, 'SELECT * FROM rides WHERE id=$1 FOR UPDATE', [id]),
     404,
     'RIDE_NOT_FOUND',
   );
   ensure(ride.rider_id === user.id || ride.driver_id === user.id, 403, 'FORBIDDEN');
+  ensure(!expectedState || ride.state === expectedState, 409, 'RIDE_STATE_CHANGED');
   ensure(
     !TERMINAL.includes(ride.state) &&
       !['IN_PROGRESS', 'AT_STOP', 'WAITING', 'RETURNING'].includes(ride.state),

@@ -1,0 +1,14 @@
+<resources>
+    <string name="ride_history_error">பயணங்களை ஏற்ற முடியவில்லை.</string>
+    <string name="ride_history_more">மேலும் பயணங்களைக் காட்டு</string>
+    <string name="ride_history_active">செயலில் உள்ளது</string>
+    <string name="ride_history_destination">செல்லும் இடம்</string>
+    <string name="ride_history_estimate">மதிப்பிடப்பட்ட கட்டணம் · %1$s</string>
+    <string name="ride_history_total">பயணக் கட்டணம் · %1$s</string>
+    <string name="ride_history_cash_due">ரொக்கக் கட்டணம் நிலுவையில் உள்ளது</string>
+    <string name="ride_history_cash_collected">ரொக்கக் கட்டணம் பெறப்பட்டது</string>
+    <string name="ride_history_cash_disputed">ரொக்கக் கட்டணம் பரிசீலனையில் உள்ளது</string>
+    <string name="ride_history_distance">வழித்தடத் தூரம் · %1$.1f கி.மீ.</string>
+    <string name="ride_history_cancel">திட்டமிட்ட பயணத்தை ரத்துசெய்</string>
+    <string name="ride_history_cancel_failed">இந்தப் பயணத்தை ரத்துசெய்ய முடியவில்லை. தற்போதைய நிலையைப் பார்க்க பயணப் பட்டியலை மீண்டும் திறக்கவும்.</string>
+</resources>

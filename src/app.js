@@ -706,15 +706,25 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     { idem: true, status: 201, body: z.object({ quoteId: uuid }).strict() },
     ({ db, user, body }) => rides.book(db, user, body.quoteId, config),
   );
-  route('get', '/v1/rides', {}, async ({ db, user, req }) => {
-    const p = page.parse(req.query);
-    const items = (
-      await db.query(
-        'SELECT id,state,version,scheduled_at,final_minor,created_at FROM rides WHERE (rider_id=$1 OR driver_id=$1) AND ($2::uuid IS NULL OR id<$2) ORDER BY id DESC LIMIT $3',
-        [user.id, p.cursor ?? null, p.limit],
-      )
-    ).rows;
-    return { items, nextCursor: items.length === p.limit ? items.at(-1).id : null };
+  const rideHistoryQuery = page.extend({ app: notificationApp.optional() });
+  route('get', '/v1/rides', { query: rideHistoryQuery }, async ({ db, user, req }) => {
+    const { cursor, limit, app } = rideHistoryQuery.parse(req.query);
+    const scope = `(($4::text IS DISTINCT FROM 'DRIVER' AND r.rider_id=$1)
+                   OR ($4::text IS DISTINCT FROM 'RIDER' AND r.driver_id=$1))`;
+    const items = (await db.query(
+      `SELECT r.id,r.state,r.version,r.scheduled_at,r.final_minor,r.created_at,r.started_at,r.completed_at,
+              q.category,q.trip_type,q.waypoints,q.estimated_minor,
+              q.route->'distanceMeters' AS distance_meters,q.route->'durationSeconds' AS duration_seconds,
+              p.status AS payment_status
+         FROM rides r JOIN fare_quotes q ON q.id=r.quote_id
+         LEFT JOIN payments p ON p.ride_id=r.id
+        WHERE ${scope}
+          AND ($2::uuid IS NULL OR (r.created_at,r.id) <
+            (SELECT r.created_at,r.id FROM rides r WHERE r.id=$2 AND ${scope}))
+        ORDER BY r.created_at DESC,r.id DESC LIMIT $3`,
+      [user.id, cursor ?? null, limit + 1, app ?? null],
+    )).rows;
+    return { items: items.slice(0, limit), nextCursor: items.length > limit ? items[limit - 1].id : null };
   });
   route('get', '/v1/rides/:id', {}, async ({ db, user, req }) => {
     const r = ensure(
@@ -755,8 +765,8 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
   route(
     'post',
     '/v1/rides/:id/cancel',
-    { idem: true, body: z.object({ reason: text }).strict() },
-    ({ db, user, req, body }) => rides.cancel(db, user, req.params.id, body.reason),
+    { idem: true, body: z.object({ reason: text, expectedState: z.literal('SCHEDULED').optional() }).strict() },
+    ({ db, user, req, body }) => rides.cancel(db, user, req.params.id, body.reason, body.expectedState),
   );
   route(
     'post',
