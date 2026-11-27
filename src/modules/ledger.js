@@ -189,7 +189,9 @@ export async function createPayout(db, user, body) {
   );
   const payout = await one(
     db,
-    'INSERT INTO payouts(driver_id,amount_minor,maker_id,reason) VALUES($1,$2,$3,$4) RETURNING *',
+    `INSERT INTO payouts(driver_id,amount_minor,maker_id,reason)
+     VALUES($1,$2,$3,$4)
+     RETURNING id,driver_id,amount_minor,status,maker_id,approver_id,bank_reference,reason,created_at`,
     [body.driverId, body.amountMinor, user.id, body.reason],
   );
   await audit(db, user.id, 'PAYOUT_CREATED', payout.id, {});
@@ -233,7 +235,7 @@ export async function payoutAction(db, user, id, body) {
     ]);
   }
   await audit(db, user.id, `PAYOUT_${body.action}`, id, {});
-  return one(db, 'SELECT * FROM payouts WHERE id=$1', [id]);
+  return one(db, 'SELECT id,driver_id,amount_minor,status,maker_id,approver_id,bank_reference,reason,created_at FROM payouts WHERE id=$1', [id]);
 }
 export async function chargeCancellation(db, ride) {
   const q = await one(db, 'SELECT fare_snapshot FROM fare_quotes WHERE id=$1', [ride.quote_id]);

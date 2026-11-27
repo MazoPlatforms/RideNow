@@ -12,7 +12,7 @@ const bankShape = (value) => {
     branch: value.branch,
     number: value.number,
     type: value.type ?? 'Savings',
-    verified: true,
+    verified: false,
   };
 };
 
@@ -34,6 +34,8 @@ export async function savePayoutMethod(db, user, value, key) {
   404, 'DRIVER_NOT_FOUND');
   ensure(profile.status === 'APPROVED', 409, 'DRIVER_NOT_APPROVED');
   ensure(!['RESERVED', 'ON_TRIP'].includes(profile.availability), 409, 'DRIVER_BUSY');
+  ensure(!(await one(db, "SELECT id FROM payouts WHERE driver_id=$1 AND status IN ('PENDING','APPROVED') LIMIT 1", [user.id])),
+    409, 'PAYOUT_PENDING');
   const method = bankShape(value);
   await db.query('UPDATE driver_profiles SET payout_bank_encrypted=$2 WHERE user_id=$1',
     [user.id, encrypt(JSON.stringify(method), key)]);
@@ -62,18 +64,31 @@ export async function removePayoutMethod(db, user, key) {
 }
 
 export async function createDriverPayout(db, user, amountMinor, key) {
-    const profile = ensure(await one(db,
-      'SELECT payout_bank_encrypted,application_encrypted FROM driver_profiles WHERE user_id=$1 FOR UPDATE', [user.id]),
-    404, 'DRIVER_NOT_FOUND');
-    const bank = profile.payout_bank_encrypted
-      ? JSON.parse(decrypt(profile.payout_bank_encrypted, key))
-      : readApplication(profile, key)?.bank;
-    ensure(Boolean(bank), 409, 'PAYOUT_METHOD_REQUIRED');
-    return ledger.createPayout(db, user, {
-      driverId: user.id,
-      amountMinor,
-      reason: 'Driver withdrawal request',
-    });
+  const profile = ensure(await one(db,
+    'SELECT payout_bank_encrypted,application_encrypted FROM driver_profiles WHERE user_id=$1 FOR UPDATE', [user.id]),
+  404, 'DRIVER_NOT_FOUND');
+  const bank = profile.payout_bank_encrypted
+    ? JSON.parse(decrypt(profile.payout_bank_encrypted, key))
+    : readApplication(profile, key)?.bank;
+  ensure(Boolean(bank), 409, 'PAYOUT_METHOD_REQUIRED');
+  const payout = await ledger.createPayout(db, user, {
+    driverId: user.id,
+    amountMinor,
+    reason: 'Driver withdrawal request',
+  });
+  await db.query('UPDATE payouts SET destination_encrypted=$2 WHERE id=$1',
+    [payout.id, encrypt(JSON.stringify(bank), key)]);
+  return payout;
+}
+
+export async function createAdminPayout(db, user, body, key) {
+  await one(db, 'SELECT user_id FROM driver_profiles WHERE user_id=$1 FOR UPDATE', [body.driverId]);
+  const bank = await payoutMethod(db, { id: body.driverId }, key);
+  ensure(bank, 409, 'PAYOUT_METHOD_REQUIRED');
+  const payout = await ledger.createPayout(db, user, body);
+  await db.query('UPDATE payouts SET destination_encrypted=$2 WHERE id=$1',
+    [payout.id, encrypt(JSON.stringify(bank), key)]);
+  return payout;
 }
 
 export async function myPayouts(db, user, limit = 30) {
@@ -82,4 +97,16 @@ export async function myPayouts(db, user, limit = 30) {
     db.query('SELECT id,amount_minor,status,created_at FROM payouts WHERE driver_id=$1 ORDER BY created_at DESC,id DESC LIMIT $2', [user.id, limit]),
   ]);
   return { balance, items: payouts.rows };
+}
+
+export async function payoutDestination(db, user, payoutId, key) {
+  const payout = ensure(await one(db,
+    'SELECT id,driver_id,status,destination_encrypted FROM payouts WHERE id=$1', [payoutId]),
+  404, 'PAYOUT_NOT_FOUND');
+  const method = payout.destination_encrypted
+    ? JSON.parse(decrypt(payout.destination_encrypted, key))
+    : await payoutMethod(db, { id: payout.driver_id }, key);
+  ensure(method, 404, 'PAYOUT_METHOD_NOT_FOUND');
+  await audit(db, user.id, 'PAYOUT_DESTINATION_VIEWED', payout.id);
+  return { payoutId: payout.id, driverId: payout.driver_id, status: payout.status, ...method };
 }

@@ -1192,7 +1192,7 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       idem: true,
       body: z.object({ driverId: uuid, amountMinor: money, reason: text }).strict(),
     },
-    ({ db, user, body }) => ledger.createPayout(db, user, body),
+    ({ db, user, body }) => driverFinance.createAdminPayout(db, user, body, config.ENCRYPTION_KEY),
   );
   route(
     'post',
@@ -1215,13 +1215,17 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       return {
         items: (
           await db.query(
-            'SELECT * FROM payouts WHERE ($1::uuid IS NULL OR id<$1) ORDER BY id DESC LIMIT $2',
+            `SELECT id,driver_id,amount_minor,status,maker_id,approver_id,bank_reference,reason,created_at
+             FROM payouts WHERE ($1::uuid IS NULL OR id<$1) ORDER BY id DESC LIMIT $2`,
             [p.cursor ?? null, p.limit],
           )
         ).rows,
       };
     },
   );
+  route('get', '/v1/admin/finance/payouts/:id/destination', {
+    permission: 'finance.manage', noStore: true,
+  }, ({ db, user, req }) => driverFinance.payoutDestination(db, user, req.params.id, config.ENCRYPTION_KEY));
   route('get', '/v1/admin/audit', { permission: 'audit.read' }, async ({ db, req }) => {
     const cursor = z.coerce.number().int().positive().optional().parse(req.query.cursor);
     return {

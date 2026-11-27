@@ -570,6 +570,28 @@ test('driver payout method is private and encrypted, and payout requests use the
   });
   const rider = await login();
   await request('get', '/v1/driver/payout-method', rider).expect(403);
+  const payout = await one(pool,
+    "INSERT INTO payouts(driver_id,amount_minor,maker_id,reason) VALUES($1,500,$1,'Payout destination test') RETURNING id",
+    [d.user.id]);
+  await pool.query('UPDATE payouts SET destination_encrypted=$2 WHERE id=$1',
+    [payout.id, encrypt(JSON.stringify({ holder: 'Test Driver', bank: 'Demo Bank', branch: 'Kattankudy', number: '1234567890', type: 'Savings' }), config.ENCRYPTION_KEY)]);
+  await request('put', '/v1/driver/payout-method', d, {
+    holder: 'Changed Driver', bank: 'Other Bank', branch: 'Town', number: '0987654321', type: 'Current',
+  }).expect(409);
+  await request('get', `/v1/admin/finance/payouts/${payout.id}/destination`, rider).expect(403);
+  let financeAdmin;
+  const adminPhone = '+94770000999';
+  await setupTest(async (call) => {
+    const firstOtp = await adminOtp(adminPhone);
+    await call('complete', { ...adminBody(adminPhone), ...firstOtp }).expect(201);
+    const loginOtp = await adminOtp(adminPhone);
+    financeAdmin = await auth.staffLogin(adminPhone, adminBody(adminPhone).password,
+      undefined, loginOtp.challengeId, loginOtp.code);
+  });
+  const destination = (await request('get', `/v1/admin/finance/payouts/${payout.id}/destination`, financeAdmin).expect(200)).body;
+  assert.equal(destination.number, '1234567890');
+  assert.equal(destination.driverId, d.user.id);
+  await pool.query("UPDATE payouts SET status='REJECTED' WHERE id=$1", [payout.id]);
   await request('post', '/v1/driver/payouts', d, { amountMinor: 100 }, 'driver-payout-no-credit')
     .expect(409);
   await request('delete', '/v1/driver/payout-method', d).expect(200);

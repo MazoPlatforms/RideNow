@@ -33,6 +33,9 @@ class DriverStore {
     var photo by mutableStateOf<android.graphics.Bitmap?>(null)
     var photoSource: String? = null
     var sessionEarned by mutableIntStateOf(0)
+    var apiWeekTotal by mutableIntStateOf(0)
+    var apiMonthTotal by mutableIntStateOf(0)
+    var apiAllTotal by mutableIntStateOf(0)
     private var counter = 1000
     private var noticeId = 100
     private var ticketNo = 790_000
@@ -46,7 +49,7 @@ class DriverStore {
 
     fun reset() {
         rides.clear(); txns.clear(); notices.clear(); tickets.clear(); docs.clear(); banks.clear()
-        sessionEarned = 0; balance = 0; rating = 0.0; totalRides = 0; memberSince = ""; dob = ""; nic = ""; prefLanguage = "English"; photo = null; photoSource = null
+        sessionEarned = 0; apiWeekTotal = 0; apiMonthTotal = 0; apiAllTotal = 0; balance = 0; rating = 0.0; totalRides = 0; memberSince = ""; dob = ""; nic = ""; prefLanguage = "English"; photo = null; photoSource = null
         vehicle = VehicleInfo("", "", "", "", "", "")
         acceptCash = true; acceptCard = true; acceptWallet = false
         if (sample) loadSample()
@@ -63,10 +66,10 @@ class DriverStore {
     fun earned(maxAge: Int) = done(maxAge).sumOf { it.earned }
     fun ridesCount(maxAge: Int) = done(maxAge).size
     fun onlineMinutes(maxAge: Int) = done(maxAge).sumOf { it.durationMin } + done(maxAge).size * 6
-    val weekTotal: Int get() = earned(6)
-    val monthTotal: Int get() = earned(29)
+    val weekTotal: Int get() = if (sample) earned(6) else apiWeekTotal
+    val monthTotal: Int get() = if (sample) earned(29) else apiMonthTotal
     /** Lifetime earnings. The sample figure stands in for history that is not listed as rides. */
-    val allTotal: Int get() = if (sample) 482_150 + sessionEarned else earned(Int.MAX_VALUE)
+    val allTotal: Int get() = if (sample) 482_150 + sessionEarned else apiAllTotal
 
     // ----- Actions -----
     fun markAllNoticesRead() = notices.forEach { it.unread = false }

@@ -15,10 +15,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.*
 import com.ridenow.driver.R
+import com.ridenow.driver.ui.auth.PhoneAuthApi
 import com.ridenow.driver.ui.components.*
 import com.ridenow.driver.ui.data.*
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.util.Money
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 private fun iconFor(k: TxnKind) = when (k) {
     TxnKind.Trip -> RideIcons.Car; TxnKind.Cash -> RideIcons.Wallet; TxnKind.Bonus -> RideIcons.Gift
@@ -36,6 +43,72 @@ fun PayoutsScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -> Unit, on
     var filter by rememberSaveable { mutableStateOf(0) }
     var withdraw by remember { mutableStateOf(false) }
     var detail by remember { mutableStateOf<Txn?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(true) }
+    var retry by remember { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+    suspend fun refresh() {
+        loading = true; failed = false
+        try {
+            val periods = EarningsApi.summary(context)
+            store.apiWeekTotal = (periods[1].total / 100L).toInt()
+            store.apiMonthTotal = (periods[2].total / 100L).toInt()
+            store.apiAllTotal = (periods[3].total / 100L).toInt()
+            val finance = DriverPayoutApi.payouts(context)
+            store.balance = (finance.getJSONObject("balance").getString("net_minor").toLong() / 100L).toInt()
+            val bank = DriverPayoutApi.method(context)
+            store.banks.clear()
+            if (bank != null) store.banks.add(BankAccountInfo(1, bank.holder, bank.bank, bank.number, bank.branch, bank.type, verified = false))
+            store.txns.clear()
+            val result = PhoneAuthApi.authorized(context, "GET", "/v1/earnings/transactions?limit=100")
+            val entries = result.getJSONArray("items")
+            for (index in 0 until entries.length()) {
+                val item = entries.getJSONObject(index)
+                val kindName = item.optString("kind")
+                val kind = when {
+                    kindName.startsWith("FARE") -> TxnKind.Trip
+                    kindName == "CASH_COLLECTION" -> TxnKind.Cash
+                    kindName == "PAYOUT" -> TxnKind.Payout
+                    kindName.contains("CANCEL") -> TxnKind.Cancellation
+                    kindName.contains("BONUS") -> TxnKind.Bonus
+                    else -> TxnKind.Adjustment
+                }
+                val debit = item.optString("debit", "0").toLongOrNull() ?: 0L
+                val credit = item.optString("credit", "0").toLongOrNull() ?: 0L
+                val minor = credit - debit
+                val instant = Instant.parse(item.getString("created_at"))
+                val local = instant.atZone(ZoneId.systemDefault())
+                val age = ChronoUnit.DAYS.between(local.toLocalDate(), LocalDate.now()).toInt().coerceAtLeast(0)
+                val amount = (minor / 100L).toInt()
+                val ref = item.optString("ride_id").takeIf { it.isNotBlank() }?.take(8)
+                val title = when (kind) {
+                    TxnKind.Trip -> context.getString(R.string.pay_earnings)
+                    TxnKind.Cash -> "Cash collected"
+                    TxnKind.Payout -> context.getString(R.string.pay_payouts)
+                    TxnKind.Cancellation -> context.getString(R.string.ride_cancelled)
+                    TxnKind.Bonus -> "Bonus"
+                    TxnKind.Adjustment -> context.getString(R.string.pay_adjustments)
+                }
+                store.txns.add(Txn(item.getString("id"), kind, title,
+                    ref?.let { "Ride · #$it" } ?: kindName.replace('_', ' '), age, local.hour * 60 + local.minute, amount))
+            }
+            val pending = finance.getJSONArray("items")
+            for (index in 0 until pending.length()) {
+                val item = pending.getJSONObject(index)
+                if (item.optString("status") !in setOf("PENDING", "APPROVED", "REJECTED")) continue
+                val instant = Instant.parse(item.getString("created_at"))
+                val local = instant.atZone(ZoneId.systemDefault())
+                val age = ChronoUnit.DAYS.between(local.toLocalDate(), LocalDate.now()).toInt().coerceAtLeast(0)
+                val minor = item.getString("amount_minor").toLong()
+                store.txns.add(Txn(item.getString("id"), TxnKind.Payout,
+                    context.getString(R.string.pay_payouts), item.getString("status"), age,
+                    local.hour * 60 + local.minute, -(minor / 100L).toInt()))
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { failed = true }
+        finally { loading = false }
+    }
+    LaunchedEffect(retry) { refresh() }
     val list = store.txns.filter {
         filter == 0 || (filter == 1 && it.kind in listOf(TxnKind.Trip, TxnKind.Cash, TxnKind.Bonus, TxnKind.Cancellation)) ||
             (filter == 2 && it.kind == TxnKind.Payout) || (filter == 3 && it.kind == TxnKind.Adjustment)
@@ -64,7 +137,11 @@ fun PayoutsScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -> Unit, on
             Figure(str(R.string.pay_total), store.allTotal, null, Modifier.weight(1f))
         }
         FilterPills(listOf(str(R.string.filter_all), str(R.string.pay_earnings), str(R.string.pay_payouts), str(R.string.pay_adjustments)), filter, { filter = it }, Modifier.padding(top = 16.dp))
-        if (list.isEmpty()) EmptyState(RideIcons.Receipt, str(R.string.pay_empty_title), str(R.string.pay_empty_text))
+        if (failed) {
+            Text(str(R.string.earn_live_error), color = c.muted, modifier = Modifier.padding(top = 12.dp))
+            RideButton(str(R.string.sys_try_again), { retry++ }, style = RideButtonStyle.Text)
+        } else if (loading && list.isEmpty()) CircularProgressIndicator(color = c.accent, modifier = Modifier.padding(top = 20.dp))
+        else if (list.isEmpty()) EmptyState(RideIcons.Receipt, str(R.string.pay_empty_title), str(R.string.pay_empty_text))
         groups.forEach { (age, items) ->
             Row(Modifier.padding(top = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (age == 0) str(R.string.pay_today) else Calendars.dayLabel(store.sample, age), color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
@@ -88,7 +165,10 @@ fun PayoutsScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -> Unit, on
         }
         Spacer(Modifier.height(20.dp))
     }
-    if (withdraw) WithdrawSheet(store, { withdraw = false }) { toast(context, it) }
+    if (withdraw) WithdrawSheet(store, { withdraw = false }, onWithdraw = { amountMinor ->
+        DriverPayoutApi.request(context, amountMinor)
+        refresh()
+    }) { toast(context, it) }
     detail?.let { t ->
         RideSheet(t.title, { detail = null }) { close ->
             GroupCard {
@@ -117,7 +197,7 @@ private fun Figure(label: String, amount: Int, delta: String?, modifier: Modifie
 }
 
 @Composable
-private fun WithdrawSheet(store: DriverStore, onDismiss: () -> Unit, notify: (String) -> Unit) {
+private fun WithdrawSheet(store: DriverStore, onDismiss: () -> Unit, onWithdraw: suspend (Long) -> Unit, notify: (String) -> Unit) {
     val c = RideTheme.colors
     var amount by rememberSaveable { mutableStateOf("") }
     var tried by rememberSaveable { mutableStateOf(false) }
@@ -125,6 +205,9 @@ private fun WithdrawSheet(store: DriverStore, onDismiss: () -> Unit, notify: (St
     val value = amount.toIntOrNull() ?: 0
     val bad = tried && (value <= 0 || value > store.balance)
     val done = str(R.string.pay_withdraw_done)
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf(false) }
     RideSheet(str(R.string.pay_withdraw), onDismiss, str(R.string.pay_withdraw_sub, Money.fmt(store.balance))) { close ->
         RideTextField(amount, { amount = it.filter { ch -> ch.isDigit() }.take(8) }, str(R.string.pay_amount) + " (" + Money.CURRENCY + ")", RideIcons.Wallet, isError = bad, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
         if (bad) Text(str(R.string.pay_amount_error), color = c.danger, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
@@ -136,12 +219,18 @@ private fun WithdrawSheet(store: DriverStore, onDismiss: () -> Unit, notify: (St
             Text(bank.bank + " \u2022 ****" + bank.number.takeLast(4), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
         }
         Spacer(Modifier.height(14.dp))
+        error.let { if (it) Text(str(R.string.earn_live_error), color = c.danger, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
         RideButton(str(R.string.pay_withdraw), {
             tried = true
             if (value in 1..store.balance) {
-                val now = java.util.Calendar.getInstance().let { it.get(java.util.Calendar.HOUR_OF_DAY) * 60 + it.get(java.util.Calendar.MINUTE) }
-                store.withdraw(value, bank, now); notify(done); close()
+                busy = true; error = false
+                scope.launch {
+                    try { onWithdraw(value.toLong() * 100L); notify(done); close() }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { error = true }
+                    finally { busy = false }
+                }
             }
-        })
+        }, enabled = !busy, loading = busy)
     }
 }

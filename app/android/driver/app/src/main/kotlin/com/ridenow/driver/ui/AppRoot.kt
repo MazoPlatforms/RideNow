@@ -89,6 +89,8 @@ import com.ridenow.driver.ui.notifications.NotificationsScreen
 import com.ridenow.driver.ui.notifications.loadDriverNotices
 import com.ridenow.driver.ui.payouts.BankAccountManageScreen
 import com.ridenow.driver.ui.payouts.BankFormScreen
+import com.ridenow.driver.ui.payouts.DriverPayoutApi
+import com.ridenow.driver.ui.payouts.PayoutBank
 import com.ridenow.driver.ui.payouts.PayoutsScreen
 import com.ridenow.driver.ui.earnings.EarningsDetailsScreen
 import com.ridenow.driver.ui.rides.RideDetailsScreen
@@ -194,11 +196,16 @@ fun AppRoot(appearance: AppearanceState) {
         app.store.vehicle = snapshot.vehicle
         app.store.docs.clear()
         app.store.docs.addAll(snapshot.documents)
+        val payoutMethod = try { DriverPayoutApi.method(context) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { null }
+        app.store.banks.clear()
+        payoutMethod?.let { app.store.banks.add(BankAccountInfo(1, it.holder, it.bank, it.number, it.branch, it.type, verified = false)) }
         reviewStatus = profile?.optString("status").orEmpty()
         reviewReason = profile?.opt("review_reason") as? String ?: ""
         val contact = data?.optJSONObject("contact")
         data?.optJSONObject("application")?.let { application ->
-            app.bankSaved = application.optJSONObject("bank") != null
+            app.bankSaved = payoutMethod != null || application.optJSONObject("bank") != null
             if (contact == null) {
                 app.profileName = application.optString("name")
                 app.profileEmail = application.optString("email")
@@ -809,14 +816,21 @@ fun AppRoot(appearance: AppearanceState) {
                         BackHandler { back() }
                         BankAccountManageScreen(
                             store, { back() }, { selTopic = 2; go(Screen.Faq) }, onEdit = { editBankId = it.id; go(Screen.BankForm) },
-                            onAdd = { editBankId = -1; go(Screen.BankForm) }, onRemoved = { app.bankSaved = store.banks.isNotEmpty(); if (!app.bankSaved && app.online) changeOnline(false) },
+                            onAdd = { editBankId = -1; go(Screen.BankForm) }, onRemoved = {
+                                DriverPayoutApi.remove(context)
+                                store.banks.clear(); app.bankSaved = false
+                                if (app.online) changeOnline(false)
+                            },
                         )
                     }
                     Screen.BankForm -> {
                         BackHandler { back() }
                         val existing = store.banks.firstOrNull { it.id == editBankId }
                         BankFormScreen(existing, { back() }, onSave = { h, b, br, n, t ->
-                            if (existing != null) { val i = store.banks.indexOf(existing); store.banks[i] = BankAccountInfo(existing.id, h, b, n, br, t) } else store.addBank(h, b, br, n, t)
+                            val type = if (t == context.getString(R.string.bank_current)) "Current" else "Savings"
+                            val saved = DriverPayoutApi.save(context, PayoutBank(h, b, br, n, type))
+                            store.banks.clear()
+                            store.banks.add(BankAccountInfo(1, saved.holder, saved.bank, saved.number, saved.branch, saved.type, verified = false))
                             app.bankSaved = true; back()
                         })
                     }
