@@ -8,6 +8,7 @@ on:
       - 'app/android/**'
       - '.github/workflows/android-apk.yml'
       - 'docs/android-build.md'
+      - 'scripts/package-android-apks.py'
   workflow_dispatch:
 
 permissions:
@@ -237,30 +238,20 @@ jobs:
               raise SystemExit(f"Expected all appearance setters in temporary Driver source: {rename_counts}")
           print("Applied build-only Kotlin compatibility and missing Compose import fixes to the temporary CI copy.")
           PYCODE
-      - name: Build Rider and Driver debug APKs
+      - name: Build optimized Rider and Driver APKs
         run: |
           set -o pipefail
-          "$RUNNER_TEMP/rider-build/gradlew" --no-daemon --stacktrace --project-dir "$RUNNER_TEMP/rider-build" :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-build.log"
-          "$RUNNER_TEMP/driver-build/gradlew" --no-daemon --stacktrace --project-dir "$RUNNER_TEMP/driver-build" :app:assembleDebug 2>&1 | tee -a "$RUNNER_TEMP/android-build.log"
+          "$RUNNER_TEMP/rider-build/gradlew" --no-daemon --stacktrace --project-dir "$RUNNER_TEMP/rider-build" :app:assemblePreview 2>&1 | tee "$RUNNER_TEMP/android-build.log"
+          "$RUNNER_TEMP/driver-build/gradlew" --no-daemon --stacktrace --project-dir "$RUNNER_TEMP/driver-build" :app:assemblePreview 2>&1 | tee -a "$RUNNER_TEMP/android-build.log"
       - name: Verify APKs and source archives
         run: |
-          rider_apk="$RUNNER_TEMP/rider-build/app/build/outputs/apk/debug/app-debug.apk"
-          driver_apk="$RUNNER_TEMP/driver-build/app/build/outputs/apk/debug/app-debug.apk"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$rider_apk"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$driver_apk"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$rider_apk" > "$RUNNER_TEMP/rider-apk-metadata.txt"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$driver_apk" > "$RUNNER_TEMP/driver-apk-metadata.txt"
-          head -5 "$RUNNER_TEMP/rider-apk-metadata.txt"
-          head -5 "$RUNNER_TEMP/driver-apk-metadata.txt"
+          python3 scripts/package-android-apks.py "$RUNNER_TEMP" "$ANDROID_HOME/build-tools/35.0.0"
           sha256sum --check "$RUNNER_TEMP/android-release/ANDROID_SOURCE_SHA256SUMS.txt"
           git diff --exit-code -- app/android
-          mkdir -p "$RUNNER_TEMP/android-release"
-          cp "$rider_apk" "$RUNNER_TEMP/android-release/RideNow-Rider-debug.apk"
-          cp "$driver_apk" "$RUNNER_TEMP/android-release/RideNow-Driver-debug.apk"
           test -s "$RUNNER_TEMP/android-release/RideNow-Android.zip"
           cp app/android/driver/RideNowDriver.zip "$RUNNER_TEMP/android-release/RideNowDriver.zip"
           cd "$RUNNER_TEMP/android-release"
-          sha256sum RideNow-Rider-debug.apk RideNow-Driver-debug.apk RideNow-Android.zip RideNowDriver.zip ANDROID_SOURCE_SHA256SUMS.txt > SHA256SUMS.txt
+          sha256sum ./*.apk RideNow-Android.zip RideNowDriver.zip ANDROID_SOURCE_SHA256SUMS.txt > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: ridenow-android-apks-${{ github.run_id }}
@@ -293,7 +284,8 @@ jobs:
           cat > "$RUNNER_TEMP/android-release-notes.md" <<EOF
           RideNow Rider and Driver Android APKs built from commit ${GITHUB_SHA}.
 
-          - Both APKs are debug-signed previews for installation and testing, not production or Play Store releases.
+          - Both apps use R8 code optimization and resource shrinking. APKs are debug-signed previews, not production or Play Store releases.
+          - Each app includes arm64-v8a, armeabi-v7a, x86, x86_64, and universal APKs. Choose arm64-v8a for most current Android phones, or universal for any supported architecture. Install one APK per app.
           - The Rider source ZIP is generated from the current tracked Rider source. The Driver ZIP and source are included unchanged. For compilation only, Actions applies Kotlin compatibility and missing runtime-state fixes to temporary Rider and Driver build copies; repository source is untouched.
           - Gradle 8.11.1 wrappers are generated only in GitHub Actions and are not committed.
           - Debug signing keys may differ between runs; uninstall an older preview if Android rejects an update.
