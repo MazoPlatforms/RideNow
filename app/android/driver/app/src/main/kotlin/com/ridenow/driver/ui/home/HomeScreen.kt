@@ -104,8 +104,10 @@ fun HomeScreen(
 
     val position = rememberDriverMapLocation(locationPermissionGranted)
     val mapCamera = rememberCameraPositionState { this.position = CameraPosition.fromLatLngZoom(defaultMapCenter, 14f) }
-    LaunchedEffect(position != null) {
-        mapCamera.animate(CameraUpdateFactory.newLatLngZoom(position ?: defaultMapCenter, 14f))
+    LaunchedEffect(position, mapCamera.userHasMoved) {
+        if (!mapCamera.userHasMoved && position != null) {
+            mapCamera.animate(CameraUpdateFactory.newLatLngZoom(position, 14f))
+        }
     }
 
     Box(modifier.fillMaxSize().background(c.bg)) {

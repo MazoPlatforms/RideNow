@@ -79,6 +79,8 @@ class CameraPositionState {
     var position by mutableStateOf(CameraPosition.fromLatLngZoom(LatLng(7.6842, 81.7335), 14f))
     var isMoving by mutableStateOf(false)
         internal set
+    var userHasMoved by mutableStateOf(false)
+        internal set
     internal var map: MapLibreMap? = null
     private var pending: CameraUpdate? = null
 
@@ -169,7 +171,10 @@ fun RideMap(
                 native.uiSettings.isCompassEnabled = false
                 native.uiSettings.isLogoEnabled = false
                 native.uiSettings.isAttributionEnabled = true
-                native.addOnCameraMoveStartedListener { camera.isMoving = true }
+                native.addOnCameraMoveStartedListener { reason ->
+                    camera.isMoving = true
+                    if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) camera.userHasMoved = true
+                }
                 native.addOnCameraIdleListener {
                     camera.position = native.cameraPosition
                     camera.isMoving = false
@@ -250,7 +255,7 @@ fun RideMap(
     }
 }
 
-class UserLocation(val position: LatLng, val real: Boolean)
+class UserLocation(val position: LatLng, val real: Boolean, val accuracyMeters: Float? = null)
 
 /** A current, accurate location fix; the default is only a map starting point, never a confirmed GPS fix. */
 @SuppressLint("MissingPermission")
@@ -324,7 +329,7 @@ fun rememberUserLocation(
         }
     }
     val point = fix?.let { LatLng(it.latitude, it.longitude) }
-    return UserLocation(point ?: default, point != null && granted && locationOn)
+    return UserLocation(point ?: default, point != null && granted && locationOn, fix?.accuracy)
 }
 
 /** A fresh, bounded fix for explicit location actions. Call after checking location and permissions. */

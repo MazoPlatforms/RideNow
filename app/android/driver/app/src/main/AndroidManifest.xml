@@ -26,6 +26,9 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name="com.google.android.gms.oss.licenses.OssLicensesMenuActivity"
+            android:theme="@style/Theme.RideNowDriver.Licenses" />
 
         <!-- Launcher icon choices (Appearance > App icon). Exactly one alias is enabled at a time. -->
         <activity-alias
