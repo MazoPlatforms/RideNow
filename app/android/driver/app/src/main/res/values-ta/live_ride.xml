@@ -1,0 +1,37 @@
+<resources>
+    <string name="live_open">தற்போதைய பயணத்தைத் திற</string>
+    <string name="live_error">இந்தக் கோரிக்கையை நிறைவேற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.</string>
+    <string name="live_connection">நேரடிப் பயணப் புதுப்பிப்புகள் தற்காலிகமாகக் கிடைக்கவில்லை.</string>
+    <string name="live_state_changed">பயண நிலை மாறியுள்ளது. தற்போதைய நிலையைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.</string>
+    <string name="live_cancel">பயணத்தை ரத்துசெய்</string>
+    <string name="live_near_stop">நிறுத்தத்திற்கு அருகில் சென்று புதிய GPS இருப்பிடத்திற்காகக் காத்திருங்கள்.</string>
+    <string name="live_service_area">செயலில் உள்ள சேவைப் பகுதியிலிருந்து ஆன்லைனுக்குச் செல்லுங்கள்.</string>
+    <string name="live_ineligible">உங்கள் ஓட்டுநர் கணக்கும் வாகனமும் பயண அழைப்புகளுக்குத் தகுதி பெற்றிருக்க வேண்டும்.</string>
+    <string name="live_offer_expired">இந்தப் பயண அழைப்பு காலாவதியானது.</string>
+    <string name="live_invalid_pin">PIN தவறாக உள்ளது. பயணியிடம் சரிபார்க்கவும்.</string>
+    <string name="live_pin_locked">PIN சரிபார்ப்பு பூட்டப்பட்டுள்ளது. ஆதரவைத் தொடர்புகொள்ளுங்கள்.</string>
+    <string name="live_pickup_time">திட்டமிட்ட புறப்படும் நேரம் வரை காத்திருங்கள்.</string>
+    <string name="live_wait">பயணி வரவில்லை எனப் பதிவிடுவதற்கு முன் ஐந்து நிமிடங்கள் காத்திருங்கள்.</string>
+    <string name="live_gps">துல்லியமான இருப்பிடத்தை இயக்கி புதிய GPS இருப்பிடத்திற்காகக் காத்திருங்கள்.</string>
+    <string name="live_busy">தற்போதைய பயணத்தை முதலில் முடிக்கவும் அல்லது தீர்வு பெறவும்.</string>
+    <string name="live_offer">புதிய பயண அழைப்பு</string>
+    <string name="live_offer_price">%1$.1f கி.மீ. · மதிப்பிடப்பட்ட கட்டணம் %2$s</string>
+    <string name="live_return_trip">திரும்பும் பயணம்</string>
+    <string name="live_offer_seconds">%1$d வினாடிகள் உள்ளன</string>
+    <string name="live_accept">ஏற்றுக்கொள்</string>
+    <string name="live_decline">நிராகரி</string>
+    <string name="live_en_route">புறப்படும் இடத்திற்குச் செல்</string>
+    <string name="live_arrive">புறப்படும் இடத்திற்கு வந்துவிட்டேன்</string>
+    <string name="live_start">பயணத்தைத் தொடங்கு</string>
+    <string name="live_at_stop">நிறுத்தத்திற்கு வந்துவிட்டேன்</string>
+    <string name="live_waiting">காத்திருக்கத் தொடங்கு</string>
+    <string name="live_return">திரும்பும் பயணத்தைத் தொடங்கு</string>
+    <string name="live_finish">பயணத்தை முடி</string>
+    <string name="live_cash">ரொக்கம் பெற்றதைப் பதிவு செய்</string>
+    <string name="live_confirm_cash">பயணியிடமிருந்து %1$s ரொக்கமாகப் பெற்றதை உறுதிப்படுத்துங்கள்.</string>
+    <string name="live_pin">பயணியின் நான்கு இலக்க PIN</string>
+    <string name="live_no_show">பயணி வரவில்லை எனப் பதிவிடு</string>
+    <string name="live_tracking">RideNow ஓட்டுநர் இருப்பிடம்</string>
+    <string name="live_tracking_detail">நீங்கள் ஆன்லைனில் அல்லது பயணத்தில் இருக்கும்போது இருப்பிடம் பகிரப்படும்.</string>
+    <string name="live_pending_cash">ஆன்லைனுக்குச் செல்வதற்கு முன் முடிந்த பயணத்தின் ரொக்கக் கட்டணத்தைப் பதிவு செய்யுங்கள்.</string>
+</resources>

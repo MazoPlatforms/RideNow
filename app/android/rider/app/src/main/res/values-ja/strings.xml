@@ -938,7 +938,7 @@
     <string name="text_add_new_address">"新しいアドレスを追加"</string>
     <string name="text_trusted_contacts_can_follow_your_route_in_real_time">"信頼できる連絡先がリアルタイムでルートを追跡できます。"</string>
     <string name="text_add">"追加"</string>
-    <string name="text_share_automatically_on_every_ride">"乗車するたびに自動的に共有"</string>
+    <string name="text_share_automatically_on_every_ride">"すぐに乗車するたびに共有メッセージを準備"</string>
     <string name="text_share_link">"リンクを共有"</string>
     <string name="text_follow_my_ridenow_trip_value">"RideNow の旅行をフォローしてください: %1$s"</string>
     <string name="text_choose_how_you_would_like_to_reach_us">"ご希望の連絡方法を選択してください。"</string>

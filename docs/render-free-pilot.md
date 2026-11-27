@@ -57,6 +57,7 @@ In production, the code forces `OTP_PROVIDER` to `baileys`. Even if the Render v
 Alternative CA setup: If `SUPABASE_CA_CERT` contains public PEM in an environment variable, `start:pilot` writes a temporary CA file and configures `NODE_EXTRA_CA_CERTS` before starting child processes. In this mode, the `/etc/secrets/supabase-ca.crt` setting above is unnecessary. If both are set, the new CA is added to the existing CA file; the referenced file must exist. TLS certificate verification remains enabled.
 
 Also add `S3_ENDPOINT` and `S3_BUCKET`. Include actual HTTPS frontend origins as comma-separated values in `CORS_ORIGINS`. Specify only approved vehicle categories in `MAP_CATEGORY_APPROVALS`; do not enable `TUK,CAR,VAN` before roads are verified. Keep `PORT` at the value provided by Render.
+Set `PUBLIC_BASE_URL` to the browser-accessible HTTPS origin used for shared trip pages (for this service: `https://mzn-api.onrender.com`). Shared trip secrets are placed in the URL fragment and sent to the API in a request body so they do not appear in HTTP paths or referrer headers.
 
 Configure `TRUST_PROXY_HOPS` only after verifying the actual proxy chain. Incorrect settings affect rate limiting. Use `1` only after confirming one proxy hop for direct onrender.com ingress; recheck if a Cloudflare proxy is added later.
 

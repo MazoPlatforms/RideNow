@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { one, event } from '../shared/db.js';
 import { ensure } from '../shared/errors.js';
 import { hash, encrypt, equal } from '../shared/crypto.js';
@@ -24,13 +24,18 @@ export async function setState(db, ride, state, actor, extra = {}) {
     'UPDATE rides SET state=$2,version=version+1,updated_at=now() WHERE id=$1 RETURNING *',
     [ride.id, state],
   );
+  if (TERMINAL.includes(changed.state))
+    await db.query('UPDATE rides SET passenger_phone_encrypted=NULL WHERE id=$1', [ride.id]);
+  if (TERMINAL.includes(changed.state))
+    await db.query('UPDATE ride_share_links SET revoked_at=now() WHERE ride_id=$1 AND revoked_at IS NULL', [ride.id]);
   await rideEvent(db, changed, actor, extra);
   return changed;
 }
-export async function book(db, user, quoteId, config) {
+export async function book(db, user, quoteId, config, passenger = null) {
   // Lock rider to serialize scheduled-spacing and active-ride checks.
-  ensure(await one(db, 'SELECT id FROM users WHERE id=$1 AND deleted_at IS NULL AND NOT suspended FOR UPDATE',
+  const rider = ensure(await one(db, 'SELECT id,phone FROM users WHERE id=$1 AND deleted_at IS NULL AND NOT suspended FOR UPDATE',
     [user.id]), 401, 'SESSION_REVOKED');
+  if (passenger) ensure(passenger.phone !== rider.phone, 400, 'PASSENGER_MUST_DIFFER');
   const q = await one(db, 'SELECT * FROM fare_quotes WHERE id=$1 AND rider_id=$2 FOR UPDATE', [
     quoteId,
     user.id,
@@ -39,17 +44,12 @@ export async function book(db, user, quoteId, config) {
   ensure(q.expires_at > Date.now(), 409, 'QUOTE_EXPIRED');
   ensure(!q.consumed_at, 409, 'QUOTE_USED');
   ensure(!(await one(db, 'SELECT id FROM rides WHERE quote_id=$1', [q.id])), 409, 'QUOTE_USED');
+  const repeatedAt = q.scheduled_at ? (q.repeat_at?.length ? q.repeat_at : [q.scheduled_at.toISOString()]) : [];
   if (q.scheduled_at) {
     ensure(q.scheduled_at - Date.now() >= 30 * 60000, 409, 'SCHEDULE_TOO_SOON');
-    ensure(
-      !(await one(
-        db,
-        "SELECT id FROM rides WHERE rider_id=$1 AND state='SCHEDULED' AND abs(extract(epoch from scheduled_at-$2::timestamptz))<3600",
-        [user.id, q.scheduled_at],
-      )),
-      409,
-      'SCHEDULE_CONFLICT',
-    );
+    for (const when of repeatedAt) ensure(!(await one(db,
+      "SELECT id FROM rides WHERE rider_id=$1 AND state='SCHEDULED' AND abs(extract(epoch from scheduled_at-$2::timestamptz))<3600",
+      [user.id, when])), 409, 'SCHEDULE_CONFLICT');
   } else
     ensure(
       !(await one(
@@ -60,23 +60,38 @@ export async function book(db, user, quoteId, config) {
       409,
       'ACTIVE_RIDE_EXISTS',
     );
-  const pin = String(randomInt(1000, 10000));
-  const ride = await one(
-    db,
-    `INSERT INTO rides(rider_id,quote_id,state,scheduled_at,search_started_at,search_deadline,pin_hash,pin_encrypted)
-    VALUES($1,$2,$3,$4,CASE WHEN $4::timestamptz IS NULL THEN now() END,CASE WHEN $4::timestamptz IS NULL THEN now()+interval '2 minutes' END,$5,$6) RETURNING *`,
-    [
-      user.id,
-      q.id,
-      q.scheduled_at ? 'SCHEDULED' : 'SEARCHING',
-      q.scheduled_at,
-      hash(pin, config.OTP_PEPPER),
-      encrypt(pin, config.ENCRYPTION_KEY),
-    ],
-  );
+  const dates = q.scheduled_at ? repeatedAt : [null];
+  const group = dates.length > 1 ? randomUUID() : null;
+  const rideIds = [];
+  let firstPin;
+  for (let index = 0; index < dates.length; index++) {
+    const when = dates[index];
+    const pin = String(randomInt(1000, 10000));
+    const quoteForRide = index === 0 ? q : await one(db,
+      `INSERT INTO fare_quotes(rider_id,area_id,category,trip_type,waypoints,route,fare_snapshot,estimated_minor,
+        scheduled_at,expires_at,waypoint_labels,repeat_rule,repeat_at,reminder_minutes,consumed_at)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '2 minutes',$10,'NONE',jsonb_build_array($9::text),$11,now()) RETURNING id`,
+      [q.rider_id,q.area_id,q.category,q.trip_type,q.waypoints,q.route,q.fare_snapshot,q.estimated_minor,
+        when,q.waypoint_labels,q.reminder_minutes]);
+    const ride = await one(db,
+      `INSERT INTO rides(rider_id,quote_id,state,scheduled_at,search_started_at,search_deadline,pin_hash,pin_encrypted,
+        repeat_group,repeat_index,passenger_name,passenger_phone_encrypted,reminder_minutes)
+       VALUES($1,$2,$3,$4,CASE WHEN $4::timestamptz IS NULL THEN now() END,
+        CASE WHEN $4::timestamptz IS NULL THEN now()+interval '2 minutes' END,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [user.id,quoteForRide.id,q.scheduled_at?'SCHEDULED':'SEARCHING',when,hash(pin,config.OTP_PEPPER),
+        encrypt(pin,config.ENCRYPTION_KEY),group,index,passenger?.name ?? null,
+        passenger ? encrypt(passenger.phone,config.ENCRYPTION_KEY) : null,q.reminder_minutes ?? 0]);
+    if (index === 0) firstPin = pin;
+    rideIds.push(ride.id);
+    if (ride.scheduled_at && ride.reminder_minutes > 0) {
+      await db.query(`INSERT INTO jobs(kind,payload,run_at) VALUES('scheduled_ride_reminder',$1,
+        GREATEST(now(),$2::timestamptz-($3::int*interval '1 minute')))` ,
+      [{ rideId: ride.id, scheduledAt: ride.scheduled_at.toISOString() },ride.scheduled_at,ride.reminder_minutes]);
+    }
+    await rideEvent(db,ride,user.id,index > 0 ? { repeatGroup: group, occurrence: index + 1, count: dates.length } : {});
+  }
   await db.query('UPDATE fare_quotes SET consumed_at=now() WHERE id=$1', [q.id]);
-  await rideEvent(db, ride, user.id);
-  return { rideId: ride.id, state: ride.state, ridePin: pin };
+  return { rideId: rideIds[0], rideIds, state: q.scheduled_at ? 'SCHEDULED' : 'SEARCHING', ...(firstPin ? { ridePin: firstPin } : {}) };
 }
 export async function releaseDriver(db, id) {
   if (!id) return;
@@ -85,13 +100,14 @@ export async function releaseDriver(db, id) {
     [id],
   );
 }
-export async function cancel(db, user, id, reason) {
+export async function cancel(db, user, id, reason, expectedState) {
   const ride = ensure(
     await one(db, 'SELECT * FROM rides WHERE id=$1 FOR UPDATE', [id]),
     404,
     'RIDE_NOT_FOUND',
   );
   ensure(ride.rider_id === user.id || ride.driver_id === user.id, 403, 'FORBIDDEN');
+  ensure(!expectedState || ride.state === expectedState, 409, 'RIDE_STATE_CHANGED');
   ensure(
     !TERMINAL.includes(ride.state) &&
       !['IN_PROGRESS', 'AT_STOP', 'WAITING', 'RETURNING'].includes(ride.state),
@@ -259,6 +275,7 @@ export async function reschedule(db, user, id, quoteId) {
   );
   ensure(
     q.scheduled_at &&
+      q.repeat_rule === 'NONE' &&
       q.scheduled_at - Date.now() >= 30 * 60000 &&
       q.expires_at > Date.now() &&
       !q.consumed_at,
@@ -276,11 +293,15 @@ export async function reschedule(db, user, id, quoteId) {
     'SCHEDULE_CONFLICT',
   );
   await db.query('UPDATE fare_quotes SET consumed_at=now() WHERE id=$1', [q.id]);
-  await db.query('UPDATE rides SET quote_id=$2,scheduled_at=$3 WHERE id=$1', [
+  await db.query('UPDATE rides SET quote_id=$2,scheduled_at=$3,reminder_minutes=$4 WHERE id=$1', [
     id,
     q.id,
     q.scheduled_at,
+    q.reminder_minutes ?? 0,
   ]);
+  if ((q.reminder_minutes ?? 0) > 0) await db.query(`INSERT INTO jobs(kind,payload,run_at)
+    VALUES('scheduled_ride_reminder',$1,GREATEST(now(),$2::timestamptz-($3::int*interval '1 minute')))` ,
+    [{ rideId: id, scheduledAt: q.scheduled_at.toISOString() },q.scheduled_at,q.reminder_minutes]);
   const changed = await setState(db, r, 'SCHEDULED', user.id, { rescheduledAt: q.scheduled_at });
   return { rideId: id, state: changed.state, scheduledAt: q.scheduled_at };
 }

@@ -17,18 +17,34 @@ import com.ridenow.driver.R
 import com.ridenow.driver.ui.components.*
 import com.ridenow.driver.ui.data.*
 import com.ridenow.driver.ui.theme.RideTheme
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 /** Bank account: linked accounts, details of the selected one, Edit, Remove and Add. Used only for payouts. */
 @Composable
-fun BankAccountManageScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -> Unit, onEdit: (BankAccountInfo) -> Unit, onAdd: () -> Unit, onRemoved: () -> Unit, modifier: Modifier = Modifier) {
+fun BankAccountManageScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -> Unit, onEdit: (BankAccountInfo) -> Unit, onAdd: () -> Unit, onRemoved: suspend () -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var selected by rememberSaveable { mutableStateOf(0) }
     var confirm by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        try {
+            val method = DriverPayoutApi.method(context)
+            store.banks.clear()
+            if (method != null) store.banks.add(BankAccountInfo(1, method.holder, method.bank, method.number, method.branch, method.type, verified = false))
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { error = true }
+    }
     val accounts = store.banks
     val acc = accounts.getOrNull(selected.coerceAtMost((accounts.size - 1).coerceAtLeast(0)))
     SubScreen(str(R.string.bank_acc_title), onBack, modifier, trailing = { CircleButton(RideIcons.Help, str(R.string.acct_help), onHelp, filled = false) }) {
         InfoBanner(RideIcons.Shield, str(R.string.bank_note_title), str(R.string.bank_note_text), Modifier.padding(top = 4.dp), Tone.Brand)
         SectionTitle(str(R.string.bank_linked))
+        if (error) Text(str(R.string.earn_live_error), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(vertical = 8.dp))
         if (acc == null) {
             GroupCard { EmptyState(RideIcons.Bank, str(R.string.bank_none_title), str(R.string.bank_none_text)) }
             Spacer(Modifier.height(16.dp)); RideButton(str(R.string.bank_add), onAdd)
@@ -48,7 +64,7 @@ fun BankAccountManageScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -
                             if (a.verified) StatusChip(str(R.string.doc_verified), Tone.Good, Modifier.padding(start = 8.dp), dot = true)
                         }
                         Text(a.holder, color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
-                        Text(a.number, color = c.muted, fontSize = 13.sp)
+                        Text("•••• ${a.number.takeLast(4)}", color = c.muted, fontSize = 13.sp)
                         Text(a.branch, color = c.muted, fontSize = 13.sp)
                     }
                     RideIcon(RideIcons.Chevron, c.fg, size = 16.dp)
@@ -59,9 +75,9 @@ fun BankAccountManageScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -
         GroupCard {
             DetailRow(RideIcons.Person, str(R.string.bank_holder), acc.holder); RowDivider()
             DetailRow(RideIcons.Bank, str(R.string.bank_name), acc.bank); RowDivider()
-            DetailRow(RideIcons.Card, str(R.string.bank_number), acc.number); RowDivider()
+            DetailRow(RideIcons.Card, str(R.string.bank_number), "•••• ${acc.number.takeLast(4)}"); RowDivider()
             DetailRow(RideIcons.Pin, str(R.string.bank_branch), acc.branch); RowDivider()
-            DetailRow(RideIcons.Info, str(R.string.bank_type), acc.type)
+            DetailRow(RideIcons.Info, str(R.string.bank_type), str(if (acc.type == "Current") R.string.bank_current else R.string.bank_savings))
         }
         Spacer(Modifier.height(12.dp))
         SoftButton(str(R.string.bank_edit), { onEdit(acc) }, icon = RideIcons.Pencil)
@@ -74,14 +90,22 @@ fun BankAccountManageScreen(store: DriverStore, onBack: () -> Unit, onHelp: () -
         onDismissRequest = { confirm = false }, containerColor = c.bg,
         title = { Text(str(R.string.bank_remove_title), color = c.fg) },
         text = { Text(str(R.string.bank_remove_text), color = c.muted) },
-        confirmButton = { TextButton(onClick = { confirm = false; store.banks.remove(acc); selected = 0; onRemoved() }) { Text(str(R.string.bank_remove_confirm), color = c.danger) } },
+        confirmButton = { TextButton(enabled = !busy, onClick = {
+            busy = true; error = false
+            scope.launch {
+                try { onRemoved(); store.banks.remove(acc); selected = 0; confirm = false }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { error = true }
+                finally { busy = false }
+            }
+        }) { Text(str(R.string.bank_remove_confirm), color = c.danger) } },
         dismissButton = { TextButton(onClick = { confirm = false }) { Text(str(R.string.dialog_cancel), color = c.fg) } },
     )
 }
 
 /** Add a bank account, or edit [existing]. */
 @Composable
-fun BankFormScreen(existing: BankAccountInfo?, onBack: () -> Unit, onSave: (holder: String, bank: String, branch: String, number: String, type: String) -> Unit, modifier: Modifier = Modifier) {
+fun BankFormScreen(existing: BankAccountInfo?, onBack: () -> Unit, onSave: suspend (holder: String, bank: String, branch: String, number: String, type: String) -> Unit, modifier: Modifier = Modifier) {
     val c = RideTheme.colors
     val savings = str(R.string.bank_savings); val current = str(R.string.bank_current)
     var holder by rememberSaveable { mutableStateOf(existing?.holder ?: "") }
@@ -89,13 +113,28 @@ fun BankFormScreen(existing: BankAccountInfo?, onBack: () -> Unit, onSave: (hold
     var branch by rememberSaveable { mutableStateOf(existing?.branch ?: "") }
     var number by rememberSaveable { mutableStateOf(existing?.number ?: "") }
     var confirmNo by rememberSaveable { mutableStateOf(existing?.number ?: "") }
-    var type by rememberSaveable { mutableStateOf(existing?.type ?: savings) }
+    var type by rememberSaveable { mutableStateOf(if (existing?.type == "Current") current else savings) }
     var tried by rememberSaveable { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val numberOk = number.length in 6..20
     val ok = holder.trim().length >= 2 && bank.trim().length >= 2 && branch.isNotBlank() && numberOk && confirmNo == number
     SubScreen(str(if (existing == null) R.string.bank_add else R.string.bank_edit), onBack, modifier, bottom = {
-        RideButton(str(R.string.bank_save_btn), { tried = true; if (ok) onSave(holder.trim(), bank.trim(), branch.trim(), number, type) })
+        RideButton(str(R.string.bank_save_btn), {
+            tried = true
+            if (ok) {
+                busy = true; error = false
+                scope.launch {
+                    try { onSave(holder.trim(), bank.trim(), branch.trim(), number, type) }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { error = true }
+                    finally { busy = false }
+                }
+            }
+        }, enabled = !busy, loading = busy)
     }) {
+        if (error) Text(str(R.string.earn_live_error), color = c.danger, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
         InfoBanner(RideIcons.Shield, str(R.string.bank_note_title), str(R.string.bank_note_text), Modifier.padding(top = 4.dp, bottom = 14.dp), Tone.Brand)
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             RideTextField(holder, { holder = it }, str(R.string.bank_holder), RideIcons.Person, isError = tried && holder.trim().length < 2)

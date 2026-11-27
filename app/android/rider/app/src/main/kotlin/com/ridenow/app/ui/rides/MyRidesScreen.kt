@@ -4,6 +4,11 @@ import com.ridenow.app.ui.components.localizedLabel
 
 import com.ridenow.app.R
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+import java.util.UUID
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -30,25 +35,49 @@ import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
 
-enum class RideStatus(val label: String) { Completed("Completed"), Scheduled("Scheduled"), Cancelled("Cancelled") }
-data class RideItem(val date: String, val destination: String, val meta: String, val fare: String, val status: RideStatus)
+enum class RideStatus(val label: String) { Completed("Completed"), Scheduled("Scheduled"), Cancelled("Cancelled"), Active("Active") }
+data class RideItem(
+    val id: String, val date: String, val pickup: String, val destination: String, val meta: String,
+    val fare: String, val status: RideStatus, val payment: String?, val distanceMeters: Double?,
+    val destinationPoint: com.ridenow.app.ui.map.LatLng?,
+)
 
-
-
-/** Ride history with filters. Sample data for now. [onOpen] receives the destination. */
 @Composable
-fun MyRidesScreen(onBack: () -> Unit, onBook: () -> Unit, onOpen: (RideItem) -> Unit, modifier: Modifier = Modifier) {
-    val textWed4Nov830Am = stringResource(R.string.text_wed_4_nov_8_30_am)
-    val textNovaTerminalGate4 = stringResource(R.string.text_nova_terminal_gate_4)
-    val textOrbitBooked = stringResource(R.string.text_orbit_booked)
-    val textScheduleToday = stringResource(R.string.schedule_today)
-    val textHelixGardenPlaza = stringResource(R.string.text_helix_garden_plaza)
-    val textOrbit84Km19Min = stringResource(R.string.text_orbit_8_4_km_19_min)
-    val textMon2Nov = stringResource(R.string.text_mon_2_nov)
-    val textAuroraMedicalCentre = stringResource(R.string.text_aurora_medical_centre)
-    val textPulse52Km14Min = stringResource(R.string.text_pulse_5_2_km_14_min)
-    val textSat31Oct = stringResource(R.string.text_sat_31_oct)
-    val textNovaXlCancelled = stringResource(R.string.text_nova_xl_cancelled)
+fun MyRidesScreen(onBack: () -> Unit, onBook: () -> Unit, modifier: Modifier = Modifier, onLiveRide: ((String) -> Unit)? = null) {
+    val context = LocalContext.current
+    val preview = LocalInspectionMode.current
+    val scope = rememberCoroutineScope()
+    var rides by remember { mutableStateOf<List<RideItem>>(emptyList()) }
+    var cursor by remember { mutableStateOf<String?>(null) }
+    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    var loadError by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(!preview) }
+
+    suspend fun fetch(next: String? = null) {
+        loading = true
+        loadError = false
+        try {
+            val page = RideHistoryApi.list(context, next)
+            rides = if (next == null) page.items else (rides + page.items).distinctBy { it.id }
+            cursor = page.nextCursor
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            loadError = true
+        } finally {
+            loading = false
+        }
+    }
+    LaunchedEffect(preview) { if (!preview) fetch() }
+
+    val ride = rides.firstOrNull { it.id == selected }
+    if (ride != null) {
+        androidx.activity.compose.BackHandler { selected = null }
+        HistoryDetails(ride, { selected = null }) {
+            rides = rides.map { if (it.id == ride.id) it.copy(status = RideStatus.Cancelled) else it }
+        }
+        return
+    }
     val textMenuRides = stringResource(R.string.menu_rides)
     val textAll = stringResource(R.string.text_all)
     val textNoRidesYet = stringResource(R.string.text_no_rides_yet)
@@ -57,33 +86,30 @@ fun MyRidesScreen(onBack: () -> Unit, onBook: () -> Unit, onOpen: (RideItem) -> 
     val textUpcoming = stringResource(R.string.text_upcoming)
     val textPast = stringResource(R.string.text_past)
 
-    val Rides = listOf(
-        RideItem(textWed4Nov830Am, textNovaTerminalGate4, textOrbitBooked, "$16.80", RideStatus.Scheduled),
-        RideItem(textScheduleToday, textHelixGardenPlaza, textOrbit84Km19Min, "$16.80", RideStatus.Completed),
-        RideItem(textMon2Nov, textAuroraMedicalCentre, textPulse52Km14Min, "$12.40", RideStatus.Completed),
-        RideItem(textSat31Oct, textHelixGardenPlaza, textNovaXlCancelled, "—", RideStatus.Cancelled),
-    )
-
     val c = RideTheme.colors
     var filter by rememberSaveable { mutableStateOf<String?>(null) }
-    val shown = Rides.filter { filter == null || it.status.label == filter }
+    val shown = rides.filter { filter == null || it.status.label == filter }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         ScreenTop(textMenuRides, onBack)
         Row(Modifier.padding(top = 14.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Pill(textAll, filter == null) { filter = null }
-            RideStatus.values().forEach { s -> Pill(localizedLabel(s.label), filter == s.label) { filter = s.label } }
+            RideStatus.values().forEach { s -> Pill(statusLabel(s), filter == s.label) { filter = s.label } }
         }
-        if (shown.isEmpty()) {
+        if (rides.isEmpty() && (loading || loadError)) {
+            HistoryLoadState(loading) { scope.launch { fetch() } }
+        } else if (shown.isEmpty() && cursor == null) {
             Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Text(textNoRidesYet, color = c.fg, fontSize = 24.sp, fontWeight = FontWeight.Light)
                 Text(textYourTripsAndReceiptsWillAppearHere, color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp, bottom = 20.dp))
                 Box(Modifier.width(220.dp)) { RideButton(textBookARide, onBook) }
             }
         } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
-            val upcoming = shown.filter { it.status == RideStatus.Scheduled }
+            val upcoming = shown.filter { it.status == RideStatus.Scheduled || it.status == RideStatus.Active }
             val past = shown - upcoming.toSet()
-            if (upcoming.isNotEmpty()) { SectionLabel(textUpcoming); upcoming.forEach { RideCard(it) { onOpen(it) }; Spacer(Modifier.height(8.dp)) } }
-            if (past.isNotEmpty()) { SectionLabel(textPast); past.forEach { RideCard(it) { onOpen(it) }; Spacer(Modifier.height(8.dp)) } }
+            if (upcoming.isNotEmpty()) { SectionLabel(textUpcoming); upcoming.forEach { RideCard(it) { if (onLiveRide == null) selected = it.id else onLiveRide(it.id) }; Spacer(Modifier.height(8.dp)) } }
+            if (past.isNotEmpty()) { SectionLabel(textPast); past.forEach { RideCard(it) { selected = it.id }; Spacer(Modifier.height(8.dp)) } }
+            if (loadError) HistoryLoadState(false) { scope.launch { fetch(cursor) } }
+            else if (cursor != null) RideButton(stringResource(R.string.ride_history_more), { scope.launch { fetch(cursor) } }, enabled = !loading, loading = loading)
             Spacer(Modifier.height(12.dp))
         }
     }
@@ -123,7 +149,7 @@ private fun RideCard(r: RideItem, onClick: () -> Unit) {
             Text(r.fare, color = c.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             val on = r.status != RideStatus.Cancelled
             Text(
-                localizedLabel(r.status.label), color = if (on) c.accent else c.muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                statusLabel(r.status), color = if (on) c.accent else c.muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 6.dp).clip(RoundedCornerShape(50)).then(if (r.status == RideStatus.Completed) Modifier.background(c.accent.copy(alpha = 0.14f)) else Modifier.border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))).padding(horizontal = 10.dp, vertical = 3.dp),
             )
         }
@@ -132,4 +158,87 @@ private fun RideCard(r: RideItem, onClick: () -> Unit) {
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun RidesPreview() = RideNowTheme(darkTheme = true) { MyRidesScreen({}, {}, {}) }
+private fun RidesPreview() = RideNowTheme(darkTheme = true) { MyRidesScreen({}, {}) }
+
+
+@Composable
+private fun statusLabel(status: RideStatus): String =
+    if (status == RideStatus.Active) stringResource(R.string.ride_history_active) else localizedLabel(status.label)
+
+@Composable
+private fun HistoryLoadState(loading: Boolean, retry: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (loading) CircularProgressIndicator(color = RideTheme.colors.accent)
+        else {
+            Text(stringResource(R.string.ride_history_error), color = RideTheme.colors.muted)
+            TextButton(onClick = retry) { Text(stringResource(R.string.text_try_again), color = RideTheme.colors.accent) }
+        }
+    }
+}
+
+@Composable
+private fun HistoryDetails(ride: RideItem, back: () -> Unit, onCancelled: () -> Unit) {
+    val c = RideTheme.colors
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var confirm by rememberSaveable(ride.id) { mutableStateOf(false) }
+    var busy by remember(ride.id) { mutableStateOf(false) }
+    var error by remember(ride.id) { mutableStateOf(false) }
+    val cancellationKey = rememberSaveable(ride.id) { UUID.randomUUID().toString() }
+    val receipt = rememberRideReceiptDownload(ride.id)
+
+    Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
+        ScreenTop(stringResource(R.string.text_ride_details), back)
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionLabel(statusLabel(ride.status))
+            Text(ride.date, color = c.muted)
+            Text(stringResource(R.string.text_pickup), color = c.muted)
+            Text(ride.pickup, color = c.fg)
+            Text(stringResource(R.string.ride_history_destination), color = c.muted)
+            Text(ride.destination, color = c.fg)
+            Text(ride.meta, color = c.fg)
+            ride.distanceMeters?.let { Text(stringResource(R.string.ride_history_distance, it / 1000), color = c.muted) }
+            Text(stringResource(if (ride.payment == null) R.string.ride_history_estimate else R.string.ride_history_total, ride.fare), color = c.fg)
+            when (ride.payment) {
+                "DUE" -> Text(stringResource(R.string.ride_history_cash_due), color = c.muted)
+                "COLLECTED" -> Text(stringResource(R.string.ride_history_cash_collected), color = c.muted)
+                "DISPUTED" -> Text(stringResource(R.string.ride_history_cash_disputed), color = c.muted)
+                else -> Unit
+            }
+            receipt.feedback?.let { Text(stringResource(it), color = c.fg) }
+            if (error) Text(stringResource(R.string.ride_history_cancel_failed), color = c.fg)
+        }
+        if (ride.payment == "COLLECTED") {
+            RideButton(stringResource(R.string.ride_history_receipt), receipt.start, enabled = !receipt.busy, loading = receipt.busy)
+        }
+        if (ride.status == RideStatus.Scheduled) {
+            RideButton(stringResource(R.string.ride_history_cancel), { confirm = true }, enabled = !busy, loading = busy)
+        }
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text(stringResource(R.string.text_cancel_scheduled_ride)) },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.text_keep_ride)) } },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirm = false
+                    busy = true
+                    error = false
+                    scope.launch {
+                        try {
+                            RideHistoryApi.cancelScheduled(context, ride.id, cancellationKey)
+                            onCancelled()
+                        } catch (failure: CancellationException) {
+                            throw failure
+                        } catch (_: Exception) {
+                            error = true
+                        } finally {
+                            busy = false
+                        }
+                    }
+                }) { Text(stringResource(R.string.ride_history_cancel)) }
+            },
+        )
+    }
+}

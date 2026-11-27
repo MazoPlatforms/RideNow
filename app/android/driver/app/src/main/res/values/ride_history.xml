@@ -1,0 +1,15 @@
+<resources>
+    <string name="ride_history_error">Could not load rides.</string>
+    <string name="ride_history_more">Load more rides</string>
+    <string name="ride_history_active">Active</string>
+    <string name="ride_history_destination">Destination</string>
+    <string name="ride_history_estimate">Estimated fare · %1$s</string>
+    <string name="ride_history_total">Ride fare · %1$s</string>
+    <string name="ride_history_cash_due">Cash payment due</string>
+    <string name="ride_history_cash_collected">Cash payment collected</string>
+    <string name="ride_history_cash_disputed">Cash payment under review</string>
+    <string name="ride_history_pickup">Pickup</string>
+    <string name="earn_live_error">Could not load earnings.</string>
+    <string name="earn_live_calendar">Periods use Sri Lanka time</string>
+    <string name="earn_live_session">Online this session</string>
+</resources>

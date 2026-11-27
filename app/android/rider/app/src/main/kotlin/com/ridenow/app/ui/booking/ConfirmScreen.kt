@@ -43,6 +43,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ridenow.app.R
+import com.ridenow.app.ui.rides.rideFare
 import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
@@ -56,21 +57,14 @@ import com.ridenow.app.ui.util.entrance
 fun ConfirmScreen(
     destination: String, vehicleIndex: Int, returnTrip: Boolean, whenLabel: String?, onBack: () -> Unit, onBook: () -> Unit,
     route: RouteInfo?, from: LatLng, to: LatLng?, modifier: Modifier = Modifier,
+    quotedMinor: Long? = null, busy: Boolean = false, error: Int? = null, onRefreshQuote: () -> Unit = {},
+    pickupLabel: String? = null, repeatedRideCount: Int = 1, reminderMinutes: Int = 0,
 ) {
-    val textValueKmValueMin = stringResource(R.string.text_value_km_value_min)
-    val miles = com.ridenow.app.ui.util.rememberUseMiles()
-    val kmText = route?.km ?: TripKm
-    val chipText = if (miles) stringResource(R.string.text_value_mi_value_min).format(com.ridenow.app.ui.util.kmToMiles(kmText), route?.minutes ?: TripMinutes) else textValueKmValueMin.format(kmText, route?.minutes ?: TripMinutes)
+    val chipText = route?.let { stringResource(R.string.text_value_km_value_min).format(it.km, it.minutes) }
     val textValueValueSeats = stringResource(R.string.text_value_value_seats)
-
     val c = RideTheme.colors
     val backLabel = stringResource(R.string.search_back)
     val v = Vehicles[vehicleIndex]
-    val total = v.fareFor(returnTrip)
-    val taxes = Math.round(total * 0.065 * 100) / 100.0
-    val base = Math.round(total * 0.21 * 100) / 100.0
-    val dist = Math.round(total * 0.50 * 100) / 100.0
-    val time = Math.round((total - taxes - base - dist) * 100) / 100.0
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
@@ -86,9 +80,9 @@ fun ConfirmScreen(
                 RouteMap(Modifier.fillMaxSize(), from, to, route, chipText, topPadding = 0.dp)
             }
             Card {
-                Row2(stringResource(R.string.confirm_pickup), stringResource(R.string.search_current), dot = Dot.Pickup)
+                Row2(stringResource(R.string.confirm_pickup), pickupLabel ?: stringResource(R.string.search_current), dot = Dot.Pickup)
                 Divider(); Row2(stringResource(R.string.confirm_drop), destination, dot = Dot.Drop)
-                Divider(); Row2(stringResource(R.string.confirm_when), whenLabel ?: stringResource(R.string.confirm_now, v.etaMin), dot = Dot.Clock)
+                Divider(); Row2(stringResource(R.string.confirm_when), whenLabel ?: stringResource(R.string.live_now), dot = Dot.Clock)
                 Divider()
                 Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -101,19 +95,24 @@ fun ConfirmScreen(
             Text(stringResource(R.string.confirm_fare), color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp, modifier = Modifier.padding(top = 4.dp))
             Card {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                    FareLine(stringResource(R.string.confirm_base), base)
-                    FareLine(if (miles) stringResource(R.string.confirm_distance_mi, com.ridenow.app.ui.util.kmToMiles(kmText)) else stringResource(R.string.confirm_distance, kmText), dist)
-                    FareLine(stringResource(R.string.confirm_duration, route?.minutes ?: TripMinutes), time)
-                    FareLine(stringResource(R.string.confirm_taxes), taxes)
-                    HorizontalDivider(color = c.line)
-                    FareLine(stringResource(R.string.confirm_total), total, bold = true)
+                    Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.confirm_total), color = c.fg, modifier = Modifier.weight(1f))
+                        Text(quotedMinor?.let(::rideFare) ?: "—", color = c.fg, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
+            if (repeatedRideCount > 1) Text(stringResource(R.string.schedule_repeat_summary, repeatedRideCount), color = c.muted, fontSize = 13.sp)
+            if (reminderMinutes > 0 && whenLabel != null) Text(stringResource(R.string.schedule_reminder_summary, reminderMinutes), color = c.muted, fontSize = 13.sp)
+            if (returnTrip) Text(stringResource(R.string.ride_return_note), color = c.muted)
+            error?.let { Text(stringResource(it), color = c.fg) }
         }
-        RideButton(
-            (if (whenLabel != null) stringResource(R.string.confirm_book_schedule) else stringResource(R.string.confirm_book_now)) + "${v.name} · ${money(total)}", onBook,
-            modifier = Modifier.padding(vertical = 12.dp).entrance(200),
-        )
+        if (quotedMinor == null && !busy && error != null) {
+            RideButton(stringResource(R.string.text_try_again), onRefreshQuote)
+        } else {
+            val label = if (whenLabel == null) R.string.live_book else R.string.live_book_scheduled
+            RideButton(stringResource(label), onBook, enabled = quotedMinor != null && !busy, loading = busy,
+                modifier = Modifier.padding(vertical = 12.dp).entrance(200))
+        }
     }
 }
 
@@ -146,15 +145,6 @@ private fun Row2(label: String, value: String, dot: Dot) {
             Text(label, color = c.muted, fontSize = 11.sp, letterSpacing = 1.1.sp)
             Text(value, color = c.fg, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-    }
-}
-
-@Composable
-private fun FareLine(label: String, amount: Double, bold: Boolean = false) {
-    val c = RideTheme.colors
-    Row(Modifier.fillMaxWidth().height(if (bold) 42.dp else 34.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = if (bold) c.fg else c.muted, fontSize = if (bold) 16.sp else 14.sp, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
-        Text(money(amount), color = c.fg, fontSize = if (bold) 16.sp else 14.sp, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
 

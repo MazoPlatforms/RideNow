@@ -105,7 +105,7 @@ export function mountDataExport(route, { pool, redis, config, storage, rateLimit
       }
       if (selected.has('RIDES')) {
         const ownership = isRider ? 'rider_id' : 'driver_id';
-        const waypoints = isRider ? ',q.waypoints' : '';
+        const waypoints = isRider ? ',q.waypoints,q.waypoint_labels' : '';
         data.rides = await rows(db, `SELECT r.id,r.state,q.category,q.trip_type,r.scheduled_at,r.arrived_at,r.started_at,
           r.completed_at,r.created_at,r.final_minor,p.amount_minor AS payment_minor,p.status AS payment_status
           ${waypoints} FROM rides r JOIN fare_quotes q ON q.id=r.quote_id LEFT JOIN payments p ON p.ride_id=r.id

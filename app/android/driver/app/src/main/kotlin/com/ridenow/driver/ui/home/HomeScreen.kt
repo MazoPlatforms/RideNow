@@ -80,9 +80,10 @@ import kotlinx.coroutines.isActive
 @Composable
 fun HomeScreen(
     online: Boolean, bankSaved: Boolean, driverName: String, onlineSince: Long, bankedMillis: Long,
-    onToggle: () -> Unit, onAddBank: () -> Unit, onTab: (MainTab) -> Unit = {}, earnings: Double = 0.0, trips: Int = 0,
+    onToggle: () -> Unit, onAddBank: () -> Unit, onTab: (MainTab) -> Unit = {}, earnings: Double? = null, trips: Int? = null,
     unread: Int = 0, onBell: () -> Unit = {}, onProfile: () -> Unit = {}, onCycleMap: () -> Unit = {},
     request: TripRequest? = null, onOfferRequest: () -> Unit = {}, onAccept: () -> Unit = {}, onDecline: () -> Unit = {}, modifier: Modifier = Modifier,
+    onActiveTrip: (() -> Unit)? = null, problem: Int? = null,
 ) {
     val c = RideTheme.colors
     val context = LocalContext.current
@@ -99,7 +100,7 @@ fun HomeScreen(
         if (PreviewConfig.ENABLED && online && request == null) { delay(PreviewConfig.MOCK_REQUEST_DELAY_MS); onOfferRequest() }
     }
     val totalMinutes = ((bankedMillis + if (online) (now - onlineSince).coerceAtLeast(0) else 0L) / 60_000L).toInt()
-    val money = remember(earnings) { com.ridenow.driver.ui.util.Money.fmt(earnings) }
+    val money = remember(earnings) { earnings?.let { com.ridenow.driver.ui.util.Money.fmt(it) } ?: "—" }
 
     val position = rememberDriverMapLocation()
     val mapCamera = rememberCameraPositionState { this.position = CameraPosition.fromLatLngZoom(defaultMapCenter, 14f) }
@@ -172,6 +173,10 @@ fun HomeScreen(
                     color = c.muted, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 14.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
+                if (problem != null) Text(stringResource(problem), color = c.warn, modifier = Modifier.padding(bottom = 8.dp))
+                if (onActiveTrip != null) {
+                    com.ridenow.driver.ui.components.RideButton(stringResource(R.string.live_open), onActiveTrip)
+                }
                 if (online) {
                     InfoRow(stringResource(R.string.home_waiting), c.accent, c.border, c.bg)
                 } else if (!bankSaved) {
@@ -188,7 +193,7 @@ fun HomeScreen(
                 }
                 Row(Modifier.padding(top = 14.dp).fillMaxWidth()) {
                     Stat(money, stringResource(R.string.home_earnings), Modifier.weight(1f))
-                    Stat(trips.toString(), stringResource(R.string.home_trips), Modifier.weight(1f))
+                    Stat(trips?.toString() ?: "—", stringResource(R.string.home_trips), Modifier.weight(1f))
                     Stat(stringResource(R.string.home_time_fmt, totalMinutes / 60, totalMinutes % 60), stringResource(R.string.home_online_time), Modifier.weight(1f))
                 }
             }

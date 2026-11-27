@@ -945,7 +945,7 @@
     <string name="text_add_new_address">"Ajouter une nouvelle adresse"</string>
     <string name="text_trusted_contacts_can_follow_your_route_in_real_time">"Les contacts de confiance peuvent suivre votre itinéraire en temps réel."</string>
     <string name="text_add">"Ajouter"</string>
-    <string name="text_share_automatically_on_every_ride">"Partager automatiquement chaque trajet"</string>
+    <string name="text_share_automatically_on_every_ride">"Préparer un message pour chaque trajet immédiat"</string>
     <string name="text_share_link">"Partager le lien"</string>
     <string name="text_follow_my_ridenow_trip_value">"Suivez mon trajet RideNow : %1$s"</string>
     <string name="text_choose_how_you_would_like_to_reach_us">"Choisissez comment nous contacter."</string>

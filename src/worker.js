@@ -1,6 +1,6 @@
 import { approvedDocuments } from './modules/drivers.js';
 import { randomUUID } from 'node:crypto';
-import { one, transaction } from './shared/db.js';
+import { one, transaction, event } from './shared/db.js';
 import { dispatchTick } from './modules/dispatch.js';
 export async function publishOutbox({ pool, redis, config }) {
   for (let n = 0; n < 100; n++) {
@@ -72,7 +72,7 @@ export async function finishJob(pool, job, error) {
 }
 export async function processJobs(deps) {
   const { pool, storage, push, logger } = deps;
-  const kinds = ['scan', 'scan_support', 'purge_account_storage'];
+  const kinds = ['scan', 'scan_support', 'purge_account_storage', 'scheduled_ride_reminder'];
   if (push) kinds.push('push');
   for (let i = 0; i < 20; i++) {
     // Disabled external push must not consume retries or falsely record delivery.
@@ -106,6 +106,15 @@ export async function processJobs(deps) {
             WHERE id=$1 AND lease_token=$2`, [job.id, job.lease_token]);
           continue;
         }
+      } else if (job.kind === 'scheduled_ride_reminder') {
+        await transaction(pool, async db => {
+          const ride = await one(db, `SELECT id,rider_id,state,scheduled_at FROM rides WHERE id=$1 FOR UPDATE`, [job.payload.rideId]);
+          if (!ride || ride.state !== 'SCHEDULED' || ride.scheduled_at.toISOString() !== job.payload.scheduledAt || ride.scheduled_at <= Date.now()) return;
+          const once = await one(db, `INSERT INTO ride_reminders_sent(ride_id,scheduled_at) VALUES($1,$2)
+            ON CONFLICT DO NOTHING RETURNING ride_id`, [ride.id,ride.scheduled_at]);
+          if (once) await event(db,'ride.scheduled.reminder',ride.id,
+            { rideId: ride.id, scheduledAt: ride.scheduled_at, state: 'SCHEDULED' },[ride.rider_id]);
+        });
       } else if (push) await push(job.payload);
       else throw Object.assign(new Error('Push unavailable'), { code: 'PUSH_DISABLED' });
       await finishJob(pool, job);
@@ -176,6 +185,10 @@ export async function maintenance(pool) {
       "DELETE FROM jobs WHERE (done_at IS NOT NULL OR dead) AND run_at<now()-interval '90 days'",
     );
     await db.query("DELETE FROM mobile_login_steps WHERE expires_at<=now()");
+    await db.query(`WITH expired AS (
+      SELECT id FROM ride_share_links WHERE expires_at<now()-interval '1 day'
+      ORDER BY expires_at LIMIT 500 FOR UPDATE SKIP LOCKED
+    ) DELETE FROM ride_share_links s USING expired WHERE s.id=expired.id`);
     await db.query(`WITH abandoned AS (
       DELETE FROM support_attachments WHERE id IN (
         SELECT id FROM support_attachments WHERE message_id IS NULL AND created_at<now()-interval '1 day'
