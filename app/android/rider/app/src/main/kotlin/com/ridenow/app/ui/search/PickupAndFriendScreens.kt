@@ -55,10 +55,13 @@ fun ChangePickupScreen(
     val textChangePickup = stringResource(R.string.change_pickup)
     val textPickupTitle = stringResource(R.string.pickup_title)
     val textSearchChooseMap = stringResource(R.string.search_choose_map)
+    val textCurrentLocation = stringResource(R.string.search_current)
 
     val c = RideTheme.colors
     var query by rememberSaveable { mutableStateOf("") }
-    var picked by rememberSaveable { mutableStateOf(current) }
+    var picked by rememberSaveable(current, places) {
+        mutableStateOf(places.firstOrNull { it.first == "Current location" && current == textCurrentLocation }?.second ?: current)
+    }
     var pickedPoint by remember { mutableStateOf<LatLng?>(null) }
     val q = query.trim()
     val localMatches = places.filter { q.isEmpty() || it.first.contains(q, true) || it.second.contains(q, true) }
@@ -92,15 +95,18 @@ fun ChangePickupScreen(
                 }
             },
         )
+        Spacer(Modifier.height(14.dp))
+        GroupCard { NavRow(RideIcons.Map, textSearchChooseMap, onMap) }
+        Spacer(Modifier.height(10.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
-            Spacer(Modifier.height(14.dp))
             if (localMatches.isNotEmpty()) GroupCard {
                 localMatches.forEachIndexed { i, (label, address) ->
                     if (i > 0) RowDivider()
                     val on = address == picked
                     NavRow(
                         when (label) { "Home" -> RideIcons.Home; "Work" -> RideIcons.Work; "Current location" -> RideIcons.Pin; else -> RideIcons.Clock },
-                        localizedLabel(label), { if (label != "Current location" || allowCurrentLocation()) { picked = address; pickedPoint = null } }, subtitle = address,
+                        localizedLabel(label), { if (label != "Current location" || allowCurrentLocation()) { picked = address; pickedPoint = null } },
+                        subtitle = address.takeUnless { label == "Current location" },
                         trailing = { Box(Modifier.size(20.dp).clip(CircleShape).then(if (on) Modifier.background(c.accent) else Modifier.border(1.5.dp, c.muted, CircleShape)), contentAlignment = Alignment.Center) { if (on) Box(Modifier.size(8.dp).clip(CircleShape).background(c.onAccent)) } },
                     )
                 }
@@ -125,8 +131,6 @@ fun ChangePickupScreen(
                 }
                 q.length >= 2 && localMatches.isEmpty() -> Text(stringResource(R.string.pickup_none, q), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(vertical = 12.dp))
             }
-            Spacer(Modifier.height(10.dp))
-            GroupCard { NavRow(RideIcons.Map, textSearchChooseMap, onMap) }
             Spacer(Modifier.height(16.dp))
         }
         RideButton(stringResource(R.string.pickup_confirm), { onConfirm(picked, pickedPoint) }, modifier = Modifier.padding(vertical = 12.dp))

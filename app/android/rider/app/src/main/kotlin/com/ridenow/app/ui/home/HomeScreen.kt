@@ -77,6 +77,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -189,7 +190,10 @@ fun HomeScreen(
 
             Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent)); Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.home_pickup, pickup), color = c.muted, fontSize = 13.sp)
+                Text(
+                    stringResource(R.string.home_pickup, pickup), color = c.muted, fontSize = 13.sp,
+                    modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
                 Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup).semantics { contentDescription = editPickupLabel }, contentAlignment = Alignment.Center) {
                     RideIcon(RideIcons.Pencil, c.accent, size = 18.dp)
                 }

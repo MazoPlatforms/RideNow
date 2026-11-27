@@ -58,6 +58,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
@@ -210,7 +211,10 @@ private fun RouteCard(
             },
     ) {
         RouteRow(stringResource(R.string.search_pickup), false, Marker.Pickup) {
-            Text(pickup ?: stringResource(R.string.search_current), color = c.fg, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Text(
+                pickup ?: stringResource(R.string.search_current), color = c.fg, fontSize = 16.sp,
+                modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
             Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onEditPickup).semantics { contentDescription = editPickupLabel }, contentAlignment = Alignment.Center) {
                 RideIcon(RideIcons.Pencil, c.accent, size = 18.dp)
             }

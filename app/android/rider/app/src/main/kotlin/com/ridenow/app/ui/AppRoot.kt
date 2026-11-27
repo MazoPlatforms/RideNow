@@ -110,6 +110,8 @@ enum class Screen {
     Complete, Rate, Report, ReportDraft, Profile, EditProfile, MyRides, Payments, Settings, Intro, Loading, Expired, ServerError, Notifs, Saved, Help, Legal, Doc, Support, Chat, Safety, Contacts, MapPick, ShareTrip, ChangePickup, Friend, AddAddr, ReportIssue, Stub,
 }
 
+private const val CURRENT_LOCATION_PICKUP_KEY = "__RIDE_NOW_CURRENT_LOCATION__"
+
 /** Survives activity recreation within one app process, so the splash does not replay on rotation or theme changes. */
 private object SessionFlags { var splashDone = false }
 
@@ -123,6 +125,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     val text128MeridianWalkSector7 = stringResource(R.string.text_text_128_meridian_walk_sector_7)
     val textNovaTerminalGate4 = stringResource(R.string.text_nova_terminal_gate_4)
     val textSector12OrbitRing = stringResource(R.string.text_sector_12_orbit_ring)
+    val textCurrentLocation = stringResource(R.string.search_current)
     val textHelixGardenPlaza = stringResource(R.string.text_helix_garden_plaza)
     val textSector9GardenLoop = stringResource(R.string.text_sector_9_garden_loop)
     val textAuroraMedicalCentre = stringResource(R.string.text_aurora_medical_centre)
@@ -817,17 +820,18 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             Screen.ChangePickup -> {
                 BackHandler { back() }
                 val places = buildList {
-                    if (me.real) add("Current location" to "%.6f, %.6f".format(java.util.Locale.ROOT, me.position.latitude, me.position.longitude))
+                    if (me.real) add("Current location" to CURRENT_LOCATION_PICKUP_KEY)
                     savedAddresses.forEach { item ->
                         val label = when (item.kind) { "HOME" -> "Home"; "WORK" -> "Work"; else -> item.label ?: item.address.substringBefore(',') }
                         add(label to item.address)
                     }
                 }
                 ChangePickupScreen(pickup, places, onBack = { back() }, near = me.position.takeIf { me.real }, onConfirm = { address, selectedPoint ->
-                    pickup = address
+                    val isCurrentLocation = address == CURRENT_LOCATION_PICKUP_KEY
+                    pickup = if (isCurrentLocation) textCurrentLocation else address
                     val saved = savedAddresses.firstOrNull { it.address == address }
-                    pickupPoint = selectedPoint ?: saved?.point ?: me.position.takeIf { me.real && address == places.firstOrNull { it.first == "Current location" }?.second }
-                    if (pickupPoint == null) scope.launch {
+                    pickupPoint = if (isCurrentLocation) me.position.takeIf { me.real } else selectedPoint ?: saved?.point
+                    if (pickupPoint == null && !isCurrentLocation) scope.launch {
                         val found = SifricApi.geocode(context, address)
                         if (pickup == address) pickupPoint = found
                     }

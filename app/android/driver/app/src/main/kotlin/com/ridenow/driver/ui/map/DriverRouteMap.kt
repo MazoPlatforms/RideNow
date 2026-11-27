@@ -28,6 +28,21 @@ internal fun rememberDriverMapLocation(permissionGranted: Boolean? = null): LatL
             if (!active || location == null || !location.hasAccuracy() || location.accuracy > 100f) return
             val ageNanos = android.os.SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos
             if (ageNanos !in 0..30_000_000_000L || !location.latitude.isFinite() || !location.longitude.isFinite()) return
+            val previous = fix
+            if (previous != null) {
+                val distance = previous.distanceTo(location)
+                val jitterRadius = maxOf(8f, minOf(25f, minOf(previous.accuracy, location.accuracy) * 0.75f))
+                val significantlyMoreAccurate = location.accuracy < previous.accuracy * 0.65f
+                val withinReportedUncertainty = distance <= previous.accuracy + location.accuracy
+                if (distance < jitterRadius || (withinReportedUncertainty && !significantlyMoreAccurate)) {
+                    // Keep the stable coordinate while refreshing its timestamp from the live fix.
+                    fix = android.location.Location(previous).apply {
+                        time = location.time
+                        elapsedRealtimeNanos = location.elapsedRealtimeNanos
+                    }
+                    return
+                }
+            }
             fix = android.location.Location(location)
         }
         val callback = object : com.google.android.gms.location.LocationCallback() {
