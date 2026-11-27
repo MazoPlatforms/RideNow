@@ -88,9 +88,10 @@ fun LegalAboutScreen(onBack: () -> Unit, onOpen: (String) -> Unit, modifier: Mod
             GroupCard {
                 LegalDocs.about.forEachIndexed { i, d ->
                     if (i > 0) RowDivider()
-                    NavRow(d.icon, str(d.title), {
+                    val title = str(d.title)
+                    NavRow(d.icon, title, {
                         if (d.key == "licenses") {
-                            OssLicensesMenuActivity.setActivityTitle(str(d.title))
+                            OssLicensesMenuActivity.setActivityTitle(title)
                             context.startActivity(Intent(context, OssLicensesMenuActivity::class.java))
                         } else onOpen(d.key)
                     }, subtitle = str(d.sub))
