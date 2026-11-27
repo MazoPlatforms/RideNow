@@ -174,7 +174,7 @@ async function assigned(s, d, extra = {}) {
   await request('post', `/v1/driver-offers/${offer.id}/respond`, d, { accept: true }).expect(200);
   return r;
 }
-async function act(d, r, action, extra = {}) {
+function act(d, r, action, extra = {}) {
   return request('post', `/v1/rides/${r.rideId}/actions`, d, { action, ...extra });
 }
 async function teleport(d, point, seq) {
