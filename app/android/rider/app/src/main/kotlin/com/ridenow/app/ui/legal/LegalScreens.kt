@@ -1,7 +1,7 @@
 package com.ridenow.app.ui.legal
 
 import android.content.Intent
-import com.google.android.gms.oss.licenses.v2.OssLicensesMenuActivity
+import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 import com.ridenow.app.ui.components.localizedLabel
 
 import androidx.compose.ui.res.stringResource
@@ -63,9 +63,6 @@ fun LegalScreen(onBack: () -> Unit, onOpen: (String) -> Unit, modifier: Modifier
 
     val c = RideTheme.colors
     val context = LocalContext.current
-    val licenseScheme = if (c.isDark) darkColorScheme(primary = c.accent, background = c.bg, surface = c.bg, onBackground = c.fg, onSurface = c.fg)
-        else lightColorScheme(primary = c.accent, background = c.bg, surface = c.bg, onBackground = c.fg, onSurface = c.fg)
-    val licenseTypography = MaterialTheme.typography
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
         ScreenTop(textLegalAbout, onBack, subtitle = textAppInformationLegalDocumentsAndPolicies)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
@@ -91,7 +88,6 @@ fun LegalScreen(onBack: () -> Unit, onOpen: (String) -> Unit, modifier: Modifier
                 NavRow(RideIcons.Info, textMenuAbout, { onOpen("About RideNow") }, subtitle = textAppInformationAndFeatures); RowDivider()
                 NavRow(RideIcons.Star, textOpenSourceLicenses, {
                     OssLicensesMenuActivity.setActivityTitle(textOpenSourceLicenses)
-                    OssLicensesMenuActivity.setTheme(licenseScheme, licenseScheme, licenseTypography)
                     context.startActivity(Intent(context, OssLicensesMenuActivity::class.java))
                 }, subtitle = textThirdPartyLibrariesAndLicenses)
             }
