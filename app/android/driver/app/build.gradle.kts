@@ -53,7 +53,7 @@ android {
 }
 
 dependencies {
-    implementation("org.maplibre.gl:android-sdk:13.6.1")
+    implementation("org.maplibre.gl:android-sdk:13.8.0")
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
