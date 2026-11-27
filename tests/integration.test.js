@@ -533,7 +533,7 @@ test('ride share links are opaque, scoped to participants, revocable and removed
   await api.post('/v1/public/trips').send({ token: 'short' }).expect(400).expect('Cache-Control', 'no-store');
   const second = (await request('post', sharePath, operator).expect(200)).body;
   const secondToken = second.url.split('#')[1];
-  assert.equal((await api.post('/v1/public/trips').send({ token: firstToken }).expect(404)).body.error.code, 'SHARED_TRIP_NOT_FOUND');
+  assert.equal((await api.post('/v1/public/trips').send({ token: firstToken }).expect(404)).body.code, 'SHARED_TRIP_NOT_FOUND');
   const publicRide = (await api.post('/v1/public/trips').send({ token: secondToken }).expect(200).expect('Cache-Control', 'no-store')).body;
   assert.equal(publicRide.state, 'DRIVER_ASSIGNED');
   assert.equal(publicRide.pickup, 'Pickup gate');
