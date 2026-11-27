@@ -22,6 +22,7 @@ export async function installPrivateSchema(client) {
 }
 async function install(client) {
   const existing = await client.query("SELECT tablename FROM pg_tables WHERE schemaname='ridenow'");
+  const alreadyInstalled = existing.rows.length > 0;
   if (
     existing.rows.length &&
     !(await client.query("SELECT to_regclass('ridenow.schema_migrations') AS name")).rows[0].name
@@ -69,23 +70,25 @@ async function install(client) {
     const owner = (await client.query('SELECT current_user AS name')).rows[0].name;
     await client.query(`GRANT ridenow_backend TO "${owner.replaceAll('"', '""')}"`);
     await client.query('GRANT USAGE ON SCHEMA ridenow,extensions TO ridenow_backend');
-    await client.query(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA ridenow FROM ${denied}`);
-    await client.query(`REVOKE ALL ON ALL FUNCTIONS IN SCHEMA ridenow FROM ${denied}`);
-    await client.query('GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA ridenow TO ridenow_backend');
-    await client.query('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ridenow TO ridenow_backend');
-    for (const f of ['check_balanced_ledger', 'immutable_ledger', 'immutable_fare'])
+    if (!alreadyInstalled) {
+      await client.query(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA ridenow FROM ${denied}`);
+      await client.query(`REVOKE ALL ON ALL FUNCTIONS IN SCHEMA ridenow FROM ${denied}`);
+      await client.query('GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA ridenow TO ridenow_backend');
+      await client.query('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ridenow TO ridenow_backend');
+      for (const f of ['check_balanced_ledger', 'immutable_ledger', 'immutable_fare'])
+        await client.query(
+          `ALTER FUNCTION ridenow.${f}() SET search_path TO ridenow,extensions,pg_temp`,
+        );
       await client.query(
-        `ALTER FUNCTION ridenow.${f}() SET search_path TO ridenow,extensions,pg_temp`,
+        `ALTER DEFAULT PRIVILEGES IN SCHEMA ridenow REVOKE ALL ON TABLES FROM ${denied}`,
       );
-    await client.query(
-      `ALTER DEFAULT PRIVILEGES IN SCHEMA ridenow REVOKE ALL ON TABLES FROM ${denied}`,
-    );
-    await client.query(
-      `ALTER DEFAULT PRIVILEGES IN SCHEMA ridenow REVOKE ALL ON SEQUENCES FROM ${denied}`,
-    );
-    await client.query(
-      `ALTER DEFAULT PRIVILEGES IN SCHEMA ridenow REVOKE EXECUTE ON FUNCTIONS FROM ${denied}`,
-    );
+      await client.query(
+        `ALTER DEFAULT PRIVILEGES IN SCHEMA ridenow REVOKE ALL ON SEQUENCES FROM ${denied}`,
+      );
+      await client.query(
+        `ALTER DEFAULT PRIVILEGES IN SCHEMA ridenow REVOKE EXECUTE ON FUNCTIONS FROM ${denied}`,
+      );
+    }
     // Partition creation is a release/admin operation, not an application privilege.
     for (let i = 0; i <= 12; i++) {
       const start = new Date();
@@ -126,17 +129,19 @@ async function install(client) {
         `CREATE POLICY backend_access ON ridenow.${name} FOR ALL TO ridenow_backend USING(true) WITH CHECK(true)`,
       );
       await client.query(`REVOKE ALL ON ridenow.${name} FROM ${denied}`);
-      if (tablename !== 'schema_migrations')
+      if (tablename === 'schema_migrations') {
+        await client.query(`REVOKE INSERT,UPDATE,DELETE ON ridenow.${name} FROM ridenow_backend`);
+      } else {
         await client.query(
           `GRANT SELECT,INSERT,UPDATE,DELETE ON ridenow.${name} TO ridenow_backend`,
         );
+      }
     }
-    await client.query(
-      'REVOKE INSERT,UPDATE,DELETE ON ridenow.schema_migrations FROM ridenow_backend',
-    );
-    await client.query(
-      'REVOKE UPDATE,DELETE ON ridenow.ledger_entries,ridenow.ledger_transactions,ridenow.audit_logs,ridenow.fare_plans FROM ridenow_backend',
-    );
+    if (!alreadyInstalled) {
+      await client.query(
+        'REVOKE UPDATE,DELETE ON ridenow.ledger_entries,ridenow.ledger_transactions,ridenow.audit_logs,ridenow.fare_plans FROM ridenow_backend',
+      );
+    }
     await client.query('COMMIT');
     return {
       tables: tables.length,
