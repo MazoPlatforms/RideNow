@@ -79,7 +79,7 @@ export function readApplication(profile, key) {
 
 export function publicProfile(profile) {
   if (!profile) return null;
-  const { application_encrypted, contact_encrypted, profile_photo_key, profile_photo_version, ...safe } = profile;
+  const { application_encrypted, contact_encrypted, payout_bank_encrypted, profile_photo_key, profile_photo_version, ...safe } = profile;
   return safe;
 }
 

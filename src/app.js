@@ -15,6 +15,7 @@ import { createRecaptchaVerifier } from './shared/recaptcha.js';
 import { mountSupport } from './modules/support.js';
 import { mountDataExport } from './modules/data-export.js';
 import * as sharing from './modules/ride-sharing.js';
+import * as driverFinance from './modules/driver-finance.js';
 import { createAuth, permission, normalizePhone } from './modules/auth.js';
 import { createMobilePreferences, cityInput, savedAddressInput, trustedContactInput, notificationApp, notificationChange } from './modules/mobile-preferences.js';
 import { quote } from './modules/pricing.js';
@@ -894,6 +895,26 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       ).rows,
     };
   });
+  const payoutMethodInput = z.strictObject({
+    holder: z.string().trim().min(2).max(100),
+    bank: z.string().trim().min(2).max(100),
+    branch: z.string().trim().min(1).max(100),
+    number: z.string().regex(/^\d{4,34}$/),
+    type: z.enum(['Savings', 'Current']),
+  });
+  route('get', '/v1/driver/payout-method', { access: 'driver', noStore: true }, ({ db, user }) =>
+    driverFinance.payoutMethod(db, user, config.ENCRYPTION_KEY));
+  route('put', '/v1/driver/payout-method', { access: 'driver', noStore: true, body: payoutMethodInput },
+    ({ user, body }) => transaction(pool, (db) =>
+      driverFinance.savePayoutMethod(db, user, body, config.ENCRYPTION_KEY)));
+  route('delete', '/v1/driver/payout-method', { access: 'driver', noStore: true },
+    ({ user }) => transaction(pool, (db) => driverFinance.removePayoutMethod(db, user, config.ENCRYPTION_KEY)));
+  route('get', '/v1/driver/payouts', { access: 'driver', noStore: true }, ({ db, user }) =>
+    driverFinance.myPayouts(db, user));
+  route('post', '/v1/driver/payouts', {
+    access: 'driver', noStore: true, idem: true,
+    body: z.strictObject({ amountMinor: z.number().int().positive().max(1000000000) }),
+  }, ({ db, user, body }) => driverFinance.createDriverPayout(db, user, body.amountMinor, config.ENCRYPTION_KEY));
   route('get', '/v1/admin/dashboard', { permission: 'rides.monitor' }, async ({ db }) => ({
     counts: await one(db, `SELECT
       (SELECT count(*)::int FROM users WHERE deleted_at IS NULL) AS users,

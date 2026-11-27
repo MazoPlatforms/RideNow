@@ -555,6 +555,29 @@ test('ride share links are opaque, scoped to participants, revocable and removed
   await api.post('/v1/public/trips').send({ token: terminalLink.url.split('#')[1] }).expect(404);
 });
 
+test('driver payout method is private and encrypted, and payout requests use the ledger balance', async () => {
+  const d = await driver();
+  const saved = await request('put', '/v1/driver/payout-method', d, {
+    holder: 'Test Driver', bank: 'Demo Bank', branch: 'Kattankudy', number: '1234567890', type: 'Savings',
+  }).expect(200);
+  assert.equal(saved.body.number, '1234567890');
+  const row = await one(pool, 'SELECT payout_bank_encrypted FROM driver_profiles WHERE user_id=$1', [d.user.id]);
+  assert.notEqual(row.payout_bank_encrypted, '1234567890');
+  assert.equal(JSON.stringify(row).includes('1234567890'), false);
+  assert.equal((await request('get', '/v1/driver/payout-method', d).expect(200)).body.number, '1234567890');
+  await request('get', `/v1/drivers/me`, d).expect(200).then(({ body }) => {
+    assert.equal(Object.hasOwn(body.profile, 'payout_bank_encrypted'), false);
+  });
+  const rider = await login();
+  await request('get', '/v1/driver/payout-method', rider).expect(403);
+  await request('post', '/v1/driver/payouts', d, { amountMinor: 100 }, 'driver-payout-no-credit')
+    .expect(409);
+  await request('delete', '/v1/driver/payout-method', d).expect(200);
+  await request('get', '/v1/driver/payout-method', d).expect(200).then(({ body }) => {
+    assert.equal(Object.hasOwn(body, 'number'), false);
+  });
+});
+
 test('mobile history can open a scheduled booking and reload its updated pickup time', async () => {
   const rider = await login();
   const firstTime = new Date(Date.now() + 3600000).toISOString();
