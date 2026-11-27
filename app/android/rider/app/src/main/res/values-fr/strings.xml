@@ -239,7 +239,7 @@
     <string name="settings_help_sub">Obtenez de l\'aide ou contactez-nous</string>
     <string name="settings_about">À propos</string>
     <string name="settings_about_sub">Version de l\'application, conditions et politiques</string>
-    <string name="theme_system">Par défaut du système</string>
+    <string name="theme_system">Système</string>
     <string name="theme_light">Clair</string>
     <string name="theme_dark">Sombre</string>
 

@@ -83,7 +83,7 @@ fun HomeScreen(
     onToggle: () -> Unit, onAddBank: () -> Unit, onTab: (MainTab) -> Unit = {}, earnings: Double? = null, trips: Int? = null,
     unread: Int = 0, onBell: () -> Unit = {}, onProfile: () -> Unit = {}, onCycleMap: () -> Unit = {},
     request: TripRequest? = null, onOfferRequest: () -> Unit = {}, onAccept: () -> Unit = {}, onDecline: () -> Unit = {}, modifier: Modifier = Modifier,
-    onActiveTrip: (() -> Unit)? = null, problem: Int? = null,
+    onActiveTrip: (() -> Unit)? = null, problem: Int? = null, locationPermissionGranted: Boolean? = null,
 ) {
     val c = RideTheme.colors
     val context = LocalContext.current
@@ -102,7 +102,7 @@ fun HomeScreen(
     val totalMinutes = ((bankedMillis + if (online) (now - onlineSince).coerceAtLeast(0) else 0L) / 60_000L).toInt()
     val money = remember(earnings) { earnings?.let { com.ridenow.driver.ui.util.Money.fmt(it) } ?: "—" }
 
-    val position = rememberDriverMapLocation()
+    val position = rememberDriverMapLocation(locationPermissionGranted)
     val mapCamera = rememberCameraPositionState { this.position = CameraPosition.fromLatLngZoom(defaultMapCenter, 14f) }
     LaunchedEffect(position != null) {
         mapCamera.animate(CameraUpdateFactory.newLatLngZoom(position ?: defaultMapCenter, 14f))

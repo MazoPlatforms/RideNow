@@ -355,7 +355,7 @@
     <string name="acct_title">"ගිණුම"</string>
     <string name="acct_bank_missing">"එකතු කර නැත · සබැඳිව යාමට අවශ්‍යයි"</string>
     <string name="acct_appearance">"පෙනුම"</string>
-    <string name="acct_appearance_sub">"පද්ධති පෙරනිමි, ආලෝකය හෝ අඳුරු තෝරන්න."</string>
+    <string name="acct_appearance_sub">"පද්ධතිය, ආලෝකය හෝ අඳුරු තෝරන්න."</string>
     <string name="acct_language">"භාෂාව"</string>
     <string name="acct_language_sub">"RideNow Driver සඳහා භාෂාව තෝරන්න."</string>
     <string name="acct_help">"උදව් සහ සහාය"</string>

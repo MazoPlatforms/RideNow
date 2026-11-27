@@ -234,7 +234,7 @@
     <string name="settings_help_sub">"सहायता प्राप्त करें या हमसे संपर्क करें"</string>
     <string name="settings_about">"के बारे में"</string>
     <string name="settings_about_sub">"ऐप संस्करण, नियम और नीतियां"</string>
-    <string name="theme_system">"सिस्टम की डिफ़ॉल्ट सेटिंग"</string>
+    <string name="theme_system">"सिस्टम"</string>
     <string name="theme_light">"लाइट"</string>
     <string name="theme_dark">"डार्क"</string>
     <string name="text_terms_policies">"नियम एवं नीतियाँ"</string>

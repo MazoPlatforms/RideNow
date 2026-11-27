@@ -362,7 +362,7 @@
     <string name="acct_title">Account</string>
     <string name="acct_bank_missing">Not added \u00b7 needed to go online</string>
     <string name="acct_appearance">Appearance</string>
-    <string name="acct_appearance_sub">Choose System default, Light or Dark.</string>
+    <string name="acct_appearance_sub">Choose System, Light or Dark.</string>
     <string name="acct_language">Language</string>
     <string name="acct_language_sub">Choose the language for RideNow Driver.</string>
     <string name="acct_help">Help and support</string>

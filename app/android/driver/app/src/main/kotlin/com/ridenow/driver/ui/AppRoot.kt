@@ -4,6 +4,11 @@ import com.ridenow.driver.R
 import androidx.compose.ui.res.stringResource
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -14,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -120,6 +126,7 @@ import com.ridenow.driver.ui.system.NotificationsOffScreen
 import com.ridenow.driver.ui.system.rememberLocationEnabled
 import com.ridenow.driver.ui.system.rememberNotificationsEnabled
 import com.ridenow.driver.ui.system.rememberOnline
+import com.ridenow.driver.ui.util.hasLocationPermission
 import com.ridenow.driver.ui.theme.AppearanceState
 import com.ridenow.driver.ui.theme.MapStyle
 import com.ridenow.driver.ui.vehicle.VehicleDetailsScreen
@@ -170,6 +177,26 @@ fun AppRoot(appearance: AppearanceState) {
     var onboardingLocationDismissed by rememberSaveable(screen, locationOn) { mutableStateOf(false) }
     var ntfDismissed by rememberSaveable { mutableStateOf(false) }
     val prefs = remember { context.getSharedPreferences("ridenowdriver", 0) }
+    val locationLifecycle = LocalLifecycleOwner.current.lifecycle
+    var locationPermissionGranted by remember(context) { mutableStateOf(hasLocationPermission(context)) }
+    var locationPermissionPrompted by rememberSaveable { mutableStateOf(prefs.getBoolean("location_permission_prompted", false)) }
+    val requestLocationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        locationPermissionGranted = result.values.any { it }
+    }
+    LaunchedEffect(screen, locationOn, locationPermissionGranted) {
+        if (screen == Screen.Home && locationOn && !locationPermissionGranted && !locationPermissionPrompted) {
+            locationPermissionPrompted = true
+            prefs.edit().putBoolean("location_permission_prompted", true).apply()
+            requestLocationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+        }
+    }
+    DisposableEffect(locationLifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) locationPermissionGranted = hasLocationPermission(context)
+        }
+        locationLifecycle.addObserver(observer)
+        onDispose { locationLifecycle.removeObserver(observer) }
+    }
     val scope = rememberCoroutineScope()
     val activityError = stringResource(R.string.onboarding_connection_error)
     val incompleteError = stringResource(R.string.onboarding_incomplete)
@@ -717,6 +744,7 @@ fun AppRoot(appearance: AppearanceState) {
                         problem = liveError ?: if (liveStale) R.string.live_connection else null,
                         unread = store.unreadCount, onBell = { go(Screen.NotificationCenter) }, onProfile = { go(Screen.DriverProfile) },
                         onCycleMap = { appearance.setMapStyle(MapStyle.entries[(appearance.mapStyle.ordinal + 1) % MapStyle.entries.size]) },
+                        locationPermissionGranted = locationPermissionGranted,
                     )
                         liveOffer?.let { offer -> LiveOfferSheet(offer, liveBusy, { respondToOffer(offer, it) }) }
                     }

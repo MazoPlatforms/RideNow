@@ -27,14 +27,14 @@ import com.ridenow.driver.R
 import com.ridenow.driver.ui.theme.LocalMapStyle
 import com.ridenow.driver.ui.theme.MapStyle
 import com.ridenow.driver.ui.theme.RideTheme
-import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdate
 import org.maplibre.android.camera.CameraUpdateFactory as NativeCameraUpdates
 import org.maplibre.android.camera.CameraPosition as NativeCameraPosition
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
-import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.OnMapReadyCallback
+import org.sifric.maps.SifricMapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
@@ -102,7 +102,6 @@ data class ServiceRadius(val center: LatLng, val kilometers: Double) {
     }
 }
 
-private const val STYLE = "https://maps.sifric.workers.dev/api/v1/native-style.json"
 private val emptyFeatures = FeatureCollection.fromFeatures(emptyArray<Feature>())
 private fun LatLng.point(): Point = Point.fromLngLat(longitude, latitude)
 
@@ -151,23 +150,24 @@ fun RideMap(
     val dark = styleChoice == MapStyle.Dark || colors.isDark
     val theme = if (dark) "dark" else "light"
     val type = if (styleChoice == MapStyle.Satellite) "satellite" else "default"
-    val styleUrl = "$STYLE?type=$type&theme=$theme"
+    val mapType = if (type == "satellite") SifricMapView.MapType.SATELLITE else SifricMapView.MapType.DEFAULT
+    val mapTheme = if (theme == "dark") SifricMapView.Theme.DARK else SifricMapView.Theme.LIGHT
+    val styleUrl = SifricMapView.appearanceStyleUrl(context, mapType, mapTheme)
     val loaded by rememberUpdatedState(onLoaded)
-    val view = remember(context) {
-        MapLibre.getInstance(context.applicationContext)
-        MapView(context, MapLibreMapOptions.createFromAttributes(context).textureMode(true))
-    }
+    val view = remember(context) { SifricMapView(context) }
     var map by remember(view) { mutableStateOf<MapLibreMap?>(null) }
     var style by remember(view) { mutableStateOf<Style?>(null) }
+    var appliedStyleKey by remember(view) { mutableStateOf<String?>(null) }
     var error by remember(view) { mutableStateOf(false) }
     var attempt by remember(view) { mutableIntStateOf(0) }
 
     DisposableEffect(view, lifecycle, camera) {
         var released = false
+        val mapView = (0 until view.childCount).mapNotNull { view.getChildAt(it) as? MapView }.firstOrNull()
         val fail = MapView.OnDidFailLoadingMapListener { if (!released) error = true }
-        view.addOnDidFailLoadingMapListener(fail)
+        mapView?.addOnDidFailLoadingMapListener(fail)
         view.onCreate(null)
-        view.getMapAsync { native ->
+        view.load(mapType, mapTheme, OnMapReadyCallback { native ->
             if (!released) {
                 native.uiSettings.isCompassEnabled = false
                 native.uiSettings.isLogoEnabled = false
@@ -179,8 +179,14 @@ fun RideMap(
                 }
                 camera.attach(native)
                 map = native
+                native.style?.let { ready ->
+                    ready.rideLayers(colors.accent.toArgb())
+                    style = ready
+                    appliedStyleKey = "$styleUrl|${colors.accent.toArgb()}|$attempt"
+                    loaded()
+                }
             }
-        }
+        })
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> view.onStart()
@@ -198,20 +204,24 @@ fun RideMap(
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) view.onStop()
             camera.map = null
             camera.isMoving = false
-            view.removeOnDidFailLoadingMapListener(fail)
+            mapView?.removeOnDidFailLoadingMapListener(fail)
             view.onDestroy()
         }
     }
     DisposableEffect(map, styleUrl, colors.accent, attempt) {
         var current = true
-        style = null
         error = false
         val native = map
-        native?.setStyle(Style.Builder().fromUri(styleUrl)) { ready ->
-            if (current) {
-                ready.rideLayers(colors.accent.toArgb())
-                style = ready
-                loaded()
+        val styleKey = "$styleUrl|${colors.accent.toArgb()}|$attempt"
+        if (native != null && appliedStyleKey != styleKey) {
+            style = null
+            native.setStyle(Style.Builder().fromUri(styleUrl)) { ready ->
+                if (current) {
+                    ready.rideLayers(colors.accent.toArgb())
+                    style = ready
+                    appliedStyleKey = styleKey
+                    loaded()
+                }
             }
         }
         onDispose { current = false }
@@ -240,9 +250,6 @@ fun RideMap(
                     actualRight.roundToPx(), padding.calculateBottomPadding().roundToPx())
             }
         })
-        Text("© Sifric Maps", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding() + 4.dp)
-            .background(colors.field.copy(alpha = 0.88f)).padding(horizontal = 5.dp), color = colors.fg,
-            style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
         if (error) TextButton(onClick = { attempt++ }, modifier = Modifier.align(Alignment.Center).background(colors.field)) {
             Text(stringResource(R.string.sifric_retry_map), color = colors.fg)
         }

@@ -355,7 +355,7 @@
     <string name="acct_title">"アカウント"</string>
     <string name="acct_bank_missing">"追加されていません。オンラインにする必要があります"</string>
     <string name="acct_appearance">"外観"</string>
-    <string name="acct_appearance_sub">"システムのデフォルト、ライトまたはダークを選択します。"</string>
+    <string name="acct_appearance_sub">"システム、ライトまたはダークを選択します。"</string>
     <string name="acct_language">"言語"</string>
     <string name="acct_language_sub">"RideNow Driver の言語を選択します。"</string>
     <string name="acct_help">"ヘルプとサポート"</string>

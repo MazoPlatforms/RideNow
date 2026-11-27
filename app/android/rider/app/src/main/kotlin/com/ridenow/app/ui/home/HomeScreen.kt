@@ -21,6 +21,7 @@ import com.ridenow.app.ui.map.MapPin
 import com.ridenow.app.ui.map.PinKind
 import com.ridenow.app.ui.map.RideMap
 import com.ridenow.app.ui.map.rememberUserLocation
+import com.ridenow.app.ui.map.UserLocation
 import androidx.compose.runtime.LaunchedEffect
 
 import androidx.compose.animation.AnimatedVisibility
@@ -98,8 +99,9 @@ import com.ridenow.app.ui.util.rememberReducedMotion
 fun HomeScreen(
     onMenu: () -> Unit, onNotifications: () -> Unit, onSearch: () -> Unit, onLater: () -> Unit,
     onEditPickup: () -> Unit, onSaved: (String) -> Unit, onRecent: (String) -> Unit,
-    modifier: Modifier = Modifier, hasUnread: Boolean = true, pickup: String = stringResource(R.string.text_text_128_meridian_walk),
+    modifier: Modifier = Modifier, hasUnread: Boolean = false, pickup: String = stringResource(R.string.text_text_128_meridian_walk),
     onActiveRide: (() -> Unit)? = null, recentRides: List<Pair<String, String>> = emptyList(),
+    userLocation: UserLocation? = null,
 ) {
     val c = RideTheme.colors
     val sheetExpandLabel = stringResource(R.string.sheet_expand)
@@ -112,9 +114,15 @@ fun HomeScreen(
     val density = LocalDensity.current
     val recentHeight = (recentRides.size * 60 + if (recentRides.isEmpty()) 0 else 8).dp
     val recentPx = with(density) { recentHeight.toPx().coerceAtLeast(1f) }
-    val me = rememberUserLocation()
+    val me = userLocation ?: rememberUserLocation()
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(me.position, 15f) }
-    LaunchedEffect(me.position) { cam.animate(CameraUpdateFactory.newLatLngZoom(me.position, 15.5f)) }
+    var centeredOnLocation by remember { mutableStateOf(false) }
+    LaunchedEffect(me.real, me.position) {
+        if (me.real && !centeredOnLocation) {
+            centeredOnLocation = true
+            cam.animate(CameraUpdateFactory.newLatLngZoom(me.position, 15.5f))
+        }
+    }
     Box(modifier.fillMaxSize().background(c.bg)) {
         RideMap(Modifier.fillMaxSize(), cam, myLocation = me.position.takeIf { me.real }, padding = PaddingValues(bottom = 300.dp))
 

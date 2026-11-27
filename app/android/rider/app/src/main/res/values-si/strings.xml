@@ -234,7 +234,7 @@
     <string name="settings_help_sub">"උදව් ලබා ගන්න හෝ අප හා සම්බන්ධ වන්න"</string>
     <string name="settings_about">"ගැන"</string>
     <string name="settings_about_sub">"යෙදුම් අනුවාදය, නියම සහ ප්‍රතිපත්ති"</string>
-    <string name="theme_system">"පද්ධති පෙරනිමිය"</string>
+    <string name="theme_system">"පද්ධතිය"</string>
     <string name="theme_light">"ආලෝකය"</string>
     <string name="theme_dark">"අඳුරු"</string>
     <string name="text_terms_policies">"නියම සහ ප්‍රතිපත්ති"</string>

@@ -1,71 +1,70 @@
 package com.ridenow.driver.ui.map
 
 import android.annotation.SuppressLint
-import android.content.Context
-import android.location.LocationManager
-import android.os.CancellationSignal
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-import androidx.core.content.getSystemService
-import androidx.core.location.LocationManagerCompat
 import com.ridenow.driver.ui.system.rememberLocationEnabled
 import com.ridenow.driver.ui.util.hasLocationPermission
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.android.geometry.LatLngBounds
-import kotlin.coroutines.resume
+import kotlinx.coroutines.delay
 
 internal val defaultMapCenter get() = LatLng(7.6842, 81.7335)
 
 @SuppressLint("MissingPermission")
-private fun lastFix(context: Context): LatLng? {
-    val manager = context.getSystemService<LocationManager>() ?: return null
-    if (!hasLocationPermission(context) || !LocationManagerCompat.isLocationEnabled(manager)) return null
-    return runCatching {
-        manager.getProviders(true).mapNotNull { manager.getLastKnownLocation(it) }
-            .filter { fix -> fix.elapsedRealtimeNanos > 0 && android.os.SystemClock.elapsedRealtimeNanos() - fix.elapsedRealtimeNanos < 120_000_000_000 }
-            .maxByOrNull { it.elapsedRealtimeNanos }?.let { LatLng(it.latitude, it.longitude) }
-    }.getOrNull()
-}
-
-@SuppressLint("MissingPermission")
-private suspend fun currentFix(context: Context): LatLng? = withTimeoutOrNull(10_000) {
-    val manager = context.getSystemService<LocationManager>() ?: return@withTimeoutOrNull null
-    if (!hasLocationPermission(context) || !LocationManagerCompat.isLocationEnabled(manager)) return@withTimeoutOrNull null
-    val provider = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-        .firstOrNull { manager.isProviderEnabled(it) } ?: return@withTimeoutOrNull null
-    suspendCancellableCoroutine { continuation ->
-        val signal = CancellationSignal()
-        continuation.invokeOnCancellation { signal.cancel() }
-        try {
-            LocationManagerCompat.getCurrentLocation(manager, provider, signal, ContextCompat.getMainExecutor(context)) { fix ->
-                if (continuation.isActive) continuation.resume(fix?.let { LatLng(it.latitude, it.longitude) })
-            }
-        } catch (_: RuntimeException) {
-            if (continuation.isActive) continuation.resume(null)
-        }
-    }
-}
-
 @Composable
-internal fun rememberDriverMapLocation(): LatLng? {
+internal fun rememberDriverMapLocation(permissionGranted: Boolean? = null): LatLng? {
     val context = LocalContext.current
     val enabled = rememberLocationEnabled()
-    var point by remember(enabled) { mutableStateOf<LatLng?>(null) }
-    LaunchedEffect(context, enabled) {
-        while (enabled) {
-            point = withContext(Dispatchers.IO) { lastFix(context) ?: currentFix(context) }
-            delay(10_000)
+    val granted = permissionGranted ?: hasLocationPermission(context)
+    var fix by remember(enabled, granted) { mutableStateOf<android.location.Location?>(null) }
+    DisposableEffect(context, enabled, granted) {
+        val client = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+        val cancellation = com.google.android.gms.tasks.CancellationTokenSource()
+        var active = true
+        fun accept(location: android.location.Location?) {
+            if (!active || location == null || !location.hasAccuracy() || location.accuracy > 100f) return
+            val ageNanos = android.os.SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos
+            if (ageNanos !in 0..30_000_000_000L || !location.latitude.isFinite() || !location.longitude.isFinite()) return
+            fix = android.location.Location(location)
+        }
+        val callback = object : com.google.android.gms.location.LocationCallback() {
+            override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+                result.locations.filter { it.hasAccuracy() && it.accuracy <= 100f }.minByOrNull { it.accuracy }?.let(::accept)
+            }
+        }
+        if (enabled && granted) {
+            try {
+                client.lastLocation.addOnSuccessListener(::accept)
+                client.getCurrentLocation(com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, cancellation.token)
+                    .addOnSuccessListener(::accept)
+                val request = com.google.android.gms.location.LocationRequest.Builder(
+                    com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 4_000L,
+                ).setMinUpdateIntervalMillis(1_500L).setMinUpdateDistanceMeters(3f).build()
+                client.requestLocationUpdates(request, callback, android.os.Looper.getMainLooper())
+            } catch (_: SecurityException) {
+                fix = null
+            }
+        } else {
+            fix = null
+        }
+        onDispose {
+            active = false
+            cancellation.cancel()
+            client.removeLocationUpdates(callback)
         }
     }
-    return point
+    LaunchedEffect(fix) {
+        val observed = fix ?: return@LaunchedEffect
+        while (fix === observed) {
+            val ageNanos = android.os.SystemClock.elapsedRealtimeNanos() - observed.elapsedRealtimeNanos
+            if (ageNanos > 30_000_000_000L) { fix = null; break }
+            delay(5_000L)
+        }
+    }
+    return fix?.let { LatLng(it.latitude, it.longitude) }
 }
 
 /** An address-based preview is drawn only when the backend resolves both locations. */

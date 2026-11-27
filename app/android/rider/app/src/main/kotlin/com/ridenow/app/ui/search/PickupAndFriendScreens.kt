@@ -23,6 +23,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import com.ridenow.app.ui.components.GroupCard
 import com.ridenow.app.ui.components.NavRow
@@ -34,6 +35,10 @@ import com.ridenow.app.ui.components.RideTextField
 import com.ridenow.app.ui.components.RowDivider
 import com.ridenow.app.ui.components.ScreenTop
 import com.ridenow.app.ui.components.SectionLabel
+import com.ridenow.app.ui.map.LatLng
+import com.ridenow.app.ui.map.SifricApi
+import com.ridenow.app.ui.map.Suggestion
+import kotlinx.coroutines.delay
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 import com.ridenow.app.ui.util.entrance
@@ -42,9 +47,11 @@ import com.ridenow.app.ui.util.entrance
 @Composable
 fun ChangePickupScreen(
     current: String, places: List<Pair<String, String>>, onBack: () -> Unit,
-    onConfirm: (String) -> Unit, onMap: () -> Unit, modifier: Modifier = Modifier,
+    onConfirm: (String, LatLng?) -> Unit, onMap: () -> Unit, modifier: Modifier = Modifier,
     allowCurrentLocation: () -> Boolean = { true },
+    near: LatLng? = null,
 ) {
+    val context = LocalContext.current
     val textChangePickup = stringResource(R.string.change_pickup)
     val textPickupTitle = stringResource(R.string.pickup_title)
     val textSearchChooseMap = stringResource(R.string.search_choose_map)
@@ -52,8 +59,27 @@ fun ChangePickupScreen(
     val c = RideTheme.colors
     var query by rememberSaveable { mutableStateOf("") }
     var picked by rememberSaveable { mutableStateOf(current) }
+    var pickedPoint by remember { mutableStateOf<LatLng?>(null) }
     val q = query.trim()
-    val shown = places.filter { q.isEmpty() || it.first.contains(q, true) || it.second.contains(q, true) }
+    val localMatches = places.filter { q.isEmpty() || it.first.contains(q, true) || it.second.contains(q, true) }
+    var remote by remember { mutableStateOf<List<Suggestion>?>(null) }
+    var searchFailed by remember { mutableStateOf(false) }
+    LaunchedEffect(q, near) {
+        remote = null
+        searchFailed = false
+        if (q.length >= 2) {
+            delay(250)
+            val matches = SifricApi.autocomplete(context, q, near)
+            searchFailed = matches == null
+            remote = matches.orEmpty()
+        }
+    }
+    val remoteMatches = remote.orEmpty().filterNot { suggestion ->
+        localMatches.any { (label, address) ->
+            label.equals(suggestion.name, ignoreCase = true) || address.equals(suggestion.name, ignoreCase = true)
+        }
+    }
+    val loading = q.length >= 2 && remote == null && !searchFailed
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         ScreenTop(textChangePickup, onBack, subtitle = textPickupTitle)
         BasicTextField(
@@ -68,23 +94,42 @@ fun ChangePickupScreen(
         )
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
             Spacer(Modifier.height(14.dp))
-            if (shown.isEmpty()) Text(stringResource(R.string.pickup_none, q), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(vertical = 12.dp))
-            else GroupCard {
-                shown.forEachIndexed { i, (label, address) ->
+            if (localMatches.isNotEmpty()) GroupCard {
+                localMatches.forEachIndexed { i, (label, address) ->
                     if (i > 0) RowDivider()
                     val on = address == picked
                     NavRow(
                         when (label) { "Home" -> RideIcons.Home; "Work" -> RideIcons.Work; "Current location" -> RideIcons.Pin; else -> RideIcons.Clock },
-                        localizedLabel(label), { if (label != "Current location" || allowCurrentLocation()) picked = address }, subtitle = address,
+                        localizedLabel(label), { if (label != "Current location" || allowCurrentLocation()) { picked = address; pickedPoint = null } }, subtitle = address,
                         trailing = { Box(Modifier.size(20.dp).clip(CircleShape).then(if (on) Modifier.background(c.accent) else Modifier.border(1.5.dp, c.muted, CircleShape)), contentAlignment = Alignment.Center) { if (on) Box(Modifier.size(8.dp).clip(CircleShape).background(c.onAccent)) } },
                     )
                 }
+            }
+            when {
+                loading -> Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(24.dp), color = c.accent, strokeWidth = 2.5.dp)
+                }
+                searchFailed -> Text(stringResource(R.string.sifric_search_unavailable), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(vertical = 12.dp))
+                remoteMatches.isNotEmpty() -> GroupCard {
+                    remoteMatches.forEachIndexed { i, suggestion ->
+                        if (i > 0) RowDivider()
+                        val address = suggestion.area.takeIf(String::isNotBlank)?.let { "${suggestion.name}, $it" } ?: suggestion.name
+                        val on = picked == address
+                        NavRow(
+                            RideIcons.Pin, suggestion.name,
+                            { picked = address; pickedPoint = suggestion.point },
+                            subtitle = suggestion.area.takeIf(String::isNotBlank),
+                            trailing = { Box(Modifier.size(20.dp).clip(CircleShape).then(if (on) Modifier.background(c.accent) else Modifier.border(1.5.dp, c.muted, CircleShape)), contentAlignment = Alignment.Center) { if (on) Box(Modifier.size(8.dp).clip(CircleShape).background(c.onAccent)) } },
+                        )
+                    }
+                }
+                q.length >= 2 && localMatches.isEmpty() -> Text(stringResource(R.string.pickup_none, q), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(vertical = 12.dp))
             }
             Spacer(Modifier.height(10.dp))
             GroupCard { NavRow(RideIcons.Map, textSearchChooseMap, onMap) }
             Spacer(Modifier.height(16.dp))
         }
-        RideButton(stringResource(R.string.pickup_confirm), { onConfirm(picked) }, modifier = Modifier.padding(vertical = 12.dp))
+        RideButton(stringResource(R.string.pickup_confirm), { onConfirm(picked, pickedPoint) }, modifier = Modifier.padding(vertical = 12.dp))
     }
 }
 
