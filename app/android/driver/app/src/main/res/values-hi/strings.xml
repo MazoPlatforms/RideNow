@@ -355,7 +355,7 @@
     <string name="acct_title">"खाता"</string>
     <string name="acct_bank_missing">"जोड़ा नहीं गया · ऑनलाइन जाने की आवश्यकता है"</string>
     <string name="acct_appearance">"उपस्थिति"</string>
-    <string name="acct_appearance_sub">"सिस्टम डिफॉल्ट, लाइट या डार्क चुनें।"</string>
+    <string name="acct_appearance_sub">"सिस्टम, लाइट या डार्क चुनें।"</string>
     <string name="acct_language">"भाषा"</string>
     <string name="acct_language_sub">"RideNow Driver के लिए भाषा चुनें।"</string>
     <string name="acct_help">"सहायता और समर्थन"</string>

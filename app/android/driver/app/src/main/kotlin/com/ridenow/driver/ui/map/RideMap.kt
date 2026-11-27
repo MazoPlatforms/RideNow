@@ -240,9 +240,6 @@ fun RideMap(
                     actualRight.roundToPx(), padding.calculateBottomPadding().roundToPx())
             }
         })
-        Text("© Sifric Maps", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding() + 4.dp)
-            .background(colors.field.copy(alpha = 0.88f)).padding(horizontal = 5.dp), color = colors.fg,
-            style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
         if (error) TextButton(onClick = { attempt++ }, modifier = Modifier.align(Alignment.Center).background(colors.field)) {
             Text(stringResource(R.string.sifric_retry_map), color = colors.fg)
         }

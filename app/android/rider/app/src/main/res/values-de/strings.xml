@@ -234,7 +234,7 @@
     <string name="settings_help_sub">"Holen Sie sich Hilfe oder kontaktieren Sie uns"</string>
     <string name="settings_about">"Über"</string>
     <string name="settings_about_sub">"App-Version, Bedingungen und Richtlinien"</string>
-    <string name="theme_system">"Systemeinstellung"</string>
+    <string name="theme_system">"System"</string>
     <string name="theme_light">"Hell"</string>
     <string name="theme_dark">"Dunkel"</string>
     <string name="text_terms_policies">"Nutzungsbedingungen und Richtlinien"</string>

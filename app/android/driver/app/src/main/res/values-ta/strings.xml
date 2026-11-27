@@ -355,7 +355,7 @@
     <string name="acct_title">"கணக்கு"</string>
     <string name="acct_bank_missing">"சேர்க்கப்படவில்லை · ஆன்லைனில் செல்ல வேண்டும்"</string>
     <string name="acct_appearance">"தோற்றம்"</string>
-    <string name="acct_appearance_sub">"கணினி இயல்புநிலை, ஒளி அல்லது இருண்ட என்பதைத் தேர்ந்தெடுக்கவும்."</string>
+    <string name="acct_appearance_sub">"அமைப்பு, ஒளி அல்லது இருண்ட என்பதைத் தேர்ந்தெடுக்கவும்."</string>
     <string name="acct_language">"மொழி"</string>
     <string name="acct_language_sub">"RideNow Driver க்கான மொழியைத் தேர்ந்தெடுக்கவும்."</string>
     <string name="acct_help">"உதவி மற்றும் ஆதரவு"</string>

@@ -227,9 +227,6 @@ fun RideMap(
                     actualRight.roundToPx(), padding.calculateBottomPadding().roundToPx())
             }
         })
-        Text("© Sifric Maps", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding() + 4.dp)
-            .background(colors.field.copy(alpha = 0.88f)).padding(horizontal = 5.dp), color = colors.fg,
-            style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
         if (error) TextButton(onClick = { attempt++ }, modifier = Modifier.align(Alignment.Center).background(colors.field)) {
             Text(stringResource(R.string.sifric_retry_map), color = colors.fg)
         }
@@ -252,10 +249,20 @@ fun rememberUserLocation(
     DisposableEffect(context, granted, locationOn) {
         val request = if (locationOn && granted) CancellationTokenSource() else null
         if (request != null) {
-            LocationServices.getFusedLocationProviderClient(context)
-                .getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, request.token)
-                .addOnSuccessListener { fix ->
-                    if (!request.token.isCancellationRequested && fix != null) loc = LatLng(fix.latitude, fix.longitude)
+            val client = LocationServices.getFusedLocationProviderClient(context)
+            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, request.token)
+                .addOnCompleteListener { task ->
+                    if (request.token.isCancellationRequested) return@addOnCompleteListener
+                    val fix = if (task.isSuccessful) task.result else null
+                    if (fix != null) {
+                        loc = LatLng(fix.latitude, fix.longitude)
+                    } else {
+                        client.lastLocation.addOnSuccessListener { last ->
+                            val ageMillis = last?.let { System.currentTimeMillis() - it.time } ?: Long.MAX_VALUE
+                            if (!request.token.isCancellationRequested && last != null && ageMillis in 0..120_000L)
+                                loc = LatLng(last.latitude, last.longitude)
+                        }
+                    }
                 }
         }
         onDispose { request?.cancel() }

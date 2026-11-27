@@ -31,7 +31,7 @@ private val Main = listOf(
     Item(RideIcons.Clock, "Your Rides", R.string.menu_rides, R.string.menu_rides_sub),
     Item(RideIcons.Card, "Payments", R.string.menu_payments, R.string.menu_payments_sub),
     Item(RideIcons.Pin, "Saved Places", R.string.menu_saved, R.string.menu_saved_sub),
-    Item(RideIcons.Bell, "Notifications", R.string.menu_notifications, R.string.menu_notifications_sub, "1"),
+    Item(RideIcons.Bell, "Notifications", R.string.menu_notifications, R.string.menu_notifications_sub),
 )
 private val More = listOf(
     Item(RideIcons.Shield, "Safety center", R.string.menu_safety, R.string.menu_safety_sub),
@@ -42,7 +42,7 @@ private val More = listOf(
 
 /** Left drawer over Home. [onItem] receives the tapped item's route id, which does not change with language. */
 @Composable
-fun MenuDrawer(open: Boolean, name: String, phone: String, onClose: () -> Unit, onProfile: () -> Unit, onItem: (String) -> Unit, onSignOut: () -> Unit) {
+fun MenuDrawer(open: Boolean, name: String, phone: String, unreadCount: Int = 0, onClose: () -> Unit, onProfile: () -> Unit, onItem: (String) -> Unit, onSignOut: () -> Unit) {
     val mainMenuLabel = stringResource(R.string.menu_main_menu)
     val c = RideTheme.colors
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -65,7 +65,10 @@ fun MenuDrawer(open: Boolean, name: String, phone: String, onClose: () -> Unit, 
                 RideIcon(listOf("M7 4l6 6-6 6"), c.muted, size = 18.dp)
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 16.dp)) {
-                Main.forEachIndexed { i, m -> DrawerRow(m, i == 0) { if (i == 0) onClose() else onItem(m.route) } }
+                Main.forEachIndexed { i, m ->
+                    val badge = unreadCount.takeIf { m.route == "Notifications" && it > 0 }?.coerceAtMost(99)?.toString()
+                    DrawerRow(m, i == 0, badge) { if (i == 0) onClose() else onItem(m.route) }
+                }
                 HorizontalDivider(color = c.line, modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp))
                 More.forEach { m -> DrawerRow(m, false) { onItem(m.route) } }
             }
@@ -81,7 +84,7 @@ fun MenuDrawer(open: Boolean, name: String, phone: String, onClose: () -> Unit, 
 }
 
 @Composable
-private fun DrawerRow(item: Item, selected: Boolean, onClick: () -> Unit) {
+private fun DrawerRow(item: Item, selected: Boolean, badge: String? = item.badge, onClick: () -> Unit) {
     val c = RideTheme.colors
     Row(
         Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(14.dp)).background(if (selected) c.accent.copy(alpha = 0.14f) else Color.Transparent)
@@ -93,9 +96,9 @@ private fun DrawerRow(item: Item, selected: Boolean, onClick: () -> Unit) {
             Text(stringResource(item.title), color = c.fg, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
             Text(stringResource(item.sub), color = c.muted, fontSize = 12.sp, maxLines = 1)
         }
-        if (item.badge != null) Box(
+        if (badge != null) Box(
             Modifier.defaultMinSize(minWidth = 22.dp, minHeight = 22.dp).clip(CircleShape).background(c.accent).padding(horizontal = 6.dp),
             contentAlignment = Alignment.Center,
-        ) { Text(item.badge, color = c.onAccent, fontSize = 12.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold) }
+        ) { Text(badge, color = c.onAccent, fontSize = 12.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold) }
     }
 }

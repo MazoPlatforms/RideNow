@@ -55,6 +55,7 @@ import com.ridenow.app.ui.util.entrance
 fun RideOptionsScreen(
     destination: String, returnTrip: Boolean, initial: Int, onBack: () -> Unit,
     onContinue: (Int) -> Unit, onLater: (Int) -> Unit, route: RouteInfo?, from: LatLng, to: LatLng?, modifier: Modifier = Modifier,
+    myLocation: LatLng? = null,
 ) {
     val textValueKmValueMin = stringResource(R.string.text_value_km_value_min)
     val textValueKm = stringResource(R.string.text_value_km)
@@ -70,7 +71,7 @@ fun RideOptionsScreen(
     var selected by rememberSaveable { mutableIntStateOf(initial) }
     val v = Vehicles[selected]
     Box(modifier.fillMaxSize().background(c.bg)) {
-        RouteMap(Modifier.fillMaxSize(), from, to, route, chipText, bottomPadding = 430.dp)
+        RouteMap(Modifier.fillMaxSize(), from, to, route, chipText, bottomPadding = 430.dp, myLocation = myLocation)
 
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0), verticalAlignment = Alignment.CenterVertically) {
             Box(

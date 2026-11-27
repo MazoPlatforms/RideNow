@@ -98,7 +98,7 @@ import com.ridenow.app.ui.util.rememberReducedMotion
 fun HomeScreen(
     onMenu: () -> Unit, onNotifications: () -> Unit, onSearch: () -> Unit, onLater: () -> Unit,
     onEditPickup: () -> Unit, onSaved: (String) -> Unit, onRecent: (String) -> Unit,
-    modifier: Modifier = Modifier, hasUnread: Boolean = true, pickup: String = stringResource(R.string.text_text_128_meridian_walk),
+    modifier: Modifier = Modifier, hasUnread: Boolean = false, pickup: String = stringResource(R.string.text_text_128_meridian_walk),
     onActiveRide: (() -> Unit)? = null, recentRides: List<Pair<String, String>> = emptyList(),
 ) {
     val c = RideTheme.colors

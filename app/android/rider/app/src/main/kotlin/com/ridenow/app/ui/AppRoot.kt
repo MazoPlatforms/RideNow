@@ -136,6 +136,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var profileComplete by remember { mutableStateOf(false) }
     var profileDetails by remember { mutableStateOf(PhoneAuthApi.ProfileDetails()) }
     var profilePhoto by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var unreadNotificationCount by remember(phone) { mutableIntStateOf(0) }
     var stub by rememberSaveable { mutableStateOf("") }
     var stubBack by rememberSaveable { mutableStateOf(Screen.Home) }
     var dest by rememberSaveable { mutableStateOf("") }
@@ -231,6 +232,17 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     }
     LaunchedEffect(restoreRequested) {
         if (restoreRequested) restoreAuthSafely()
+    }
+    LaunchedEffect(phone, profileComplete, screen) {
+        if (!profileComplete || phone.isBlank() || screen != Screen.Home) return@LaunchedEffect
+        try {
+            val items = PhoneAuthApi.authorized(context, "GET", "/v1/me/notifications?app=RIDER&limit=100") { it.getJSONArray("items") }
+            unreadNotificationCount = (0 until items.length()).count { items.getJSONObject(it).isNull("read_at") }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Keep the last server-confirmed unread count during brief connection failures.
+        }
     }
     var netKey by remember { mutableIntStateOf(0) }
     val online = rememberOnline(netKey)
@@ -503,6 +515,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             Screen.Home -> Box(Modifier.fillMaxSize()) {
                 HomeScreen(
                     onMenu = { drawer = true }, onNotifications = { nav(Screen.Notifs) },
+                    hasUnread = unreadNotificationCount > 0,
                     onSearch = ::startRideSearch, onLater = {
                         val current = currentRideId
                         if (current != null) showRide(current) else {
@@ -525,7 +538,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     recentRides = recentRides.map { it.id to it.destination },
                 )
                 MenuDrawer(
-                    open = drawer, name = name, phone = shownPhone, onClose = { drawer = false },
+                    open = drawer, name = name, phone = shownPhone, unreadCount = unreadNotificationCount, onClose = { drawer = false },
                     onProfile = { go("Profile") }, onItem = { go(it) },
                     onSignOut = { drawer = false; phone = ""; profilePhoto = null; scope.launch { runCatching { PhoneAuthApi.signOut(context) } }; screen = Screen.Welcome; viewRideId = null; currentRideId = null },
                 )
@@ -548,7 +561,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                     destination = dest, returnTrip = isReturn, initial = vehicle, onBack = { screen = Screen.Search },
                     onContinue = { vehicle = it; screen = Screen.Confirm },
                     onLater = { vehicle = it; scheduleFrom = Screen.Options; screen = Screen.Schedule },
-                    route = routeInfo, from = routePickup, to = destLL,
+                    route = routeInfo, from = routePickup, to = destLL, myLocation = me.position.takeIf { me.real },
                 )
             }
             Screen.Schedule -> {

@@ -355,7 +355,7 @@
     <string name="acct_title">"Konto"</string>
     <string name="acct_bank_missing">"Nicht hinzugefügt · erforderlich, um online zu gehen"</string>
     <string name="acct_appearance">"Aussehen"</string>
-    <string name="acct_appearance_sub">"Wählen Sie Systemstandard, Hell oder Dunkel."</string>
+    <string name="acct_appearance_sub">"Wählen Sie System, Hell oder Dunkel."</string>
     <string name="acct_language">"Sprache"</string>
     <string name="acct_language_sub">"Wählen Sie die Sprache für RideNow Driver."</string>
     <string name="acct_help">"Hilfe und Unterstützung"</string>

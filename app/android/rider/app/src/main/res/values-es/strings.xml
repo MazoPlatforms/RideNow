@@ -249,7 +249,7 @@
     <string name="settings_help_sub">Obtén ayuda o contáctanos</string>
     <string name="settings_about">Acerca de</string>
     <string name="settings_about_sub">Versión de la app, términos y políticas</string>
-    <string name="theme_system">Predeterminado del sistema</string>
+    <string name="theme_system">Sistema</string>
     <string name="theme_light">Claro</string>
     <string name="theme_dark">Oscuro</string>
 

@@ -355,7 +355,7 @@
     <string name="acct_title">"حساب"</string>
     <string name="acct_bank_missing">"لم تتم الإضافة · يلزم الاتصال بالإنترنت"</string>
     <string name="acct_appearance">"مظهر"</string>
-    <string name="acct_appearance_sub">"اختر النظام الافتراضي، فاتح أو داكن."</string>
+    <string name="acct_appearance_sub">"اختر النظام أو الفاتح أو الداكن."</string>
     <string name="acct_language">"لغة"</string>
     <string name="acct_language_sub">"اختر لغة RideNow Driver."</string>
     <string name="acct_help">"المساعدة والدعم"</string>

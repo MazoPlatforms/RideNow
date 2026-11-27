@@ -93,7 +93,7 @@ fun VehicleArt(style: Int, width: Dp, modifier: Modifier = Modifier) {
 
 /** Sifric map showing the route between [from] and [to], fitted to the visible area, with an optional distance chip. */
 @Composable
-fun RouteMap(modifier: Modifier = Modifier, from: LatLng, to: LatLng?, route: RouteInfo?, chip: String?, bottomPadding: Dp = 0.dp, topPadding: Dp = 70.dp) {
+fun RouteMap(modifier: Modifier = Modifier, from: LatLng, to: LatLng?, route: RouteInfo?, chip: String?, bottomPadding: Dp = 0.dp, topPadding: Dp = 70.dp, myLocation: LatLng? = null) {
     val c = RideTheme.colors
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(from, 14f) }
     var loaded by remember { mutableStateOf(false) }
@@ -104,7 +104,7 @@ fun RouteMap(modifier: Modifier = Modifier, from: LatLng, to: LatLng?, route: Ro
         }
     }
     Box(modifier) {
-        RideMap(Modifier.fillMaxSize(), cam, pins = listOfNotNull(MapPin(from, PinKind.Pickup), to?.let { MapPin(it, PinKind.Drop) }), route = route?.points ?: emptyList(), padding = PaddingValues(top = topPadding, bottom = bottomPadding), onLoaded = { loaded = true })
+        RideMap(Modifier.fillMaxSize(), cam, pins = listOfNotNull(MapPin(from, PinKind.Pickup), to?.let { MapPin(it, PinKind.Drop) }), route = route?.points ?: emptyList(), myLocation = myLocation, padding = PaddingValues(top = topPadding, bottom = bottomPadding), onLoaded = { loaded = true })
         if (chip != null) Text(chip, color = c.bg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.TopCenter).padding(top = topPadding + 8.dp).background(c.fg, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 7.dp))
     }
 }
