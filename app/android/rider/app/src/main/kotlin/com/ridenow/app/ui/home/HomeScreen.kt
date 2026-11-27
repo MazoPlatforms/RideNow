@@ -118,7 +118,7 @@ fun HomeScreen(
     val me = userLocation ?: rememberUserLocation()
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(me.position, 15f) }
     var centeredOnLocation by remember { mutableStateOf(false) }
-    var centeredAccuracy by remember { mutableFloatStateOf(Float.POSITIVE_INFINITY) }
+    var centeredAccuracy by remember { mutableStateOf(Float.POSITIVE_INFINITY) }
     LaunchedEffect(me.real, me.position, me.accuracyMeters, cam.userHasMoved) {
         val accuracy = me.accuracyMeters ?: Float.POSITIVE_INFINITY
         val shouldCenter = !cam.userHasMoved && me.real &&
