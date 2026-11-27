@@ -38,8 +38,6 @@ import androidx.compose.ui.platform.LocalContext
 import com.ridenow.app.ui.map.RideMap
 import com.ridenow.app.ui.map.rememberUserLocation
 import com.ridenow.app.ui.permissions.rememberDeviceLocationEnabled
-import com.ridenow.app.ui.theme.BrandYellow
-import com.ridenow.app.ui.theme.Ink
 import com.ridenow.app.ui.theme.RideNowTheme
 import com.ridenow.app.ui.theme.RideTheme
 
@@ -76,9 +74,21 @@ fun MapPickerScreen(
             val tipY = (maxHeight - 190.dp) / 2
             Canvas(Modifier.fillMaxSize()) {
                 drawOval(Color.Black.copy(alpha = 0.3f), Offset(size.width / 2 - 10.dp.toPx(), tipY.toPx() - 4.dp.toPx()), Size(20.dp.toPx(), 8.dp.toPx()))
-                val tip = Offset(size.width / 2, tipY.toPx() - lift.toPx()); val r = 15.dp.toPx(); val cen = Offset(tip.x, tip.y - 36.dp.toPx())
-                drawPath(Path().apply { moveTo(tip.x, tip.y); lineTo(cen.x - r * 0.8f, cen.y + r * 0.7f); lineTo(cen.x + r * 0.8f, cen.y + r * 0.7f); close() }, BrandYellow)
-                drawCircle(BrandYellow, r, cen); drawCircle(Ink, 5.dp.toPx(), cen)
+                val scale = 1.dp.toPx()
+                val left = size.width / 2 - 12f * scale
+                val top = tipY.toPx() - 36f * scale - lift.toPx()
+                fun x(value: Float) = left + value * scale
+                fun y(value: Float) = top + value * scale
+                val pin = Path().apply {
+                    moveTo(x(12f), y(0f))
+                    cubicTo(x(5.373f), y(0f), x(0f), y(5.373f), x(0f), y(12f))
+                    cubicTo(x(0f), y(21f), x(12f), y(36f), x(12f), y(36f))
+                    cubicTo(x(12f), y(36f), x(24f), y(21f), x(24f), y(12f))
+                    cubicTo(x(24f), y(5.373f), x(18.627f), y(0f), x(12f), y(0f))
+                    close()
+                }
+                drawPath(pin, Color(0xFFEA4335))
+                drawCircle(Color.White, 4.5f * scale, Offset(x(12f), y(12f)))
             }
         }
         Box(Modifier.statusBarsPadding().padding(20.dp).size(48.dp).clip(CircleShape).background(c.bg).border(1.dp, c.line, CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = backLabel }, contentAlignment = Alignment.Center) { RideIcon(RideIcons.Back, c.fg, size = 22.dp) }

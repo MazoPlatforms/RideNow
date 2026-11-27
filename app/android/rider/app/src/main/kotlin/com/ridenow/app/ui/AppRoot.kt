@@ -772,11 +772,11 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                         add(label to item.address)
                     }
                 }
-                ChangePickupScreen(pickup, places, onBack = { back() }, onConfirm = { address ->
+                ChangePickupScreen(pickup, places, onBack = { back() }, near = me.position.takeIf { me.real }, onConfirm = { address, selectedPoint ->
                     pickup = address
                     val saved = savedAddresses.firstOrNull { it.address == address }
-                    pickupPoint = saved?.point ?: me.position.takeIf { me.real && address == places.firstOrNull { it.first == "Current location" }?.second }
-                    if (pickupPoint == null && saved != null) scope.launch {
+                    pickupPoint = selectedPoint ?: saved?.point ?: me.position.takeIf { me.real && address == places.firstOrNull { it.first == "Current location" }?.second }
+                    if (pickupPoint == null) scope.launch {
                         val found = SifricApi.geocode(context, address)
                         if (pickup == address) pickupPoint = found
                     }
