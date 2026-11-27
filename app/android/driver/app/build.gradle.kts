@@ -55,6 +55,7 @@ android {
 
 dependencies {
     implementation("com.google.android.gms:play-services-oss-licenses:17.3.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
     implementation(files("libs/sifric-maps.aar"))
     implementation("org.maplibre.gl:android-sdk:13.6.1")
     implementation("com.google.android.gms:play-services-location:21.3.0")
