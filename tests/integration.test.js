@@ -423,14 +423,152 @@ test('instant ride completes, cash is idempotent and driver owes commission', as
     key,
   ).expect(200);
   assert.deepEqual(repeated.body, finished.body);
+  const receiptPath = `/v1/rides/${r.rideId}/receipt`;
+  await request('get', receiptPath, s).expect(409);
+  await request('get', receiptPath, d).expect(404);
   await request('post', `/v1/rides/${r.rideId}/cash`, d).expect(200);
   await request('post', `/v1/rides/${r.rideId}/cash`, d).expect(200);
+  const receipt = await request('get', receiptPath, s).expect(200).expect('Cache-Control', 'no-store');
+  assert.equal(receipt.body.rideId, r.rideId);
+  assert.equal(receipt.body.amountMinor, finished.body.finalMinor);
+  assert.equal(receipt.body.currency, 'LKR');
+  assert.equal(receipt.body.paymentMethod, 'CASH');
+  assert.ok(Number.isFinite(Date.parse(receipt.body.paidAt)));
+  await request('get', receiptPath, d).expect(404);
+  const summaryPath = '/v1/earnings/summary';
+  await request('get', summaryPath, s).expect(403);
+  const summary = (await request('get', summaryPath, d).expect(200)).body;
+  assert.equal(summary.currency, 'LKR');
+  assert.equal(summary.timezone, 'Asia/Colombo');
+  const earned = finished.body.finalMinor - Math.round(finished.body.finalMinor * 0.2);
+  for (const [name, length] of Object.entries({ today: 24, week: 7, month: 30, all: 6 })) {
+    const period = summary.periods[name];
+    assert.equal(period.rides, 1);
+    assert.equal(Number(period.totalMinor), earned);
+    assert.equal(Number(period.previousMinor), 0);
+    assert.equal(period.series.length, length);
+    assert.equal(period.series.reduce((total, item) => total + Number(item.minor), 0), earned);
+  }
   const b = (await request('get', '/v1/earnings/balance', d).expect(200)).body;
   assert(Number(b.net_minor) < 0);
   assert.equal(-Number(b.net_minor), Math.round(finished.body.finalMinor * 0.2));
   assert.equal((await one(pool, 'SELECT count(*)::int AS n FROM ledger_transactions')).n, 2);
   assert.equal(Number((await one(pool, 'SELECT sum(debit-credit) AS n FROM ledger_entries')).n), 0);
+  const other = await driver();
+  const empty = (await request('get', summaryPath, other).expect(200)).body.periods;
+  assert.equal(empty.all.totalMinor, '0');
+  assert.equal(empty.all.rides, 0);
 });
+test('mobile ride flow exposes a scoped offer, live GPS and rider PIN, then recovers unsettled cash', async () => {
+  const rider = await login();
+  const outsider = await login();
+  const operator = await driver();
+  const waypointLabels = ['Library entrance', 'Town bus station'];
+  const booked = await booking(rider, { waypointLabels });
+  const riderPath = '/v1/mobile/ride?app=RIDER';
+  const driverPath = '/v1/mobile/ride?app=DRIVER';
+  await request('get', driverPath, rider).expect(403);
+  await request('get', riderPath + '&id=' + booked.rideId, outsider).expect(404);
+  let state = (await request('get', riderPath, rider).expect(200)).body.ride;
+  assert.equal(state.state, 'SEARCHING');
+  assert.deepEqual(state.waypoint_labels, waypointLabels);
+  assert.equal(Object.hasOwn(state, 'ridePin'), false);
+  assert.equal(Object.hasOwn(state, 'pin_encrypted'), false);
+
+  await dispatchTick(pool, maps);
+  const offerPath = '/v1/mobile/ride-offers';
+  const offer = (await request('get', offerPath, operator).expect(200)).body.items[0];
+  assert.ok(offer && Date.parse(offer.expires_at) > Date.now());
+  assert.deepEqual(offer.waypoint_labels, waypointLabels);
+  assert.equal(Object.hasOwn(offer, 'driver_id'), false);
+  await request('get', offerPath, outsider).expect(403);
+  await request('post', `/v1/driver-offers/${offer.id}/respond`, operator, { accept: true }).expect(200);
+  assert.deepEqual((await request('get', offerPath, operator).expect(200)).body.items, []);
+  assert.equal((await request('get', driverPath, operator).expect(200)).body.availability, 'RESERVED');
+
+  state = (await request('get', riderPath, rider).expect(200)).body.ride;
+  assert.equal(state.state, 'DRIVER_ASSIGNED');
+  assert.equal(state.ridePin, booked.ridePin);
+  assert.deepEqual(state.driverLocation, pickup);
+  const driverState = (await request('get', driverPath, operator).expect(200)).body.ride;
+  assert.equal(driverState.id, booked.rideId);
+  assert.equal(Object.hasOwn(driverState, 'ridePin'), false);
+  assert.equal(Object.hasOwn(driverState, 'pin_encrypted'), false);
+  await request('get', driverPath + '&id=' + booked.rideId, await driver()).expect(404);
+
+  await act(operator, booked, 'EN_ROUTE').then(response => assert.equal(response.status, 200));
+  await act(operator, booked, 'ARRIVE').then(response => assert.equal(response.status, 200));
+  await act(operator, booked, 'START', { pin: booked.ridePin }).then(response => assert.equal(response.status, 200));
+  state = (await request('get', riderPath, rider).expect(200)).body.ride;
+  assert.equal(state.state, 'IN_PROGRESS');
+  assert.equal(Object.hasOwn(state, 'ridePin'), false);
+  await teleport(operator, dropoff, 2);
+  await act(operator, booked, 'COMPLETE').then(response => assert.equal(response.status, 200));
+  state = (await request('get', driverPath, operator).expect(200)).body.ride;
+  assert.equal(state.state, 'COMPLETED');
+  assert.equal(state.payment_status, 'DUE');
+  await request('put', '/v1/drivers/availability', operator, { availability: 'AVAILABLE' }).expect(409);
+  await request('post', `/v1/rides/${booked.rideId}/cash`, operator).expect(200);
+  assert.equal((await request('get', driverPath, operator).expect(200)).body.ride, null);
+  state = (await request('get', riderPath + '&id=' + booked.rideId, rider).expect(200)).body.ride;
+  assert.equal(state.payment_status, 'COLLECTED');
+  assert.equal(Object.hasOwn(state, 'driverLocation'), false);
+});
+
+test('ride share links are opaque, scoped to participants, revocable and removed at ride end', async () => {
+  const rider = await login();
+  const outsider = await login();
+  const operator = await driver();
+  const ride = await assigned(rider, operator, { waypointLabels: ['Pickup gate', 'Market entrance'] });
+  const sharePath = `/v1/rides/${ride.rideId}/share-link`;
+  const first = (await request('post', sharePath, rider).expect(200).expect('Cache-Control', 'no-store')).body;
+  assert.match(first.url, /^https:\/\/mzn-api\.onrender\.com\/trip\/#[-A-Za-z0-9_]{43}$/);
+  assert(Date.parse(first.expiresAt) > Date.now());
+  const firstToken = first.url.split('#')[1];
+  const row = await one(pool, 'SELECT token_hash FROM ride_share_links WHERE ride_id=$1', [ride.rideId]);
+  assert.notEqual(row.token_hash, firstToken);
+  assert.equal(JSON.stringify(row).includes(firstToken), false);
+
+  await request('post', sharePath, outsider).expect(403);
+  await api.post('/v1/public/trips').send({ token: 'short' }).expect(400).expect('Cache-Control', 'no-store');
+  const second = (await request('post', sharePath, operator).expect(200)).body;
+  const secondToken = second.url.split('#')[1];
+  assert.equal((await api.post('/v1/public/trips').send({ token: firstToken }).expect(404)).body.error.code, 'SHARED_TRIP_NOT_FOUND');
+  const publicRide = (await api.post('/v1/public/trips').send({ token: secondToken }).expect(200).expect('Cache-Control', 'no-store')).body;
+  assert.equal(publicRide.state, 'DRIVER_ASSIGNED');
+  assert.equal(publicRide.pickup, 'Pickup gate');
+  assert.equal(publicRide.destination, 'Market entrance');
+  assert.equal(Object.hasOwn(publicRide, 'id'), false);
+  assert.equal(Object.hasOwn(publicRide, 'phone'), false);
+  assert.equal(Object.hasOwn(publicRide, 'ridePin'), false);
+  assert.equal(Object.hasOwn(publicRide, 'passengerPhone'), false);
+
+  await request('delete', sharePath, outsider).expect(403);
+  await request('delete', sharePath, rider).expect(200);
+  await api.post('/v1/public/trips').send({ token: secondToken }).expect(404);
+
+  const terminalLink = (await request('post', sharePath, rider).expect(200)).body;
+  await act(operator, ride, 'ARRIVE').expect(200);
+  await act(operator, ride, 'START', { pin: ride.ridePin }).expect(200);
+  await teleport(operator, dropoff, 2);
+  await act(operator, ride, 'COMPLETE').expect(200);
+  await api.post('/v1/public/trips').send({ token: terminalLink.url.split('#')[1] }).expect(404);
+});
+
+test('mobile history can open a scheduled booking and reload its updated pickup time', async () => {
+  const rider = await login();
+  const firstTime = new Date(Date.now() + 3600000).toISOString();
+  const secondTime = new Date(Date.now() + 7200000).toISOString();
+  const ride = await booking(rider, { scheduledAt: firstTime });
+  const path = '/v1/mobile/ride?app=RIDER';
+  assert.equal((await request('get', path, rider).expect(200)).body.ride, null);
+  const idPath = path + '&id=' + ride.rideId;
+  assert.equal((await request('get', idPath, rider).expect(200)).body.ride.scheduled_at, firstTime);
+  const next = await makeQuote(rider, { scheduledAt: secondTime });
+  await request('post', `/v1/rides/${ride.rideId}/reschedule`, rider, { quoteId: next.id }).expect(200);
+  assert.equal((await request('get', idPath, rider).expect(200)).body.ride.scheduled_at, secondTime);
+});
+
 test('return trip bills both legs, excludes stop waiting from driving, and returns to pickup', async () => {
   const s = await login(),
     d = await driver(),
@@ -471,6 +609,57 @@ test('two dispatch workers issue one offer and only one acceptance wins', async 
   );
   assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
 });
+test('mobile ride history separates rider and driver records and paginates by recency', async () => {
+  const dualRole = await driver();
+  const rider = await login();
+  const outsider = await login();
+  const driven = await assigned(rider, dualRole);
+  const scheduledAt = new Date(Date.now() + 3600000).toISOString();
+  const first = await booking(dualRole, { scheduledAt });
+  const second = await booking(dualRole, { scheduledAt: new Date(Date.now() + 3 * 3600000).toISOString() });
+  await pool.query("UPDATE rides SET created_at=now()-interval '2 minutes' WHERE id=$1", [first.rideId]);
+
+  const riderPath = '/v1/rides?app=RIDER&limit=1';
+  const recent = (await request('get', riderPath, dualRole).expect(200)).body;
+  assert.deepEqual(recent.items.map((item) => item.id), [second.rideId]);
+  assert.equal(recent.items[0].state, 'SCHEDULED');
+  assert.deepEqual(recent.items[0].waypoints, [pickup, dropoff]);
+  assert.equal(recent.items[0].category, 'TUK');
+  assert.ok(recent.items[0].estimated_minor > 0);
+  for (const key of ['pin_hash', 'pin_encrypted', 'ridePin', 'rider_id', 'driver_id'])
+    assert.equal(Object.hasOwn(recent.items[0], key), false);
+  assert.equal(recent.nextCursor, second.rideId);
+
+  const older = (await request('get', `${riderPath}&cursor=${recent.nextCursor}`, dualRole).expect(200)).body;
+  assert.deepEqual(older.items.map((item) => item.id), [first.rideId]);
+  assert.equal(older.nextCursor, null);
+  const driverList = (await request('get', '/v1/rides?app=DRIVER', dualRole).expect(200)).body;
+  assert.deepEqual(driverList.items.map((item) => item.id), [driven.rideId]);
+  const combined = (await request('get', '/v1/rides', dualRole).expect(200)).body;
+  assert.equal(combined.items.length, 3);
+  const wrongRoleCursor = (await request('get', `${riderPath}&cursor=${driven.rideId}`, dualRole).expect(200)).body;
+  assert.deepEqual(wrongRoleCursor.items, []);
+  assert.deepEqual((await request('get', riderPath, outsider).expect(200)).body.items, []);
+  await request('get', '/v1/rides?app=ADMIN', dualRole).expect(400);
+});
+
+test('scheduled cancellation rejects stale state and protects ownership', async () => {
+  const rider = await login();
+  const other = await login();
+  const scheduledAt = new Date(Date.now() + 3600000).toISOString();
+  const scheduled = await booking(rider, { scheduledAt });
+  const active = await booking(rider);
+  const payload = { reason: 'Changed plans', expectedState: 'SCHEDULED' };
+  await request('post', `/v1/rides/${scheduled.rideId}/cancel`, other, payload).expect(403);
+  await request('post', `/v1/rides/${active.rideId}/cancel`, rider, payload).expect(409);
+  const key = randomUUID();
+  for (let i = 0; i < 2; i++) {
+    const cancelled = (await request('post', `/v1/rides/${scheduled.rideId}/cancel`, rider, payload, key).expect(200)).body;
+    assert.equal(cancelled.state, 'CANCELLED');
+  }
+  assert.equal((await one(pool, 'SELECT state FROM rides WHERE id=$1', [active.rideId])).state, 'SEARCHING');
+});
+
 test('scheduled rides wait for dispatch window; busy rider cancels after grace period', async () => {
   const s = await login(),
     future = new Date(Date.now() + 3600000).toISOString(),
@@ -1870,6 +2059,8 @@ test('account deletion OTP is scoped to its owner and session family, then erase
   const ticket = (await request('post', support + '/tickets', owner, {
     app: 'RIDER', kind: 'TICKET', subject: 'Private support ticket', body: 'Goodbye', attachments: [file.id],
   }).expect(201)).body;
+  const tripWithAddress = await booking(owner, { waypointLabels: ['Private pickup label', 'Private drop-off label'] });
+  await request('post', `/v1/rides/${tripWithAddress.rideId}/cancel`, owner, { reason: 'Changed plans' }).expect(200);
   const { challenge, code } = await startAccountDeletion(owner);
   const payload = { challengeId: challenge.challengeId, code };
   assert.equal(challenge.twoStepRequired, false);
@@ -1895,6 +2086,8 @@ test('account deletion OTP is scoped to its owner and session family, then erase
   assert.equal(erased.name, '');
   assert.equal(erased.email, '');
   assert.equal(erased.rider_city, null);
+  const formerQuote = await one(pool, 'SELECT q.waypoint_labels FROM fare_quotes q JOIN rides r ON r.quote_id=q.id WHERE r.id=$1', [tripWithAddress.rideId]);
+  assert.equal(formerQuote.waypoint_labels, null);
   assert.equal(await one(pool, 'SELECT id FROM profile_photo_uploads WHERE user_id=$1', [id]), undefined);
   assert.equal(await one(pool, 'SELECT id FROM support_attachments WHERE id=$1', [file.id]), undefined);
   assert.equal(await one(pool, 'SELECT id FROM support_messages WHERE ticket_id=$1', [ticket.id]), undefined);
@@ -2173,7 +2366,7 @@ test('account data export honors app and section scope and excludes private cred
     kind: 'HOME', label: 'Home', address: 'Export owner address', coordinates: [81.7, 7.7],
   }).expect(200);
   await request('post', '/v1/me/saved-addresses', other, { kind: 'HOME', address: 'Someone else address' }).expect(200);
-  const mine = await booking(rider);
+  const mine = await booking(rider, { waypointLabels: ['Exported pickup', 'Exported destination'] });
   const others = await booking(other);
 
   const support = '/v1/me/support';
@@ -2193,6 +2386,7 @@ test('account data export honors app and section scope and excludes private cred
   assert.deepEqual(result.data.profile.devices.map(device => device.name), ['Rider phone']);
   assert.deepEqual(result.data.savedPlaces.addresses.map(address => address.address), ['Export owner address']);
   assert.deepEqual(result.data.rides.map(ride => ride.id), [mine.rideId]);
+  assert.deepEqual(result.data.rides[0].waypoint_labels, ['Exported pickup', 'Exported destination']);
   assert.equal(result.data.support[0].messages[0].body, 'Exported message');
   assert.deepEqual(result.files.map(file => file.type), ['avatar','support']);
   const serialized = JSON.stringify(result);

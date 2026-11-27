@@ -940,7 +940,7 @@
     <string name="text_add_new_address">"නව ලිපිනය එක් කරන්න"</string>
     <string name="text_trusted_contacts_can_follow_your_route_in_real_time">"විශ්වාසදායී සම්බන්ධතාවලට ඔබගේ මාර්ගය තථ්‍ය කාලීනව අනුගමනය කළ හැක."</string>
     <string name="text_add">"එකතු කරන්න"</string>
-    <string name="text_share_automatically_on_every_ride">"සෑම ගමනකදීම ස්වයංක්‍රීයව බෙදා ගන්න"</string>
+    <string name="text_share_automatically_on_every_ride">"ක්ෂණික ගමනකට බෙදාගැනීමේ පණිවිඩයක් සූදානම් කරන්න"</string>
     <string name="text_share_link">"බෙදාගැනීමේ සබැඳිය"</string>
     <string name="text_follow_my_ridenow_trip_value">"මගේ RideNow සංචාරය අනුගමනය කරන්න: %1$s"</string>
     <string name="text_choose_how_you_would_like_to_reach_us">"ඔබ අප වෙත ළඟා වීමට කැමති ආකාරය තෝරන්න."</string>

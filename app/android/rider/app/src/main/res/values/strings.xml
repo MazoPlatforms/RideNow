@@ -1,4 +1,8 @@
 <resources>
+    <string name="schedule_repeat_summary">%1$d scheduled rides, repeating for up to one month</string>
+    <string name="schedule_reminder_summary">A reminder will arrive %1$d minutes before each ride</string>
+    <string name="friend_ride_sms_body">RideNow ride booked for %1$s. Pickup: %2$s. Destination: %3$s. Pickup time: %4$s. Reference: %5$s. Your assigned driver will contact you.</string>
+    <string name="friend_ride_asap">as soon as possible</string>
     <string name="app_name">RideNow</string>
     <string name="splash_description">RideNow. Your ride, before you ask.</string>
     <string name="splash_tagline">Your ride, before you ask.</string>
@@ -1000,7 +1004,13 @@
     <string name="text_add_new_address">"Add new address"</string>
     <string name="text_trusted_contacts_can_follow_your_route_in_real_time">"Trusted contacts can follow your route in real time."</string>
     <string name="text_add">"Add"</string>
-    <string name="text_share_automatically_on_every_ride">"Share automatically on every ride"</string>
+    <string name="text_share_automatically_on_every_ride">"Prepare a share message for each instant ride"</string>
+    <string name="trip_share_create_prompt">Create a private link for an active ride</string>
+    <string name="trip_share_expires">Link expires %1$s</string>
+    <string name="trip_share_create_link">Create private link</string>
+    <string name="trip_share_create_failed">Could not create a trip link. Try again.</string>
+    <string name="trip_share_no_active_ride">Open this from an active ride to share it.</string>
+    <string name="trip_share_send_failed">No sharing app is available on this device.</string>
     <string name="text_share_link">"Share link"</string>
     <string name="text_follow_my_ridenow_trip_value">"Follow my RideNow trip: %1$s"</string>
     <string name="text_from_sifric" translatable="false">"from Sifric"</string>

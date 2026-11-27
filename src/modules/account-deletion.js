@@ -66,6 +66,8 @@ export function createAccountDeletion(pool, config, { lockPhones, queueOtp, twoS
     await db.query('DELETE FROM notification_preferences WHERE user_id=$1', [id]);
     await db.query('DELETE FROM notifications WHERE user_id=$1', [id]);
     await db.query('DELETE FROM idempotency_records WHERE actor_id=$1', [id]);
+    await db.query('UPDATE fare_quotes SET waypoint_labels=NULL WHERE rider_id=$1 AND waypoint_labels IS NOT NULL', [id]);
+    await db.query('UPDATE rides SET passenger_name=NULL,passenger_phone_encrypted=NULL WHERE rider_id=$1 AND passenger_phone_encrypted IS NOT NULL', [id]);
     await db.query('DELETE FROM fare_quotes q WHERE q.rider_id=$1 AND NOT EXISTS(SELECT 1 FROM rides r WHERE r.quote_id=q.id)', [id]);
     await db.query(`UPDATE jobs SET payload='{}',done_at=now(),lease_until=NULL,lease_token=NULL
       WHERE kind='otp' AND (payload->>'phone'=$1 OR payload->>'challengeId' IN (

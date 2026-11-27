@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <meta name="referrer" content="no-referrer">
+    <meta name="color-scheme" content="light dark">
+    <title>Shared Ride · RideNow</title>
+    <link rel="stylesheet" href="/styles/trip-share.css">
+    <script type="module" src="/src/trip-share.mjs"></script>
+  </head>
+  <body>
+    <main class="share-card" aria-labelledby="title">
+      <a class="brand" href="/" aria-label="RideNow home">Ride<span>Now</span></a>
+      <p class="eyebrow">LIVE RIDE</p>
+      <h1 id="title">Shared trip status</h1>
+      <p id="message" class="message" role="status" aria-live="polite">Loading secure trip details…</p>
+      <section id="details" class="details" hidden>
+        <p id="state" class="state"></p>
+        <dl>
+          <div><dt>Pickup</dt><dd id="pickup">—</dd></div>
+          <div><dt>Destination</dt><dd id="destination">—</dd></div>
+          <div id="driver-row" hidden><dt>Driver</dt><dd id="driver">—</dd></div>
+          <div id="vehicle-row" hidden><dt>Vehicle</dt><dd id="vehicle">—</dd></div>
+          <div id="location-row" hidden><dt>Last location · longitude, latitude</dt><dd id="location">—</dd></div>
+        </dl>
+        <p id="updated" class="updated"></p>
+      </section>
+      <p class="privacy">This private link shows limited trip details while the ride is active. The link expires automatically.</p>
+    </main>
+  </body>
+</html>

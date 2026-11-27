@@ -86,9 +86,9 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.abs
 
-/** Pick a pickup date and time. [onContinue] receives a label such as "Wed, 4 Nov, 8:30 AM". */
+/** Pick a pickup date and time. [onContinue] receives the display label and the selected instant. */
 @Composable
-fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: Modifier = Modifier) {
+fun ScheduleScreen(onBack: () -> Unit, onContinue: (String, String, List<String>, String, Int) -> Unit, onPassenger: (Boolean) -> Unit = {}, initialPassenger: Int = 0, allowRepeat: Boolean = true, modifier: Modifier = Modifier) {
     val textAm = stringResource(R.string.text_am)
     val textPm = stringResource(R.string.text_pm)
 
@@ -96,21 +96,42 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
     val backLabel = stringResource(R.string.search_back)
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
-    val startTime = remember { LocalDateTime.now().plusMinutes(30).let { it.plusMinutes(((15 - it.minute % 15) % 15).toLong()) } }
+    val startTime = remember { LocalDateTime.now().plusMinutes(31).let { it.plusMinutes(((15 - it.minute % 15) % 15).toLong()) } }
     var dateDay by rememberSaveable { mutableLongStateOf(startTime.toLocalDate().toEpochDay()) }
     var hour by rememberSaveable { mutableIntStateOf((startTime.hour + 11) % 12) }   // 0..11 = 1..12
     var minute by rememberSaveable { mutableIntStateOf(startTime.minute / 15) }       // 0..3
     var pm by rememberSaveable { mutableIntStateOf(if (startTime.hour >= 12) 1 else 0) }
-    var repeat by rememberSaveable { mutableIntStateOf(0) }
-    var reminder by rememberSaveable { mutableIntStateOf(2) }
-    var passenger by rememberSaveable { mutableIntStateOf(0) }
+    var repeat by rememberSaveable(allowRepeat) { mutableIntStateOf(0) }
+    var reminder by rememberSaveable { mutableIntStateOf(0) }
+    var passenger by rememberSaveable(initialPassenger) { mutableIntStateOf(initialPassenger) }
     var sheet by remember { mutableStateOf("") }
 
     val date = LocalDate.ofEpochDay(dateDay)
     val base = (0..4).map { today.plusDays(it.toLong()) }
     val chips = if (date in base) base else base.take(4) + date
     val picked = date.atTime((hour + 1) % 12 + if (pm == 1) 12 else 0, minute * 15)
-    val valid = picked.isAfter(LocalDateTime.now().plusMinutes(14))
+    val valid = picked.isAfter(LocalDateTime.now().plusMinutes(30)) && picked.isBefore(LocalDateTime.now().plusDays(30))
+    val repeatAt = remember(picked, repeat) {
+        val zone = java.time.ZoneId.systemDefault()
+        val first = picked.atZone(zone)
+        val values = mutableListOf(first.toInstant().toString())
+        if (repeat != 0) {
+            var dateCursor = first.toLocalDate().plusDays(1)
+            val end = first.toLocalDate().plusDays(32)
+            while (!dateCursor.isAfter(end) && values.size < 31) {
+                val include = when (repeat) {
+                    1 -> true // daily
+                    2 -> dateCursor.dayOfWeek.value <= 5 // weekdays
+                    3 -> dateCursor.dayOfWeek == first.dayOfWeek // weekly
+                    4 -> dateCursor.dayOfMonth == minOf(first.dayOfMonth, dateCursor.lengthOfMonth()) // monthly
+                    else -> false
+                }
+                if (include) values += dateCursor.atTime(first.toLocalTime()).atZone(zone).toInstant().toString()
+                dateCursor = dateCursor.plusDays(1)
+            }
+        }
+        values
+    }
     val label = picked.format(DateTimeFormatter.ofPattern("EEE, d MMM, h:mm a", Locale.getDefault()))
 
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
@@ -165,15 +186,15 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
             Column(Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.field).border(1.dp, c.border, RoundedCornerShape(20.dp))) {
                 OptionRow(RideIcons.Person, stringResource(R.string.passenger_title), passengerOptions()[passenger]) { sheet = "Passenger" }
                 HorizontalDivider(color = c.line)
-                OptionRow(listOf("M4 9V8a3 3 0 0 1 3-3h8l-2-2M16 11v1a3 3 0 0 1-3 3H5l2 2"), stringResource(R.string.repeat_title), repeatOptions()[repeat]) { sheet = "Repeat" }
+                OptionRow(listOf("M4 9V8a3 3 0 0 1 3-3h8l-2-2M16 11v1a3 3 0 0 1-3 3H5l2 2"), stringResource(R.string.repeat_title), repeatOptions()[repeat]) { if (allowRepeat) sheet = "Repeat" }
                 HorizontalDivider(color = c.line)
                 OptionRow(RideIcons.Bell, stringResource(R.string.reminder_title), reminderOptions()[reminder]) { sheet = "Reminder" }
             }
             if (sheet.isNotEmpty()) androidx.compose.ui.window.Dialog({ }, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false)) {
                 when (sheet) {
                     "date" -> com.ridenow.app.ui.more.CalendarSheet(date, { dateDay = it.toEpochDay(); sheet = "" }, { sheet = "" })
-                    "Passenger" -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.passenger_title), passengerOptions(), passenger, { passenger = it; sheet = "" }, { sheet = "" }, icons = listOf(RideIcons.Person, RideIcons.Group))
-                    "Repeat" -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.repeat_title), repeatOptions(), repeat, { repeat = it; sheet = "" }, { sheet = "" }, icons = List(5) { RideIcons.Calendar })
+                "Passenger" -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.passenger_title), passengerOptions(), passenger, { passenger = it; sheet = ""; onPassenger(it == 1) }, { sheet = "" }, icons = listOf(RideIcons.Person, RideIcons.Group))
+                "Repeat" -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.repeat_title), repeatOptions(), repeat, { if (allowRepeat) repeat = it; sheet = "" }, { sheet = "" }, icons = List(5) { RideIcons.Calendar })
                     else -> com.ridenow.app.ui.more.ChoiceSheet(stringResource(R.string.reminder_title), reminderOptions(), reminder, { reminder = it; sheet = "" }, { sheet = "" }, icons = List(5) { RideIcons.Clock })
                 }
             }
@@ -182,7 +203,7 @@ fun ScheduleScreen(onBack: () -> Unit, onContinue: (String) -> Unit, modifier: M
         AnimatedContent(targetState = label, transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) }, label = "pickupLabel", modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)) { l ->
             Text(stringResource(R.string.home_pickup, l), color = c.muted, fontSize = 13.sp)
         }
-        RideButton(stringResource(R.string.ride_continue), { onContinue(label) }, enabled = valid, modifier = Modifier.padding(top = 10.dp, bottom = 12.dp))
+        RideButton(stringResource(R.string.ride_continue), { onContinue(label, picked.atZone(java.time.ZoneId.systemDefault()).toInstant().toString(), repeatAt, listOf("NONE", "DAILY", "WEEKDAYS", "WEEKLY", "MONTHLY").getOrElse(repeat) { "NONE" }, listOf(0, 5, 15, 30, 60).getOrElse(reminder) { 0 }) }, enabled = valid, modifier = Modifier.padding(top = 10.dp, bottom = 12.dp))
     }
 }
 
@@ -253,4 +274,4 @@ private fun Wheel(items: List<String>, initial: Int, modifier: Modifier, onSelec
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun SchedulePreview() = RideNowTheme(darkTheme = true) { ScheduleScreen({}, {}) }
+private fun SchedulePreview() = RideNowTheme(darkTheme = true) { ScheduleScreen({}, { _, _, _, _, _ -> }) }

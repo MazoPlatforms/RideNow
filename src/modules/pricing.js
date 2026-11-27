@@ -12,6 +12,30 @@ export function calculateFare(plan, distanceMeters, drivingSeconds, waitingSecon
     .toNumber();
 }
 export async function quote(db, maps, user, body) {
+  const repeatAt = body.repeatAt?.length ? body.repeatAt : (body.scheduledAt ? [body.scheduledAt] : []);
+  const reminderMinutes = body.reminderMinutes ?? 0;
+  if (!body.scheduledAt) {
+    ensure(body.repeatRule === 'NONE' && repeatAt.length === 0 && reminderMinutes === 0, 400, 'SCHEDULE_OPTIONS_REQUIRE_TIME');
+  } else {
+    ensure(repeatAt.length > 0 && repeatAt[0] === body.scheduledAt, 400, 'INVALID_REPEAT_SCHEDULE');
+    ensure((body.repeatRule === 'NONE') === (repeatAt.length === 1), 400, 'INVALID_REPEAT_SCHEDULE');
+    const start = Date.parse(body.scheduledAt), previous = { value: start };
+    ensure(Number.isFinite(start), 400, 'INVALID_REPEAT_SCHEDULE');
+    for (const value of repeatAt) {
+      const at = Date.parse(value);
+      ensure(Number.isFinite(at) && at - Date.now() >= 30 * 60000 && at <= start + 32 * 86400000,
+        400, 'INVALID_REPEAT_SCHEDULE');
+      if (at !== start) {
+        const gap = at - previous.value;
+        const valid = body.repeatRule === 'DAILY' ? gap >= 22 * 3600000 && gap <= 26 * 3600000
+          : body.repeatRule === 'WEEKDAYS' ? gap >= 22 * 3600000 && gap <= 96 * 3600000
+            : body.repeatRule === 'WEEKLY' ? gap >= 6 * 86400000 && gap <= 8 * 86400000
+              : body.repeatRule === 'MONTHLY' ? gap >= 27 * 86400000 && gap <= 32 * 86400000 : false;
+        ensure(valid, 400, 'INVALID_REPEAT_SCHEDULE');
+      }
+      previous.value = at;
+    }
+  }
   const points =
     body.tripType === 'RETURN' ? [...body.waypoints, body.waypoints[0]] : body.waypoints;
   const area = await one(
@@ -41,8 +65,8 @@ export async function quote(db, maps, user, body) {
   const amount = calculateFare(snapshot, route.distanceMeters, route.durationSeconds);
   return ensure(await one(
     db,
-    `INSERT INTO fare_quotes(rider_id,area_id,category,trip_type,waypoints,route,fare_snapshot,estimated_minor,scheduled_at,expires_at)
-    SELECT id,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '2 minutes' FROM users
+    `INSERT INTO fare_quotes(rider_id,area_id,category,trip_type,waypoints,route,fare_snapshot,estimated_minor,scheduled_at,expires_at,waypoint_labels,repeat_rule,repeat_at,reminder_minutes)
+    SELECT id,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '2 minutes',$10,$11,$12,$13 FROM users
     WHERE id=$1 AND deleted_at IS NULL AND NOT suspended FOR KEY SHARE RETURNING *`,
     [
       user.id,
@@ -54,6 +78,10 @@ export async function quote(db, maps, user, body) {
       snapshot,
       amount,
       body.scheduledAt ?? null,
+      body.waypointLabels ? JSON.stringify(body.waypointLabels) : null,
+      body.repeatRule ?? 'NONE',
+      JSON.stringify(repeatAt),
+      reminderMinutes,
     ],
   ), 401, 'SESSION_REVOKED');
 }

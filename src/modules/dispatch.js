@@ -109,6 +109,8 @@ export async function dispatchTick(pool, maps) {
       AND l.received_at>now()-interval '30 seconds' AND ST_Covers(a.polygon,l.point::geometry)
       AND ST_DWithin(l.point,ST_SetSRID(ST_MakePoint($1,$2),4326)::geography,$4)
       AND NOT EXISTS(SELECT 1 FROM dispatch_offers WHERE driver_id=d.user_id AND (ride_id=$6 OR status='PENDING'))
+      AND NOT EXISTS(SELECT 1 FROM rides outstanding JOIN payments p ON p.ride_id=outstanding.id
+        WHERE outstanding.driver_id=d.user_id AND p.status='DUE')
       ORDER BY l.point <-> ST_SetSRID(ST_MakePoint($1,$2),4326)::geography LIMIT 10`,
           [...q.waypoints[0], q.category, radius, q.area_id, id, ride.rider_id],
         )

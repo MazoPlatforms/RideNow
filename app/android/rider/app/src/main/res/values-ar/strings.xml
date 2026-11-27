@@ -940,7 +940,7 @@
     <string name="text_add_new_address">"أضف عنوانًا جديدًا"</string>
     <string name="text_trusted_contacts_can_follow_your_route_in_real_time">"يمكن لجهات الاتصال الموثوقة متابعة مسارك في الوقت الفعلي."</string>
     <string name="text_add">"يضيف"</string>
-    <string name="text_share_automatically_on_every_ride">"شارك تلقائيًا في كل رحلة"</string>
+    <string name="text_share_automatically_on_every_ride">"جهّز رسالة مشاركة لكل رحلة فورية"</string>
     <string name="text_share_link">"رابط المشاركة"</string>
     <string name="text_follow_my_ridenow_trip_value">"تابع رحلتي إلى RideNow: %1$s"</string>
     <string name="text_choose_how_you_would_like_to_reach_us">"اختر الطريقة التي تريد بها التواصل معنا."</string>

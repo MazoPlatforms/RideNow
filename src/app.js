@@ -1,3 +1,4 @@
+import { mobileRide, mobileOffers } from './modules/mobile-rides.js';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -13,7 +14,8 @@ import { rateLimiter } from './shared/rate-limit.js';
 import { createRecaptchaVerifier } from './shared/recaptcha.js';
 import { mountSupport } from './modules/support.js';
 import { mountDataExport } from './modules/data-export.js';
-import { createAuth, permission } from './modules/auth.js';
+import * as sharing from './modules/ride-sharing.js';
+import { createAuth, permission, normalizePhone } from './modules/auth.js';
 import { createMobilePreferences, cityInput, savedAddressInput, trustedContactInput, notificationApp, notificationChange } from './modules/mobile-preferences.js';
 import { quote } from './modules/pricing.js';
 import * as rides from './modules/rides.js';
@@ -46,6 +48,7 @@ const phone = z.string().min(9).max(30),
     limit: z.coerce.number().int().min(1).max(100).default(30),
   });
 const otpCode = z.string().regex(/^\d{6}$/);
+const publicShareToken = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 const mobileDevice = z.strictObject({
   installationId: z.uuidv4(),
   name: z.string().trim().min(1).max(80).regex(/^[^\p{C}]+$/u),
@@ -67,6 +70,10 @@ const quoteSchema = z
     category,
     tripType: z.enum(['ONE_WAY', 'RETURN']).default('ONE_WAY'),
     scheduledAt: z.iso.datetime().optional(),
+    waypointLabels: z.tuple([z.string().trim().min(1).max(150), z.string().trim().min(1).max(150)]).optional(),
+    repeatRule: z.enum(['NONE','DAILY','WEEKDAYS','WEEKLY','MONTHLY']).default('NONE'),
+    repeatAt: z.array(z.iso.datetime()).max(31).default([]),
+    reminderMinutes: z.union([z.literal(0),z.literal(5),z.literal(15),z.literal(30),z.literal(60)]).default(0),
   })
   .strict();
 export function createApp({ pool, redis, config, maps, storage, logger, captchaVerifier = createRecaptchaVerifier(config) }) {
@@ -136,10 +143,12 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
   app.use('/v1/auth', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   mountAdminWeb(app, { pool, redis, config, auth, captchaVerifier });
   const sensitive = rateLimiter(redis, config, { limit: 10, seconds: 60, prefix: 'auth' });
+  const shareCreateLimit = rateLimiter(redis, config, { limit: 20, seconds: 60, prefix: 'share-create' });
+  const shareReadLimit = rateLimiter(redis, config, { limit: 120, seconds: 60, prefix: 'share-read' });
   function route(
     method,
     path,
-    { body, query, authorize, middleware = [], noStore = false, access = 'user', idem = false, permission: perm, status = 200 } = {},
+    { body, query, params, authorize, middleware = [], noStore = false, access = 'user', idem = false, permission: perm, status = 200 } = {},
     fn,
   ) {
     const apiPath = path.replace(/:([A-Za-z]+)/g, '{$1}');
@@ -163,7 +172,9 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
           name: m[1],
           in: 'path',
           required: true,
-          schema: { type: 'string', format: 'uuid' },
+          schema: params?.shape?.[m[1]]
+            ? z.toJSONSchema(params.shape[m[1]], { unrepresentable: 'any' })
+            : { type: 'string', format: 'uuid' },
         })),
         ...Object.entries(querySchema?.properties ?? {}).map(([name, schema]) => ({
           name, in: 'query', required: querySchema.required?.includes(name) ?? false, schema,
@@ -196,7 +207,8 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       ...(path.startsWith('/v1/auth/') ? [sensitive] : []),
       ...middleware,
       async (req, res) => {
-        for (const value of Object.values(req.params)) uuid.parse(value);
+        if (params) params.parse(req.params);
+        else for (const value of Object.values(req.params)) uuid.parse(value);
         if (perm) ensure(permission(req.user, perm), 403, 'FORBIDDEN');
         if (access === 'driver') ensure(req.user.roles.includes('DRIVER'), 403, 'DRIVER_REQUIRED');
         if (noStore) res.set('Cache-Control', 'no-store');
@@ -703,19 +715,45 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
   route(
     'post',
     '/v1/rides',
-    { idem: true, status: 201, body: z.object({ quoteId: uuid }).strict() },
-    ({ db, user, body }) => rides.book(db, user, body.quoteId, config),
+    { idem: true, status: 201, body: z.object({ quoteId: uuid, passenger: z.strictObject({ name: z.string().trim().min(2).max(80).regex(/^[^\p{C}]+$/u), phone }).optional() }).strict() },
+    ({ db, user, body }) => rides.book(db, user, body.quoteId, config,
+      body.passenger ? { name: body.passenger.name, phone: normalizePhone(body.passenger.phone) } : null),
   );
-  route('get', '/v1/rides', {}, async ({ db, user, req }) => {
-    const p = page.parse(req.query);
-    const items = (
-      await db.query(
-        'SELECT id,state,version,scheduled_at,final_minor,created_at FROM rides WHERE (rider_id=$1 OR driver_id=$1) AND ($2::uuid IS NULL OR id<$2) ORDER BY id DESC LIMIT $3',
-        [user.id, p.cursor ?? null, p.limit],
-      )
-    ).rows;
-    return { items, nextCursor: items.length === p.limit ? items.at(-1).id : null };
+  const rideHistoryQuery = page.extend({ app: notificationApp.optional() });
+  route('get', '/v1/rides', { query: rideHistoryQuery }, async ({ db, user, req }) => {
+    const { cursor, limit, app } = rideHistoryQuery.parse(req.query);
+    const scope = `(($4::text IS DISTINCT FROM 'DRIVER' AND r.rider_id=$1)
+                   OR ($4::text IS DISTINCT FROM 'RIDER' AND r.driver_id=$1))`;
+    const items = (await db.query(
+      `SELECT r.id,r.state,r.version,r.scheduled_at,r.final_minor,r.created_at,r.started_at,r.completed_at,
+              q.category,q.trip_type,q.waypoints,q.waypoint_labels,q.estimated_minor,
+              q.route->'distanceMeters' AS distance_meters,q.route->'durationSeconds' AS duration_seconds,
+              p.status AS payment_status
+         FROM rides r JOIN fare_quotes q ON q.id=r.quote_id
+         LEFT JOIN payments p ON p.ride_id=r.id
+        WHERE ${scope}
+          AND ($2::uuid IS NULL OR (r.created_at,r.id) <
+            (SELECT r.created_at,r.id FROM rides r WHERE r.id=$2 AND ${scope}))
+        ORDER BY r.created_at DESC,r.id DESC LIMIT $3`,
+      [user.id, cursor ?? null, limit + 1, app ?? null],
+    )).rows;
+    return { items: items.slice(0, limit), nextCursor: items.length > limit ? items[limit - 1].id : null };
   });
+  const mobileRideQuery = z.object({ app: notificationApp, id: uuid.optional() });
+  route('get', '/v1/mobile/ride', { query: mobileRideQuery }, ({ db, user, req }) => {
+    const query = mobileRideQuery.parse(req.query);
+    if (query.app === 'DRIVER') ensure(user.roles.includes('DRIVER'), 403, 'DRIVER_REQUIRED');
+    return mobileRide(db, user, query, config.ENCRYPTION_KEY);
+  });
+  route('get', '/v1/mobile/ride-offers', { access: 'driver' }, ({ db, user }) => mobileOffers(db, user));
+  route('post', '/v1/rides/:id/share-link', { params: z.object({ id: uuid }), noStore: true, middleware: [shareCreateLimit] },
+    ({ db, user, req }) => sharing.createShareLink(db, user, req.params.id, config.PUBLIC_BASE_URL, config.OTP_PEPPER));
+  route('delete', '/v1/rides/:id/share-link', { params: z.object({ id: uuid }), noStore: true },
+    ({ db, user, req }) => sharing.revokeShareLinks(db, user, req.params.id));
+  route('post', '/v1/public/trips', {
+    access: 'public', noStore: true, middleware: [shareReadLimit],
+    body: z.strictObject({ token: publicShareToken }),
+  }, ({ db, body }) => sharing.sharedTrip(db, body.token, config.OTP_PEPPER));
   route('get', '/v1/rides/:id', {}, async ({ db, user, req }) => {
     const r = ensure(
       await one(
@@ -731,7 +769,7 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       403,
       'FORBIDDEN',
     );
-    const { pin_hash, pin_encrypted, pin_attempts, ...safe } = r;
+    const { pin_hash, pin_encrypted, pin_attempts, passenger_phone_encrypted, ...safe } = r;
     const position =
       r.driver_id && !rides.TERMINAL.includes(r.state)
         ? await one(
@@ -745,6 +783,9 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       ...(r.rider_id === user.id && !rides.TERMINAL.includes(r.state)
         ? { ridePin: decrypt(pin_encrypted, config.ENCRYPTION_KEY) }
         : {}),
+      ...(r.driver_id === user.id && !rides.TERMINAL.includes(r.state) && passenger_phone_encrypted
+        ? { passengerPhone: decrypt(passenger_phone_encrypted, config.ENCRYPTION_KEY) }
+        : {}),
       driverLocation: position,
       payment: await one(db, 'SELECT * FROM payments WHERE ride_id=$1', [r.id]),
       cancellationCharge: await one(db, 'SELECT * FROM cancellation_charges WHERE ride_id=$1', [
@@ -752,11 +793,24 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
       ]),
     };
   });
+  route('get', '/v1/rides/:id/receipt', {}, async ({ db, user, req }) => {
+    const id = req.params.id;
+    const receipt = ensure(await one(db,
+      `SELECT r.id AS "rideId",r.state,q.trip_type AS "tripType",q.category,
+              p.amount_minor AS "amountMinor",p.status,p.collected_at AS "paidAt"
+         FROM rides r JOIN fare_quotes q ON q.id=r.quote_id
+         LEFT JOIN payments p ON p.ride_id=r.id WHERE r.id=$1 AND r.rider_id=$2`,
+      [id, user.id],
+    ), 404, 'RIDE_NOT_FOUND');
+    ensure(receipt.state === 'COMPLETED' && receipt.status === 'COLLECTED' && receipt.paidAt, 409, 'RECEIPT_UNAVAILABLE');
+    const { state, status, ...paid } = receipt;
+    return { ...paid, currency: 'LKR', paymentMethod: 'CASH' };
+  });
   route(
     'post',
     '/v1/rides/:id/cancel',
-    { idem: true, body: z.object({ reason: text }).strict() },
-    ({ db, user, req, body }) => rides.cancel(db, user, req.params.id, body.reason),
+    { idem: true, body: z.object({ reason: text, expectedState: z.enum(['SCHEDULED', 'SEARCHING', 'DRIVER_ASSIGNED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED']).optional() }).strict() },
+    ({ db, user, req, body }) => rides.cancel(db, user, req.params.id, body.reason, body.expectedState),
   );
   route(
     'post',
@@ -822,6 +876,9 @@ export function createApp({ pool, redis, config, maps, storage, logger, captchaV
     '/v1/driver-offers/:id/respond',
     { access: 'driver', idem: true, body: z.object({ accept: z.boolean() }).strict() },
     ({ db, user, req, body }) => acceptOffer(db, user, req.params.id, body.accept),
+  );
+  route('get', '/v1/earnings/summary', { access: 'driver' }, ({ db, user }) =>
+    ledger.earningsSummary(db, user.id),
   );
   route('get', '/v1/earnings/balance', { access: 'driver' }, ({ db, user }) =>
     ledger.balance(db, user.id),

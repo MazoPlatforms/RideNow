@@ -1,0 +1,37 @@
+<resources>
+    <string name="live_open">View current ride</string>
+    <string name="live_error">RideNow could not complete this request. Try again.</string>
+    <string name="live_connection">Live ride updates are temporarily unavailable.</string>
+    <string name="live_state_changed">The ride status changed. Check the latest status and try again.</string>
+    <string name="live_cancel">Cancel ride</string>
+    <string name="live_outside">Pickup and destination must be inside an active service area.</string>
+    <string name="live_vehicle_unavailable">This vehicle category is unavailable here.</string>
+    <string name="live_no_route">No drivable route was found.</string>
+    <string name="live_schedule_invalid">Choose a pickup 30 minutes to 30 days ahead, at least an hour apart from another booking.</string>
+    <string name="live_quote_expired">Refresh the fare estimate before booking.</string>
+    <string name="live_active_exists">You already have an active ride.</string>
+    <string name="live_need_points">Select a valid pickup and destination first.</string>
+    <string name="live_now">Now</string>
+    <string name="live_book">Book ride</string>
+    <string name="live_book_scheduled">Schedule ride</string>
+    <string name="live_seats">%1$d seats</string>
+    <string name="live_see_fare">See fare</string>
+    <string name="live_pin">Give this PIN to your driver at pickup</string>
+    <string name="live_fee_charged">Cancellation fee charged · %1$s</string>
+    <string name="live_fee_confirm">Cancelling now incurs a fee of %1$s.</string>
+    <string name="live_cancel_confirm">Cancel this booking?</string>
+    <string name="live_reschedule">Reschedule ride</string>
+    <string name="live_scheduled">Ride scheduled</string>
+    <string name="live_searching">Looking for a driver</string>
+    <string name="live_arriving">Driver on the way</string>
+    <string name="live_arrived">Driver has arrived</string>
+    <string name="live_started">Trip in progress</string>
+    <string name="live_stop">Driver is at the stop</string>
+    <string name="live_returning">On the return leg</string>
+    <string name="live_completed">Trip complete</string>
+    <string name="live_cancelled">Ride cancelled</string>
+    <string name="live_no_show">Pickup missed</string>
+    <string name="live_no_driver">No driver was available</string>
+    <string name="live_own_bookings">Live bookings currently support one trip for yourself. Repeats and reminders are unavailable.</string>
+    <string name="live_ok">OK</string>
+</resources>

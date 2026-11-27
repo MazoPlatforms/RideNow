@@ -80,6 +80,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ridenow.app.R
+import com.ridenow.app.ui.components.RideButton
 import com.ridenow.app.ui.components.RideIcon
 import com.ridenow.app.ui.components.RideIcons
 import com.ridenow.app.ui.theme.BrandYellow
@@ -98,12 +99,8 @@ fun HomeScreen(
     onMenu: () -> Unit, onNotifications: () -> Unit, onSearch: () -> Unit, onLater: () -> Unit,
     onEditPickup: () -> Unit, onSaved: (String) -> Unit, onRecent: (String) -> Unit,
     modifier: Modifier = Modifier, hasUnread: Boolean = true, pickup: String = stringResource(R.string.text_text_128_meridian_walk),
+    onActiveRide: (() -> Unit)? = null, recentRides: List<Pair<String, String>> = emptyList(),
 ) {
-    val textNovaTerminalGate4 = stringResource(R.string.text_nova_terminal_gate_4)
-    val text62Km = stringResource(R.string.text_text_6_2_km)
-    val textHelixGardenPlaza = stringResource(R.string.text_helix_garden_plaza)
-    val text38Km = stringResource(R.string.text_text_3_8_km)
-
     val c = RideTheme.colors
     val sheetExpandLabel = stringResource(R.string.sheet_expand)
     val sheetCollapseLabel = stringResource(R.string.sheet_collapse)
@@ -113,14 +110,13 @@ fun HomeScreen(
     val expanded = progress.value > 0.5f
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val recentHeight = 128.dp
-    val recentPx = with(density) { recentHeight.toPx() }
+    val recentHeight = (recentRides.size * 60 + if (recentRides.isEmpty()) 0 else 8).dp
+    val recentPx = with(density) { recentHeight.toPx().coerceAtLeast(1f) }
     val me = rememberUserLocation()
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(me.position, 15f) }
     LaunchedEffect(me.position) { cam.animate(CameraUpdateFactory.newLatLngZoom(me.position, 15.5f)) }
-    val cars = remember(me.position) { listOf(0.003 to 0.004, -0.004 to 0.002, 0.002 to -0.005, -0.003 to -0.003).map { (a, b) -> MapPin(LatLng(me.position.latitude + a, me.position.longitude + b), PinKind.Vehicle) } }
     Box(modifier.fillMaxSize().background(c.bg)) {
-        RideMap(Modifier.fillMaxSize(), cam, pins = cars, myLocation = me.position.takeIf { me.real }, padding = PaddingValues(bottom = 300.dp))
+        RideMap(Modifier.fillMaxSize(), cam, myLocation = me.position.takeIf { me.real }, padding = PaddingValues(bottom = 300.dp))
 
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp).entrance(0), horizontalArrangement = Arrangement.SpaceBetween) {
             RoundButton(RideIcons.Menu, stringResource(R.string.home_menu), onMenu)
@@ -162,6 +158,9 @@ fun HomeScreen(
                 }
                 .padding(horizontal = 24.dp).entrance(150, 40),
         ) {
+            if (onActiveRide != null) {
+                RideButton(stringResource(R.string.live_open), onActiveRide, modifier = Modifier.padding(top = 8.dp))
+            }
             // The whole sheet is draggable. Tapping this handle toggles it.
             Box(
                 Modifier.fillMaxWidth().height(28.dp).semantics { contentDescription = if (expanded) sheetCollapseLabel else sheetExpandLabel },
@@ -208,8 +207,7 @@ fun HomeScreen(
                     .graphicsLayer { alpha = progress.value },
             ) {
                 Column(Modifier.padding(top = 8.dp)) {
-                    RecentRow(textNovaTerminalGate4, text62Km) { onRecent(textNovaTerminalGate4) }
-                    RecentRow(textHelixGardenPlaza, text38Km) { onRecent(textHelixGardenPlaza) }
+                    recentRides.forEach { (id, name) -> RecentRow(name, "") { onRecent(id) } }
                 }
             }
             Spacer(Modifier.height(14.dp))

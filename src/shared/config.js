@@ -11,6 +11,7 @@ export function loadConfig(env = process.env) {
       OTP_PEPPER: z.string().min(32),
       ENCRYPTION_KEY: z.string().regex(/^[a-f\d]{64}$/i),
       CORS_ORIGINS: z.string().default('http://localhost:5173'),
+      PUBLIC_BASE_URL: z.string().url().default('https://mzn-api.onrender.com'),
       OTP_PROVIDER: z.enum(['database', 'baileys']).default('database'),
       MAP_GRAPH_PATH: z.string().default('data/kattankudy-routing.json'),
       MAP_MANIFEST_PATH: z.string().default('data/kattankudy-routing-manifest.json'),
@@ -41,6 +42,8 @@ export function loadConfig(env = process.env) {
       })
   )
     throw new Error('Production requires HTTPS origins');
+  if (c.NODE_ENV === 'production' && new URL(c.PUBLIC_BASE_URL).protocol !== 'https:')
+    throw new Error('Production requires an HTTPS public base URL');
   if (c.NODE_ENV === 'production' && !c.S3_BUCKET)
     throw new Error('Production requires private S3 storage');
   return c;

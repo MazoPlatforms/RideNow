@@ -1,0 +1,37 @@
+<resources>
+    <string name="live_open">Open current trip</string>
+    <string name="live_error">RideNow could not complete this request. Try again.</string>
+    <string name="live_connection">Live ride updates are temporarily unavailable.</string>
+    <string name="live_state_changed">The ride status changed. Check the latest status and try again.</string>
+    <string name="live_cancel">Cancel ride</string>
+    <string name="live_near_stop">Move closer to the stop and wait for a fresh GPS fix.</string>
+    <string name="live_service_area">Go online from inside an active service area.</string>
+    <string name="live_ineligible">Your driver account and vehicle must be eligible for dispatch.</string>
+    <string name="live_offer_expired">This request has expired.</string>
+    <string name="live_invalid_pin">The PIN is incorrect. Check it with the rider.</string>
+    <string name="live_pin_locked">PIN verification is locked. Contact support.</string>
+    <string name="live_pickup_time">Wait until the scheduled pickup time.</string>
+    <string name="live_wait">Wait five minutes before reporting a missed pickup.</string>
+    <string name="live_gps">Turn on precise location and wait for a fresh GPS fix.</string>
+    <string name="live_busy">Finish or resolve the active trip first.</string>
+    <string name="live_offer">New ride request</string>
+    <string name="live_offer_price">%1$.1f km · Estimated fare %2$s</string>
+    <string name="live_return_trip">Return trip</string>
+    <string name="live_offer_seconds">%1$d seconds left</string>
+    <string name="live_accept">Accept</string>
+    <string name="live_decline">Decline</string>
+    <string name="live_en_route">Head to pickup</string>
+    <string name="live_arrive">Arrived at pickup</string>
+    <string name="live_start">Start trip</string>
+    <string name="live_at_stop">Arrived at stop</string>
+    <string name="live_waiting">Start waiting</string>
+    <string name="live_return">Start return leg</string>
+    <string name="live_finish">Complete trip</string>
+    <string name="live_cash">Record cash received</string>
+    <string name="live_confirm_cash">Confirm you received %1$s in cash from the rider.</string>
+    <string name="live_pin">Four-digit rider PIN</string>
+    <string name="live_no_show">Report rider no-show</string>
+    <string name="live_tracking">RideNow driver location</string>
+    <string name="live_tracking_detail">Location is shared while you are available or on a trip.</string>
+    <string name="live_pending_cash">Record cash for your completed trip before going online.</string>
+</resources>

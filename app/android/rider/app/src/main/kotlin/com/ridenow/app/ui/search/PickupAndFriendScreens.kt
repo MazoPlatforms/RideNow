@@ -88,9 +88,11 @@ fun ChangePickupScreen(
     }
 }
 
-/** Book a ride for someone else. [onDone] receives the friend's name. */
+data class RidePassenger(val name: String, val phone: String, val shareBySms: Boolean)
+
+/** Collects the passenger details used for this booking only. */
 @Composable
-fun FriendScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifier = Modifier) {
+fun FriendScreen(onBack: () -> Unit, onDone: (RidePassenger) -> Unit, initial: RidePassenger? = null, modifier: Modifier = Modifier) {
     val textFriendTitle = stringResource(R.string.friend_title)
     val textFriendSub = stringResource(R.string.friend_sub)
     val textFriendName = stringResource(R.string.friend_name)
@@ -98,9 +100,9 @@ fun FriendScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifie
     val textFriendShareSms = stringResource(R.string.friend_share_sms)
 
     val c = RideTheme.colors
-    var name by rememberSaveable { mutableStateOf("") }
-    var phone by rememberSaveable { mutableStateOf("") }
-    var sms by rememberSaveable { mutableStateOf(true) }
+    var name by rememberSaveable(initial?.name) { mutableStateOf(initial?.name.orEmpty()) }
+    var phone by rememberSaveable(initial?.phone) { mutableStateOf(initial?.phone.orEmpty()) }
+    var sms by rememberSaveable(initial?.shareBySms) { mutableStateOf(initial?.shareBySms ?: true) }
     Column(modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 20.dp)) {
         ScreenTop(textFriendTitle, onBack, subtitle = textFriendSub)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).entrance(60)) {
@@ -118,7 +120,7 @@ fun FriendScreen(onBack: () -> Unit, onDone: (String) -> Unit, modifier: Modifie
                 Text(stringResource(R.string.friend_no_app), color = c.muted, fontSize = 13.sp, lineHeight = 19.sp)
             }
         }
-        RideButton(stringResource(R.string.ride_continue), { onDone(name.trim()) }, enabled = name.isNotBlank() && phone.length >= 6, modifier = Modifier.padding(vertical = 12.dp))
+        RideButton(stringResource(R.string.ride_continue), { onDone(RidePassenger(name.trim(), phone.trim(), sms)) }, enabled = name.trim().length >= 2 && phone.count(Char::isDigit) >= 7, modifier = Modifier.padding(vertical = 12.dp))
     }
 }
 
