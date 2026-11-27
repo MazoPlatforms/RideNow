@@ -6,6 +6,11 @@ import com.ridenow.app.R
 import androidx.compose.ui.res.stringResource
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import com.ridenow.app.ui.more.*
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -14,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +28,7 @@ import com.ridenow.app.ui.map.LatLng
 import com.ridenow.app.ui.map.SifricApi
 import com.ridenow.app.ui.map.RouteInfo
 import com.ridenow.app.ui.map.rememberUserLocation
+import com.ridenow.app.ui.map.UserLocation
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
@@ -168,6 +175,38 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     val contacts = remember { mutableStateListOf<Contact>() }
     val scope = rememberCoroutineScope()
     val locationOn = rememberDeviceLocationEnabled()
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val locationPrefs = remember(context) { context.getSharedPreferences("ridenow", 0) }
+    var locationPermissionGranted by remember(context) {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    var locationPermissionPrompted by rememberSaveable {
+        mutableStateOf(locationPrefs.getBoolean("location_permission_prompted", false))
+    }
+    val requestLocationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        locationPermissionGranted = result.values.any { it }
+    }
+    LaunchedEffect(screen, locationOn, locationPermissionGranted) {
+        if (screen == Screen.Home && locationOn && !locationPermissionGranted && !locationPermissionPrompted) {
+            locationPermissionPrompted = true
+            locationPrefs.edit().putBoolean("location_permission_prompted", true).apply()
+            requestLocationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+        }
+    }
+    DisposableEffect(lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                locationPermissionGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     var locationDismissed by rememberSaveable(locationOn) { mutableStateOf(false) }
     var locationRequested by remember(screen, locationOn) { mutableStateOf(false) }
     val showLocationOff = !locationOn && (locationRequested || (!locationDismissed && screen in setOf(
@@ -179,7 +218,6 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         locationRequested = false
         if (screen == Screen.Location) screen = Screen.Notifications
     }
-    val context = LocalContext.current
     val me = rememberUserLocation(locationOn = locationOn)
     var destLat by rememberSaveable { mutableStateOf(0.0) }
     var destLng by rememberSaveable { mutableStateOf(0.0) }
@@ -187,7 +225,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     var pickupPoint by rememberSaveable { mutableStateOf<LatLng?>(null) }
     val routePickup = pickupPoint ?: me.position
     var routeInfo by remember { mutableStateOf<RouteInfo?>(null) }
-    LaunchedEffect(destLL, routePickup, vehicle, isReturn) {
+    LaunchedEffect(destLL, pickupPoint, vehicle, isReturn) {
         routeInfo = null
         val category = listOf("TUK", "CAR", "VAN").getOrElse(vehicle) { "CAR" }
         destLL?.let { routeInfo = SifricApi.route(context, routePickup, it, category, isReturn) }
@@ -201,7 +239,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
         }
         Unit
     }
-    val prefs = remember { context.getSharedPreferences("ridenow", 0) }
+    val prefs = locationPrefs
     val allowCurrentLocation = {
         deviceLocationEnabled(context).also { enabled -> if (!enabled) locationRequested = true }
     }
@@ -248,7 +286,6 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
     val online = rememberOnline(netKey)
     val currentLocationLabel = stringResource(R.string.search_current)
     var pickup by rememberSaveable { mutableStateOf(currentLocationLabel) }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val chosenPickup = rescheduling?.pickup ?: pickupPoint ?: me.position.takeIf { me.real && pickup == currentLocationLabel }
     var recentRides by remember(phone) { mutableStateOf<List<RideItem>>(emptyList()) }
     var bookingNotice by remember { mutableStateOf(false) }
@@ -516,6 +553,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
                 HomeScreen(
                     onMenu = { drawer = true }, onNotifications = { nav(Screen.Notifs) },
                     hasUnread = unreadNotificationCount > 0,
+                    userLocation = me,
                     onSearch = ::startRideSearch, onLater = {
                         val current = currentRideId
                         if (current != null) showRide(current) else {

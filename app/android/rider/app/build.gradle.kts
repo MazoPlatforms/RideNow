@@ -53,6 +53,7 @@ android {
 }
 
 dependencies {
+    implementation(files("libs/sifric-maps.aar"))
     implementation("org.maplibre.gl:android-sdk:13.6.1")
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("com.google.android.gms:play-services-auth-api-phone:18.1.0")

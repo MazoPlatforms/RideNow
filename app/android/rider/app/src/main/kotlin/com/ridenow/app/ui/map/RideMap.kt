@@ -3,8 +3,14 @@ package com.ridenow.app.ui.map
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.location.Location
+import android.os.Looper
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.ridenow.app.ui.permissions.rememberDeviceLocationEnabled
@@ -20,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -37,14 +44,14 @@ import com.ridenow.app.R
 import com.ridenow.app.ui.theme.LocalMapStyle
 import com.ridenow.app.ui.theme.MapStyle
 import com.ridenow.app.ui.theme.RideTheme
-import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdate
 import org.maplibre.android.camera.CameraUpdateFactory as NativeCameraUpdates
 import org.maplibre.android.camera.CameraPosition as NativeCameraPosition
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
-import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.OnMapReadyCallback
+import org.sifric.maps.SifricMapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
@@ -95,7 +102,6 @@ fun rememberCameraPositionState(setup: CameraPositionState.() -> Unit): CameraPo
 enum class PinKind { Pickup, Drop, Vehicle, Location }
 data class MapPin(val at: LatLng, val kind: PinKind)
 
-private const val STYLE = "https://maps.sifric.workers.dev/api/v1/native-style.json"
 private val emptyFeatures = FeatureCollection.fromFeatures(emptyArray<Feature>())
 private fun LatLng.point(): Point = Point.fromLngLat(longitude, latitude)
 
@@ -141,23 +147,24 @@ fun RideMap(
     val dark = styleChoice == MapStyle.Dark || colors.isDark
     val theme = if (dark) "dark" else "light"
     val type = if (styleChoice == MapStyle.Satellite) "satellite" else "default"
-    val styleUrl = "$STYLE?type=$type&theme=$theme"
+    val mapType = if (type == "satellite") SifricMapView.MapType.SATELLITE else SifricMapView.MapType.DEFAULT
+    val mapTheme = if (theme == "dark") SifricMapView.Theme.DARK else SifricMapView.Theme.LIGHT
+    val styleUrl = SifricMapView.appearanceStyleUrl(context, mapType, mapTheme)
     val loaded by rememberUpdatedState(onLoaded)
-    val view = remember(context) {
-        MapLibre.getInstance(context.applicationContext)
-        MapView(context, MapLibreMapOptions.createFromAttributes(context).textureMode(true))
-    }
+    val view = remember(context) { SifricMapView(context) }
     var map by remember(view) { mutableStateOf<MapLibreMap?>(null) }
     var style by remember(view) { mutableStateOf<Style?>(null) }
+    var appliedStyleKey by remember(view) { mutableStateOf<String?>(null) }
     var error by remember(view) { mutableStateOf(false) }
     var attempt by remember(view) { mutableIntStateOf(0) }
 
     DisposableEffect(view, lifecycle, camera) {
         var released = false
+        val mapView = (0 until view.childCount).mapNotNull { view.getChildAt(it) as? MapView }.firstOrNull()
         val fail = MapView.OnDidFailLoadingMapListener { if (!released) error = true }
-        view.addOnDidFailLoadingMapListener(fail)
+        mapView?.addOnDidFailLoadingMapListener(fail)
         view.onCreate(null)
-        view.getMapAsync { native ->
+        view.load(mapType, mapTheme, OnMapReadyCallback { native ->
             if (!released) {
                 native.uiSettings.isCompassEnabled = false
                 native.uiSettings.isLogoEnabled = false
@@ -169,8 +176,14 @@ fun RideMap(
                 }
                 camera.attach(native)
                 map = native
+                native.style?.let { ready ->
+                    ready.rideLayers(colors.accent.toArgb())
+                    style = ready
+                    appliedStyleKey = "$styleUrl|${colors.accent.toArgb()}|$attempt"
+                    loaded()
+                }
             }
-        }
+        })
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> view.onStart()
@@ -188,20 +201,24 @@ fun RideMap(
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) view.onStop()
             camera.map = null
             camera.isMoving = false
-            view.removeOnDidFailLoadingMapListener(fail)
+            mapView?.removeOnDidFailLoadingMapListener(fail)
             view.onDestroy()
         }
     }
     DisposableEffect(map, styleUrl, colors.accent, attempt) {
         var current = true
-        style = null
         error = false
         val native = map
-        native?.setStyle(Style.Builder().fromUri(styleUrl)) { ready ->
-            if (current) {
-                ready.rideLayers(colors.accent.toArgb())
-                style = ready
-                loaded()
+        val styleKey = "$styleUrl|${colors.accent.toArgb()}|$attempt"
+        if (native != null && appliedStyleKey != styleKey) {
+            style = null
+            native.setStyle(Style.Builder().fromUri(styleUrl)) { ready ->
+                if (current) {
+                    ready.rideLayers(colors.accent.toArgb())
+                    style = ready
+                    appliedStyleKey = styleKey
+                    loaded()
+                }
             }
         }
         onDispose { current = false }
@@ -235,7 +252,7 @@ fun RideMap(
 
 class UserLocation(val position: LatLng, val real: Boolean)
 
-/** The rider's current position, or a default city until permission and a fix are available. */
+/** A current, accurate location fix; the default is only a map starting point, never a confirmed GPS fix. */
 @SuppressLint("MissingPermission")
 @Composable
 fun rememberUserLocation(
@@ -243,31 +260,56 @@ fun rememberUserLocation(
     locationOn: Boolean = rememberDeviceLocationEnabled(),
 ): UserLocation {
     val context = LocalContext.current
-    var loc by remember(locationOn) { mutableStateOf<LatLng?>(null) }
     val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    var fix by remember(locationOn, granted) { mutableStateOf<Location?>(null) }
     DisposableEffect(context, granted, locationOn) {
-        val request = if (locationOn && granted) CancellationTokenSource() else null
-        if (request != null) {
-            val client = LocationServices.getFusedLocationProviderClient(context)
-            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, request.token)
-                .addOnCompleteListener { task ->
-                    if (request.token.isCancellationRequested) return@addOnCompleteListener
-                    val fix = if (task.isSuccessful) task.result else null
-                    if (fix != null) {
-                        loc = LatLng(fix.latitude, fix.longitude)
-                    } else {
-                        client.lastLocation.addOnSuccessListener { last ->
-                            val ageMillis = last?.let { System.currentTimeMillis() - it.time } ?: Long.MAX_VALUE
-                            if (!request.token.isCancellationRequested && last != null && ageMillis in 0..120_000L)
-                                loc = LatLng(last.latitude, last.longitude)
-                        }
-                    }
-                }
+        val client = LocationServices.getFusedLocationProviderClient(context)
+        var active = true
+        val cancellation = CancellationTokenSource()
+        fun accept(location: Location?) {
+            if (!active || location == null || !location.hasAccuracy() || location.accuracy > 100f) return
+            val ageNanos = SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos
+            if (ageNanos !in 0..30_000_000_000L || !location.latitude.isFinite() || !location.longitude.isFinite()) return
+            fix = Location(location)
         }
-        onDispose { request?.cancel() }
+        val callback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                result.locations.filter { it.hasAccuracy() && it.accuracy <= 100f }
+                    .minByOrNull { it.accuracy }?.let(::accept)
+            }
+        }
+        if (locationOn && granted) {
+            try {
+                client.lastLocation.addOnSuccessListener(::accept)
+                client.getCurrentLocation(com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, cancellation.token)
+                    .addOnSuccessListener(::accept)
+                val request = com.google.android.gms.location.LocationRequest.Builder(
+                    com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 4_000L,
+                ).setMinUpdateIntervalMillis(1_500L).setMinUpdateDistanceMeters(3f).build()
+                client.requestLocationUpdates(request, callback, android.os.Looper.getMainLooper())
+            } catch (_: SecurityException) {
+                fix = null
+            }
+        } else {
+            fix = null
+        }
+        onDispose {
+            active = false
+            cancellation.cancel()
+            client.removeLocationUpdates(callback)
+        }
     }
-    return UserLocation(loc ?: default, loc != null && granted && locationOn)
+    LaunchedEffect(fix) {
+        val observed = fix ?: return@LaunchedEffect
+        while (fix === observed) {
+            val ageNanos = SystemClock.elapsedRealtimeNanos() - observed.elapsedRealtimeNanos
+            if (ageNanos > 30_000_000_000L) { fix = null; break }
+            delay(5_000L)
+        }
+    }
+    val point = fix?.let { LatLng(it.latitude, it.longitude) }
+    return UserLocation(point ?: default, point != null && granted && locationOn)
 }
 
 /** A fresh, bounded fix for explicit location actions. Call after checking location and permissions. */
@@ -278,10 +320,10 @@ internal suspend fun fetchRiderPosition(context: android.content.Context): LatLn
             val request = CancellationTokenSource()
             continuation.invokeOnCancellation { request.cancel() }
             LocationServices.getFusedLocationProviderClient(context)
-                .getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, request.token)
+                .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, request.token)
                 .addOnCompleteListener { task ->
                     val fix = if (task.isSuccessful) task.result else null
-                    if (continuation.isActive) continuation.resume(fix?.let { LatLng(it.latitude, it.longitude) })
+                    if (continuation.isActive) continuation.resume(fix?.takeIf { it.hasAccuracy() && it.accuracy <= 100f }?.let { LatLng(it.latitude, it.longitude) })
                 }
         }
     }
