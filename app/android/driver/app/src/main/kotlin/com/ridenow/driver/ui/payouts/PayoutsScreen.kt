@@ -18,6 +18,7 @@ import com.ridenow.driver.R
 import com.ridenow.driver.ui.auth.PhoneAuthApi
 import com.ridenow.driver.ui.components.*
 import com.ridenow.driver.ui.data.*
+import com.ridenow.driver.ui.earnings.EarningsApi
 import com.ridenow.driver.ui.theme.RideTheme
 import com.ridenow.driver.ui.util.Money
 import java.time.Instant
